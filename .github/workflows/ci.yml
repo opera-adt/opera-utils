@@ -22,7 +22,7 @@ jobs:
             spec: ""
           - label: Minimum
             spec: >-
-              python=3.8
+              python=3.9
 
       fail-fast: false
     name: ${{ matrix.os }} • ${{ matrix.deps.label }}
@@ -38,6 +38,7 @@ jobs:
         with:
           environment-file: environment.yml
           environment-name: opera_utils-env
+          generate-run-shell: false
           create-args: ${{ matrix.deps.spec }}
           condarc: |
             channels:
