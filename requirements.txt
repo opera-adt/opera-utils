@@ -1,2 +1,2 @@
-h5py
-shapely
+h5py>=1.10
+shapely>=1.8
