@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "get_burst_id",
     "group_by_burst",
+    "sort_by_burst_id",
     "get_cslc_polygon",
     "get_union_polygon",
     "make_nodata_mask",
@@ -97,7 +98,7 @@ def group_by_burst(file_list, burst_id_fmt=OPERA_BURST_RE):
     if not file_list:
         return {}
 
-    sorted_file_list = _sort_by_burst_id(list(file_list), burst_id_fmt)
+    sorted_file_list = sort_by_burst_id(list(file_list), burst_id_fmt)
     # Now collapse into groups, sorted by the burst_id
     grouped_images = {
         burst_id: list(g)
@@ -109,16 +110,16 @@ def group_by_burst(file_list, burst_id_fmt=OPERA_BURST_RE):
 
 
 @overload
-def _sort_by_burst_id(file_list: Iterable[str], burst_id_fmt) -> list[str]:
+def sort_by_burst_id(file_list: Iterable[str], burst_id_fmt) -> list[str]:
     ...
 
 
 @overload
-def _sort_by_burst_id(file_list: Iterable[Path], burst_id_fmt) -> list[Path]:
+def sort_by_burst_id(file_list: Iterable[Path], burst_id_fmt) -> list[Path]:
     ...
 
 
-def _sort_by_burst_id(file_list, burst_id_fmt):
+def sort_by_burst_id(file_list, burst_id_fmt):
     """Sort files/paths by burst id."""
     file_burst_tuples = sorted(
         [(f, get_burst_id(f, burst_id_fmt)) for f in file_list],
