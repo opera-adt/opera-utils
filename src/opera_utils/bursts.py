@@ -82,7 +82,7 @@ def group_by_burst(file_list, burst_id_fmt=OPERA_BURST_RE):
         list of paths of CSLC files
     burst_id_fmt: str
         format of the burst id in the filename.
-        Default is [`OPERA_BURST_RE`][dolphin.opera_utils.OPERA_BURST_RE]
+        Default is [`OPERA_BURST_RE`][opera_utils.OPERA_BURST_RE]
 
     Returns
     -------
