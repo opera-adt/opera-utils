@@ -6,13 +6,13 @@ import logging
 import re
 import subprocess
 import tempfile
+from os import fspath
 from pathlib import Path
 from typing import Iterable, Pattern, Sequence, Union, overload
 
 import h5py
 from shapely import geometry, ops, wkt
 
-from ._io import get_raster_gt
 from ._types import Filename, PathLikeT
 from .constants import OPERA_BURST_RE, OPERA_DATASET_NAME, OPERA_IDENTIFICATION
 
@@ -178,7 +178,7 @@ def make_nodata_mask(
     buffer_pixels: int = 0,
     overwrite: bool = False,
 ):
-    """Make a boolean raster mask from the union of nodata polygons.
+    """Make a boolean raster mask from the union of nodata polygons using GDAL.
 
     Parameters
     ----------
@@ -245,3 +245,23 @@ def make_nodata_mask(
         cmd = f"gdal_rasterize -q -burn 1 {temp_vector_file} {out_file}"
         logger.info(cmd)
         subprocess.check_call(cmd, shell=True)
+
+
+def get_raster_gt(filename: Filename) -> list[float]:
+    """Get the geotransform from a file.
+
+    Parameters
+    ----------
+    filename : Filename
+        Path to the file to load.
+
+    Returns
+    -------
+    List[float]
+        6 floats representing a GDAL Geotransform.
+    """
+    from osgeo import gdal
+
+    ds = gdal.Open(fspath(filename))
+    gt = ds.GetGeoTransform()
+    return gt

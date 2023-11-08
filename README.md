@@ -6,7 +6,6 @@
 [![Conda-Forge][conda-badge]][conda-link]
 [![GitHub Discussion][github-discussions-badge]][github-discussions-link]
 
-
 <!-- prettier-ignore-start -->
 [actions-badge]:            https://github.com/opera-adt/opera-utils/workflows/CI/badge.svg
 [actions-link]:             https://github.com/opera-adt/opera-utils/actions

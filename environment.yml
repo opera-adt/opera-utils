@@ -5,6 +5,6 @@ dependencies:
   - python>=3.9
   - pip>=21.3  # https://pip.pypa.io/en/stable/reference/build-system/pyproject-toml/#editable-installation
   - git  # for pip install, due to setuptools_scm
-  - gdal>=3.3
   - h5py>=1.10
   - shapely>=1.8
+  # - gdal>=3.3  # For now, gdal will be an optional dependency
