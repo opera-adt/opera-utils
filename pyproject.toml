@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=64.0", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "opera-utils"
+authors = [
+  { name = "Scott Staniewicz", email = "scott.j.staniewicz@jpl.nasa.gov" },
+]
+description = "Miscellaneous utilities for working with OPERA data products"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.9"
+
+classifiers = [
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python",
+  "Topic :: Scientific/Engineering",
+  "Typing :: Typed",
+]
+license = { file = "LICENSE.txt" }
+
+# The version will be written into a version.py upon install, auto-generated
+# see section: setuptools_scm
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html#dynamic-metadata
+# dependencies will be read from text files
+dynamic = ["version", "dependencies", "optional-dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/opera-adt/opera-utils"
+"Bug Tracker" = "https://github.com/opera-adt/opera-utils/issues"
+Discussions = "https://github.com/opera-adt/opera-utils/discussions"
+Changelog = "https://github.com/opera-adt/opera-utils/releases"
+
+# Entry points for the command line interface
+[project.scripts]
+opera_utils = "opera_utils.cli:main"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+# extra requirements: `pip install .[docs]` or `pip install .[docs]`
+[tool.setuptools.dynamic.optional-dependencies.docs]
+file = ["docs/requirements.txt"]
+[tool.setuptools.dynamic.optional-dependencies.test]
+file = ["tests/requirements.txt"]
+
+[tool.setuptools_scm]
+# https://github.com/pypa/setuptools_scm#configuration-parameters
+write_to = "src/opera_utils/_version.py"
+# https://github.com/pypa/setuptools_scm#version-number-construction
+version_scheme = "no-guess-dev" # Will not guess the next version
+
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+# Enable the isort rules.
+extend-select = ["I"]
+
+[tool.black]
+target-version = ["py39", "py310", "py311", "py312"]
+preview = true
+
+[tool.isort]
+profile = "black"
+known_first_party = [" opera_utils"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+
+
+[tool.pydocstyle]
+ignore = "D100,D102,D104,D105,D106,D107,D203,D204,D213,D413"
+
+[tool.pytest.ini_options]
+doctest_optionflags = "NORMALIZE_WHITESPACE NUMBER"
+addopts = "  --cov=opera_utils  --doctest-modules --randomly-seed=1234 --ignore=scripts --ignore=docs"
+filterwarnings = ["error"]

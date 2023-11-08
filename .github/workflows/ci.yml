@@ -1,0 +1,53 @@
+name: Pytest, build docker image, push to GHCR
+
+on: [pull_request, push]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  # https://github.com/pytest-dev/pytest/issues/2042#issuecomment-429289164
+  PY_IGNORE_IMPORTMISMATCH: 1
+
+jobs:
+  pytest:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        deps:
+            # Note: for now we're manually adding tophu deps,
+            # will change once it's on conda forge
+          - label: Latest
+            spec: ""
+          - label: Minimum
+            spec: >-
+              python=3.8
+
+      fail-fast: false
+    name: ${{ matrix.os }} • ${{ matrix.deps.label }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup environment
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: environment.yml
+          environment-name: opera_utils-env
+          create-args: ${{ matrix.deps.spec }}
+          condarc: |
+            channels:
+              - conda-forge
+      - name: Install
+        run: |
+          pip install --no-deps .
+      - name: Install test dependencies
+        run: |
+          micromamba install -f tests/requirements.txt -c conda-forge
+      - name: Test
+        run: |
+          pytest -n0
