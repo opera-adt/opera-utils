@@ -22,7 +22,7 @@ jobs:
             spec: ""
           - label: Minimum
             spec: >-
-              python=3.9
+              python=3.8
 
       fail-fast: false
     name: ${{ matrix.os }} • ${{ matrix.deps.label }}
