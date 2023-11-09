@@ -7,7 +7,7 @@
 [![GitHub Discussion][github-discussions-badge]][github-discussions-link]
 
 <!-- prettier-ignore-start -->
-[actions-badge]:            https://github.com/opera-adt/opera-utils/workflows/CI/badge.svg
+[actions-badge]:            https://github.com/opera-adt/opera-utils/actions/workflows/ci.yml/badge.svg
 [actions-link]:             https://github.com/opera-adt/opera-utils/actions
 [conda-badge]:              https://img.shields.io/conda/vn/conda-forge/opera-utils
 [conda-link]:               https://github.com/conda-forge/opera-utils-feedstock
