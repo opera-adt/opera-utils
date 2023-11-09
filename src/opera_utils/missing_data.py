@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import itertools
 import logging
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Iterable, Mapping, Optional
+from itertools import chain, groupby
+from typing import Iterable, Mapping, Optional, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
 from ._dates import get_dates
+from ._helpers import powerset, sorted_deduped_values
 from ._types import Filename
 from .bursts import group_by_burst
 
@@ -27,14 +28,20 @@ __all__ = [
 class BurstSubsetOption:
     """Dataclass for a possible subset of SLC data."""
 
-    num_dates: int
-    """Number of dates used in this subset"""
-    num_burst_ids: int
-    """Number of burst IDs used in this subset."""
     total_num_bursts: int
     """Total number of bursts used in this subset."""
-    burst_id_list: list[str]
-    """List of burst IDs used in this subset."""
+    burst_ids: tuple[str, ...]
+    """Burst IDs used in this subset."""
+    dates: tuple[date, ...]
+    """Dates used in this subset."""
+
+    @property
+    def num_dates(self) -> int:
+        return len(self.dates)
+
+    @property
+    def num_burst_ids(self) -> int:
+        return len(self.burst_ids)
 
 
 def get_burst_id_to_dates(
@@ -102,34 +109,13 @@ def get_missing_data_options(
     )
 
     all_burst_ids = list(burst_id_to_dates.keys())
+    all_dates = sorted_deduped_values(burst_id_to_dates)
 
     B = get_burst_id_date_incidence(burst_id_to_dates)
     # In this matrix,
     # - Each row corresponds to one of the possible burst IDs
     # - Each column corresponds to one of the possible dates
-    # Getting the unique rows of this matrix will give us the possible
-    # combinations of dates that can be used for each burst ID.
-    unique_date_idxs, burst_id_counts = np.unique(B, axis=0, return_counts=True)
-    out = []
-
-    for date_idxs in unique_date_idxs:
-        required_num_dates = date_idxs.sum()
-        keep_burst_idxs = np.array(
-            [required_num_dates == burst_row[date_idxs].sum() for burst_row in B]
-        )
-        # B.shape: (num_burst_ids, num_dates)
-        cur_burst_total = B[keep_burst_idxs, :][:, date_idxs].sum()
-
-        cur_burst_id_list = np.array(all_burst_ids)[keep_burst_idxs].tolist()
-        out.append(
-            BurstSubsetOption(
-                num_dates=required_num_dates,
-                num_burst_ids=len(cur_burst_id_list),
-                total_num_bursts=cur_burst_total,
-                burst_id_list=cur_burst_id_list,
-            )
-        )
-    return sorted(out, key=lambda x: x.total_num_bursts, reverse=True)
+    return generate_burst_subset_options(B, all_burst_ids, all_dates)
 
 
 def get_burst_id_date_incidence(
@@ -149,7 +135,7 @@ def get_burst_id_date_incidence(
         Rows correspond to burst IDs, columns correspond to dates.
         A value of True indicates that the burst ID was acquired on that date.
     """
-    all_dates = _sorted_deduped_values(burst_id_to_dates)
+    all_dates = sorted_deduped_values(burst_id_to_dates)
 
     # Construct the incidence matrix of dates vs. burst IDs
     burst_id_to_date_incidence = {}
@@ -162,12 +148,6 @@ def get_burst_id_date_incidence(
     return np.array(list(burst_id_to_date_incidence.values()))
 
 
-def _sorted_deduped_values(in_mapping: Mapping[Any, list]):
-    """Sort, dedupe, and concatenate all items in the lists of `in_mapping`'s values."""
-    all_values = itertools.chain.from_iterable(in_mapping.values())
-    return sorted(set(all_values))
-
-
 def _burst_id_mapping_from_tuples(
     burst_id_date_tuples: Iterable[tuple[str, date]]
 ) -> dict[str, list[date]]:
@@ -178,7 +158,7 @@ def _burst_id_mapping_from_tuples(
     # Group the possible SLC files by their date and by their Burst ID
     return {
         burst_id: [date for burst_id, date in g]
-        for burst_id, g in itertools.groupby(burst_id_date_tuples, key=lambda x: x[0])
+        for burst_id, g in groupby(burst_id_date_tuples, key=lambda x: x[0])
     }
 
 
@@ -199,3 +179,81 @@ def _burst_id_mapping_from_files(
         burst_id: [get_dates(f)[0] for f in file_list]
         for (burst_id, file_list) in burst_id_to_files.items()
     }
+
+
+def generate_burst_subset_options(
+    B: NDArray[np.bool], burst_ids: Sequence[str], dates: Sequence[date]
+) -> list[BurstSubsetOption]:
+    options = []
+
+    # Get the idxs where there are any missing dates for each burst
+    # We're going to try all possible combinations of these *groups*,
+    # not all possible combinations of the individual missing dates
+    missing_date_idxs = set()
+    for row in B:
+        missing_date_idxs.add(tuple(np.where(~row)[0]))
+
+    # Generate all unique combinations of idxs to exclude
+    date_idxs_to_exclude_combinations = [
+        set(chain.from_iterable(combo)) for combo in powerset(missing_date_idxs)
+    ]
+
+    all_column_idxs = set(range(B.shape[1]))
+    all_row_idxs = set(range(B.shape[0]))
+
+    # Track the row/col combinations that we've already
+    tested_combinations = set()
+    # Now iterate over these combinations
+    for idxs_to_exclude in date_idxs_to_exclude_combinations:
+        valid_col_idxs = all_column_idxs - idxs_to_exclude
+
+        # Create sub-matrix with the remaining columns
+        col_selector = sorted(valid_col_idxs)
+        B_sub = B[:, col_selector]
+
+        # We've decided which columns to exclude
+        # Now we have to decide if we're throwing away rows
+        # We'll get rid of any row that's not fully populated
+        rows_to_exclude = set()
+        for i, row in enumerate(B_sub):
+            if not row.all():
+                rows_to_exclude.add(i)
+
+        # Get which indexes we're keeping
+        valid_row_idxs = all_row_idxs - rows_to_exclude
+
+        # Check if we've already tested this combination
+        combo = (tuple(valid_row_idxs), tuple(valid_col_idxs))
+        if combo in tested_combinations:
+            continue
+        tested_combinations.add(combo)
+
+        # Remove the rows that we're excluding
+        row_selector = sorted(valid_row_idxs)
+        B_sub2 = B_sub[row_selector, :]
+
+        # Check if all rows have the same pattern in the remaining columns
+        if not (B_sub2.size > 0):
+            logger.debug("No remaining entries in B_sub2")
+            continue
+        if not np.all(B_sub2 == B_sub2[[0]]):
+            logger.debug("Not all rows have the same pattern in the remaining columns")
+            continue
+        # Create a BurstSubsetOption if we have at least one burst and one date
+        assert np.all(B_sub2)
+
+        selected_burst_ids = tuple(burst_ids[i] for i in valid_row_idxs)
+        selected_dates = tuple(dates[i] for i in valid_col_idxs)
+        total_num_bursts = B_sub2.sum()
+        # breakpoint()
+        options.append(
+            BurstSubsetOption(
+                total_num_bursts=total_num_bursts,
+                burst_ids=selected_burst_ids,
+                dates=selected_dates,
+            )
+        )
+
+    return sorted(
+        options, key=lambda x: (x.total_num_bursts, x.num_burst_ids), reverse=True
+    )
