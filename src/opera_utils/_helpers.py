@@ -13,7 +13,7 @@ def powerset(iterable: Iterable[Any]) -> chain[tuple[Any, ...]]:
 
     Examples
     --------
-    >>> powerset([1,2,3])
+    >>> list(powerset([1,2,3]))
     [(), (1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
     """
     s = list(iterable)

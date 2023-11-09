@@ -189,21 +189,22 @@ def generate_burst_subset_options(
     # Get the idxs where there are any missing dates for each burst
     # We're going to try all possible combinations of these *groups*,
     # not all possible combinations of the individual missing dates
-    missing_data_idxs = set()
+    missing_date_idxs = set()
     for row in B:
-        missing_data_idxs.add(tuple(np.where(~row)[0]))
+        missing_date_idxs.add(tuple(np.where(~row)[0]))
 
     # Generate all unique combinations of idxs to exclude
-    idxs_to_exclude_combinations = [
-        set(chain.from_iterable(combo))
-        for combo in powerset(missing_data_idxs)
-        if combo
+    date_idxs_to_exclude_combinations = [
+        set(chain.from_iterable(combo)) for combo in powerset(missing_date_idxs)
     ]
 
     all_column_idxs = set(range(B.shape[1]))
     all_row_idxs = set(range(B.shape[0]))
+
+    # Track the row/col combinations that we've already
+    tested_combinations = set()
     # Now iterate over these combinations
-    for idxs_to_exclude in idxs_to_exclude_combinations:
+    for idxs_to_exclude in date_idxs_to_exclude_combinations:
         valid_col_idxs = all_column_idxs - idxs_to_exclude
 
         # Create sub-matrix with the remaining columns
@@ -220,6 +221,12 @@ def generate_burst_subset_options(
 
         # Get which indexes we're keeping
         valid_row_idxs = all_row_idxs - rows_to_exclude
+
+        # Check if we've already tested this combination
+        combo = (tuple(valid_row_idxs), tuple(valid_col_idxs))
+        if combo in tested_combinations:
+            continue
+        tested_combinations.add(combo)
 
         # Remove the rows that we're excluding
         row_selector = sorted(valid_row_idxs)
