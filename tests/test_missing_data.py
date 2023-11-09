@@ -73,12 +73,39 @@ def test_get_burst_id_to_dates(filenames, burst_id_date_tuples):
 
 
 def test_get_burst_id_date_incidence(B, filenames):
-    missing_data.get_burst_id_date_incidence
+    B_out = missing_data.get_burst_id_date_incidence(
+        burst_id_to_dates=missing_data.get_burst_id_to_dates(slc_files=filenames)
+    )
+    np.testing.assert_array_equal(B_out, B)
 
 
 # What we want to check are 3 possible options
-def test_get_missing_data_options(B, filenames):
-    missing_data.get_missing_data_options
+# 1. Use the first/second burst ID, discard date 1
+#   Total number of bursts: (4 dates * 2 IDs) = 8
+# 2. Use all three burst IDs, discard dates 1, 2, 3
+#   Total number of bursts: (2 dates * 3 IDs) = 6
+# 3. Use the third burst ID, discard dates 2, 3
+#   Total number of bursts: (3 dates * 1 ID) = 3
+def test_get_missing_data_options(filenames):
+    mdos = missing_data.get_missing_data_options(slc_files=filenames)
+    assert len(mdos) == 3
+    mdo = mdos[0]
+    assert mdo.num_dates == 4
+    assert len(mdo.burst_id_list) == 2
+    assert mdo.num_burst_ids == 2
+    assert mdo.total_num_bursts == 8
+
+    mdo = mdos[1]
+    assert mdo.num_dates == 2
+    assert len(mdo.burst_id_list) == 3
+    assert mdo.num_burst_ids == 3
+    assert mdo.total_num_bursts == 6
+
+    mdo = mdos[2]
+    assert mdo.num_dates == 3
+    assert len(mdo.burst_id_list) == 1
+    assert mdo.num_burst_ids == 1
+    assert mdo.total_num_bursts == 3
 
 
 def test_get_dates():
