@@ -206,7 +206,7 @@ def make_nodata_mask(
     try:
         test_f = f"NETCDF:{opera_file_list[0]}:{OPERA_DATASET_NAME}"
         # convert pixels to degrees lat/lon
-        gt = get_raster_gt(test_f)
+        gt = _get_raster_gt(test_f)
         # TODO: more robust way to get the pixel size... this is a hack
         # maybe just use pyproj to warp lat/lon to meters and back?
         dx_meters = gt[1]
@@ -248,7 +248,7 @@ def make_nodata_mask(
         subprocess.check_call(cmd, shell=True)
 
 
-def get_raster_gt(filename: Filename) -> list[float]:
+def _get_raster_gt(filename: Filename) -> list[float]:
     """Get the geotransform from a file.
 
     Parameters
