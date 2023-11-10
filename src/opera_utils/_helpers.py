@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from itertools import chain, combinations
 from typing import Any, Iterable, Mapping
 
