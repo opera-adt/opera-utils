@@ -33,8 +33,8 @@ mamba install -c conda-forge opera-utils
 (Note: [using `mamba`](https://mamba.readthedocs.io/en/latest/mamba-installation.html#mamba-install) is recommended for conda-forge packages, but miniconda can also be used.)
 
 While not required for all, some utilities use the GDAL package, which can be installed most easily on conda-forge:
-``` bash
-mamba install -c conda-forge gdal
+```bash
+mamba env update --file environment-geo.yml
 ```
 
 ## Setup for Developers

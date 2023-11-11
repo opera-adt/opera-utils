@@ -1,0 +1,578 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.2
+    method: HEAD
+    uri: https://github.com/opera-adt/burst_db/releases/download/v0.3.1/frame-geometries-simple-0.3.1.geojson.zip
+  response:
+    body:
+      string: ''
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - '0'
+      Content-Security-Policy:
+      - 'default-src ''none''; base-uri ''self''; child-src github.com/assets-cdn/worker/
+        gist.github.com/assets-cdn/worker/; connect-src ''self'' uploads.github.com
+        www.githubstatus.com collector.github.com raw.githubusercontent.com
+        api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com
+        github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com
+        cdn.optimizely.com logx.optimizely.com/v1/events objects-origin.githubusercontent.com
+        *.actions.githubusercontent.com productionresultssa0.blob.core.windows.net/
+        productionresultssa1.blob.core.windows.net/ productionresultssa2.blob.core.windows.net/
+        productionresultssa3.blob.core.windows.net/ productionresultssa4.blob.core.windows.net/
+        productionresultssa5.blob.core.windows.net/ productionresultssa6.blob.core.windows.net/
+        productionresultssa7.blob.core.windows.net/ productionresultssa8.blob.core.windows.net/
+        productionresultssa9.blob.core.windows.net/ staffwus201resultssa0.blob.core.windows.net/
+        staffwus201resultssa1.blob.core.windows.net/ prodweu01resultssa0.blob.core.windows.net/
+        prodweu01resultssa1.blob.core.windows.net/ prodweu01resultssa2.blob.core.windows.net/
+        prodweu01resultssa3.blob.core.windows.net/ wss://*.actions.githubusercontent.com
+        github-production-repository-image-32fea6.s3.amazonaws.com github-production-release-asset-2e65be.s3.amazonaws.com
+        insights.github.com wss://alive.github.com; font-src github.githubassets.com;
+        form-action ''self'' github.com gist.github.com objects-origin.githubusercontent.com;
+        frame-ancestors ''none''; frame-src viewscreen.githubusercontent.com notebooks.githubusercontent.com
+        support.github.com; img-src ''self'' data: github.githubassets.com media.githubusercontent.com
+        camo.githubusercontent.com identicons.github.com avatars.githubusercontent.com
+        github-cloud.s3.amazonaws.com objects.githubusercontent.com secured-user-images.githubusercontent.com/
+        user-images.githubusercontent.com/ private-user-images.githubusercontent.com
+        opengraph.githubassets.com github-production-user-asset-6210df.s3.amazonaws.com
+        customer-stories-feed.github.com spotlights-feed.github.com objects-origin.githubusercontent.com
+        *.githubusercontent.com; manifest-src ''self''; media-src github.com user-images.githubusercontent.com/
+        secured-user-images.githubusercontent.com/ private-user-images.githubusercontent.com
+        github-production-user-asset-6210df.s3.amazonaws.com; script-src github.githubassets.com;
+        style-src ''unsafe-inline'' github.githubassets.com; upgrade-insecure-requests;
+        worker-src github.com/assets-cdn/worker/ gist.github.com/assets-cdn/worker/'
+      Content-Type:
+      - text/html; charset=utf-8
+      Date:
+      - Sat, 11 Nov 2023 03:31:32 GMT
+      Location:
+      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/57df9d7f-387b-47e9-af56-3df878a15c06?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033132Z&X-Amz-Expires=300&X-Amz-Signature=2bf50ae7ec217a13c9547fe86c5ee85d0316ea91b5190b52e7f31d02bc1b204a&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dframe-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
+      Referrer-Policy:
+      - no-referrer-when-downgrade
+      Server:
+      - GitHub.com
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubdomains; preload
+      Vary:
+      - X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, Accept-Encoding, Accept,
+        X-Requested-With
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - deny
+      X-GitHub-Request-Id:
+      - E091:67E7:1C975E4:28C2754:654EF5E7
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 302
+      message: Found
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.2
+    method: HEAD
+    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/57df9d7f-387b-47e9-af56-3df878a15c06?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033132Z&X-Amz-Expires=300&X-Amz-Signature=2bf50ae7ec217a13c9547fe86c5ee85d0316ea91b5190b52e7f31d02bc1b204a&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dframe-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Age:
+      - '1525'
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - attachment; filename=frame-geometries-simple-0.3.1.geojson.zip
+      Content-Length:
+      - '1727835'
+      Content-MD5:
+      - ejHHR3QVLytbh3Bjc53UeQ==
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Sat, 11 Nov 2023 03:32:55 GMT
+      ETag:
+      - '"0x8DBE25FE9FF4AFB"'
+      Last-Modified:
+      - Sat, 11 Nov 2023 02:42:57 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      Via:
+      - 1.1 varnish, 1.1 varnish
+      X-Cache:
+      - MISS, HIT
+      X-Cache-Hits:
+      - 0, 1
+      X-Served-By:
+      - cache-iad-kcgs7200162-IAD, cache-bur-kbur8200059-BUR
+      X-Timer:
+      - S1699673576.685237,VS0,VE67
+      x-ms-blob-type:
+      - BlockBlob
+      x-ms-creation-time:
+      - Sat, 11 Nov 2023 02:42:57 GMT
+      x-ms-lease-state:
+      - available
+      x-ms-lease-status:
+      - unlocked
+      x-ms-request-id:
+      - df63f2e3-c01e-0047-324c-148a0e000000
+      x-ms-server-encrypted:
+      - 'true'
+      x-ms-version:
+      - '2020-04-08'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.2
+    method: HEAD
+    uri: https://github.com/opera-adt/burst_db/releases/download/v0.3.1/burst-id-geometries-simple-0.3.1.geojson.zip
+  response:
+    body:
+      string: ''
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - '0'
+      Content-Security-Policy:
+      - 'default-src ''none''; base-uri ''self''; child-src github.com/assets-cdn/worker/
+        gist.github.com/assets-cdn/worker/; connect-src ''self'' uploads.github.com
+        www.githubstatus.com collector.github.com raw.githubusercontent.com api.githubcopilot.com
+        api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com
+        github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com
+        cdn.optimizely.com logx.optimizely.com/v1/events objects-origin.githubusercontent.com
+        *.actions.githubusercontent.com productionresultssa0.blob.core.windows.net/
+        productionresultssa1.blob.core.windows.net/ productionresultssa2.blob.core.windows.net/
+        productionresultssa3.blob.core.windows.net/ productionresultssa4.blob.core.windows.net/
+        productionresultssa5.blob.core.windows.net/ productionresultssa6.blob.core.windows.net/
+        productionresultssa7.blob.core.windows.net/ productionresultssa8.blob.core.windows.net/
+        productionresultssa9.blob.core.windows.net/ staffwus201resultssa0.blob.core.windows.net/
+        staffwus201resultssa1.blob.core.windows.net/ prodweu01resultssa0.blob.core.windows.net/
+        prodweu01resultssa1.blob.core.windows.net/ prodweu01resultssa2.blob.core.windows.net/
+        prodweu01resultssa3.blob.core.windows.net/ wss://*.actions.githubusercontent.com
+        github-production-repository-image-32fea6.s3.amazonaws.com github-production-release-asset-2e65be.s3.amazonaws.com
+        insights.github.com wss://alive.github.com; font-src github.githubassets.com;
+        form-action ''self'' github.com gist.github.com objects-origin.githubusercontent.com;
+        frame-ancestors ''none''; frame-src viewscreen.githubusercontent.com notebooks.githubusercontent.com
+        support.github.com; img-src ''self'' data: github.githubassets.com media.githubusercontent.com
+        camo.githubusercontent.com identicons.github.com avatars.githubusercontent.com
+        github-cloud.s3.amazonaws.com objects.githubusercontent.com secured-user-images.githubusercontent.com/
+        user-images.githubusercontent.com/ private-user-images.githubusercontent.com
+        opengraph.githubassets.com github-production-user-asset-6210df.s3.amazonaws.com
+        customer-stories-feed.github.com spotlights-feed.github.com objects-origin.githubusercontent.com
+        *.githubusercontent.com; manifest-src ''self''; media-src github.com user-images.githubusercontent.com/
+        secured-user-images.githubusercontent.com/ private-user-images.githubusercontent.com
+        github-production-user-asset-6210df.s3.amazonaws.com; script-src github.githubassets.com;
+        style-src ''unsafe-inline'' github.githubassets.com; upgrade-insecure-requests;
+        worker-src github.com/assets-cdn/worker/ gist.github.com/assets-cdn/worker/'
+      Content-Type:
+      - text/html; charset=utf-8
+      Date:
+      - Sat, 11 Nov 2023 03:31:33 GMT
+      Location:
+      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/f79055b9-b194-4376-ba06-bbbbda6929c9?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033133Z&X-Amz-Expires=300&X-Amz-Signature=7300caf63410be0a5203df5c9bf1db3401fd096ed7320e6d1076358817501030&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dburst-id-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
+      Referrer-Policy:
+      - no-referrer-when-downgrade
+      Server:
+      - GitHub.com
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubdomains; preload
+      Vary:
+      - X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, Accept-Encoding, Accept,
+        X-Requested-With
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - deny
+      X-GitHub-Request-Id:
+      - E093:917D:89C3925:C50D71B:654EF5E8
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 302
+      message: Found
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.2
+    method: HEAD
+    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/f79055b9-b194-4376-ba06-bbbbda6929c9?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033133Z&X-Amz-Expires=300&X-Amz-Signature=7300caf63410be0a5203df5c9bf1db3401fd096ed7320e6d1076358817501030&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dburst-id-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Age:
+      - '2353'
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - attachment; filename=burst-id-geometries-simple-0.3.1.geojson.zip
+      Content-Length:
+      - '25331410'
+      Content-MD5:
+      - tzwdJkKQkbQ90Qd+7DQV8A==
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Sat, 11 Nov 2023 03:32:56 GMT
+      ETag:
+      - '"0x8DBE25FE822DF17"'
+      Last-Modified:
+      - Sat, 11 Nov 2023 02:42:54 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      Via:
+      - 1.1 varnish, 1.1 varnish
+      X-Cache:
+      - MISS, HIT
+      X-Cache-Hits:
+      - 0, 0
+      X-Served-By:
+      - cache-iad-kjyo7100093-IAD, cache-bur-kbur8200130-BUR
+      X-Timer:
+      - S1699673577.501861,VS0,VE70
+      x-ms-blob-type:
+      - BlockBlob
+      x-ms-creation-time:
+      - Sat, 11 Nov 2023 02:42:54 GMT
+      x-ms-lease-state:
+      - available
+      x-ms-lease-status:
+      - unlocked
+      x-ms-request-id:
+      - 5ddab990-901e-0028-274a-1480fd000000
+      x-ms-server-encrypted:
+      - 'true'
+      x-ms-version:
+      - '2020-04-08'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.2
+    method: HEAD
+    uri: https://github.com/opera-adt/burst_db/releases/download/v0.3.1/opera-s1-disp-burst-to-frame-0.3.1.json.zip
+  response:
+    body:
+      string: ''
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - '0'
+      Content-Security-Policy:
+      - 'default-src ''none''; base-uri ''self''; child-src github.com/assets-cdn/worker/
+        gist.github.com/assets-cdn/worker/; connect-src ''self'' uploads.github.com
+        www.githubstatus.com collector.github.com raw.githubusercontent.com api.githubcopilot.com
+        api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com
+        github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com
+        cdn.optimizely.com logx.optimizely.com/v1/events objects-origin.githubusercontent.com
+        *.actions.githubusercontent.com productionresultssa0.blob.core.windows.net/
+        productionresultssa1.blob.core.windows.net/ productionresultssa2.blob.core.windows.net/
+        productionresultssa3.blob.core.windows.net/ productionresultssa4.blob.core.windows.net/
+        productionresultssa5.blob.core.windows.net/ productionresultssa6.blob.core.windows.net/
+        productionresultssa7.blob.core.windows.net/ productionresultssa8.blob.core.windows.net/
+        productionresultssa9.blob.core.windows.net/ staffwus201resultssa0.blob.core.windows.net/
+        staffwus201resultssa1.blob.core.windows.net/ prodweu01resultssa0.blob.core.windows.net/
+        prodweu01resultssa1.blob.core.windows.net/ prodweu01resultssa2.blob.core.windows.net/
+        prodweu01resultssa3.blob.core.windows.net/ wss://*.actions.githubusercontent.com
+        github-production-repository-image-32fea6.s3.amazonaws.com github-production-release-asset-2e65be.s3.amazonaws.com
+        insights.github.com wss://alive.github.com; font-src github.githubassets.com;
+        form-action ''self'' github.com gist.github.com objects-origin.githubusercontent.com;
+        frame-ancestors ''none''; frame-src viewscreen.githubusercontent.com notebooks.githubusercontent.com
+        support.github.com; img-src ''self'' data: github.githubassets.com media.githubusercontent.com
+        camo.githubusercontent.com identicons.github.com avatars.githubusercontent.com
+        github-cloud.s3.amazonaws.com objects.githubusercontent.com secured-user-images.githubusercontent.com/
+        user-images.githubusercontent.com/ private-user-images.githubusercontent.com
+        opengraph.githubassets.com github-production-user-asset-6210df.s3.amazonaws.com
+        customer-stories-feed.github.com spotlights-feed.github.com objects-origin.githubusercontent.com
+        *.githubusercontent.com; manifest-src ''self''; media-src github.com user-images.githubusercontent.com/
+        secured-user-images.githubusercontent.com/ private-user-images.githubusercontent.com
+        github-production-user-asset-6210df.s3.amazonaws.com; script-src github.githubassets.com;
+        style-src ''unsafe-inline'' github.githubassets.com; upgrade-insecure-requests;
+        worker-src github.com/assets-cdn/worker/ gist.github.com/assets-cdn/worker/'
+      Content-Type:
+      - text/html; charset=utf-8
+      Date:
+      - Sat, 11 Nov 2023 03:31:34 GMT
+      Location:
+      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/6524dd68-f043-453f-b373-c49764f3221f?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033134Z&X-Amz-Expires=300&X-Amz-Signature=16468c8e4ad82e7fec05aeaa4d4ea69ac82ba3e1a24ddc407035f79fd820f484&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-burst-to-frame-0.3.1.json.zip&response-content-type=application%2Foctet-stream
+      Referrer-Policy:
+      - no-referrer-when-downgrade
+      Server:
+      - GitHub.com
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubdomains; preload
+      Vary:
+      - X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, Accept-Encoding, Accept,
+        X-Requested-With
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - deny
+      X-GitHub-Request-Id:
+      - E095:2630:7FECBA7:B798D8C:654EF5E8
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 302
+      message: Found
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.2
+    method: HEAD
+    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/6524dd68-f043-453f-b373-c49764f3221f?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033134Z&X-Amz-Expires=300&X-Amz-Signature=16468c8e4ad82e7fec05aeaa4d4ea69ac82ba3e1a24ddc407035f79fd820f484&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-burst-to-frame-0.3.1.json.zip&response-content-type=application%2Foctet-stream
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Age:
+      - '1395'
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - attachment; filename=opera-s1-disp-burst-to-frame-0.3.1.json.zip
+      Content-Length:
+      - '3382212'
+      Content-MD5:
+      - tfdXkuKgNqthjh79ZJ/erg==
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Sat, 11 Nov 2023 03:32:57 GMT
+      ETag:
+      - '"0x8DBE25FC832FC1D"'
+      Last-Modified:
+      - Sat, 11 Nov 2023 02:42:01 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      Via:
+      - 1.1 varnish, 1.1 varnish
+      X-Cache:
+      - MISS, HIT
+      X-Cache-Hits:
+      - 0, 1
+      X-Served-By:
+      - cache-iad-kiad7000111-IAD, cache-bur-kbur8200130-BUR
+      X-Timer:
+      - S1699673577.346104,VS0,VE62
+      x-ms-blob-type:
+      - BlockBlob
+      x-ms-creation-time:
+      - Sat, 11 Nov 2023 02:42:01 GMT
+      x-ms-lease-state:
+      - available
+      x-ms-lease-status:
+      - unlocked
+      x-ms-request-id:
+      - ca573307-201e-003d-574c-14974e000000
+      x-ms-server-encrypted:
+      - 'true'
+      x-ms-version:
+      - '2020-04-08'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.2
+    method: HEAD
+    uri: https://github.com/opera-adt/burst_db/releases/download/v0.3.1/opera-s1-disp-frame-to-burst-0.3.1.json.zip
+  response:
+    body:
+      string: ''
+    headers:
+      Cache-Control:
+      - no-cache
+      Content-Length:
+      - '0'
+      Content-Security-Policy:
+      - 'default-src ''none''; base-uri ''self''; child-src github.com/assets-cdn/worker/
+        gist.github.com/assets-cdn/worker/; connect-src ''self'' uploads.github.com
+        www.githubstatus.com collector.github.com raw.githubusercontent.com api.githubcopilot.com
+        api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com
+        github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com
+        cdn.optimizely.com logx.optimizely.com/v1/events objects-origin.githubusercontent.com
+        *.actions.githubusercontent.com productionresultssa0.blob.core.windows.net/
+        productionresultssa1.blob.core.windows.net/ productionresultssa2.blob.core.windows.net/
+        productionresultssa3.blob.core.windows.net/ productionresultssa4.blob.core.windows.net/
+        productionresultssa5.blob.core.windows.net/ productionresultssa6.blob.core.windows.net/
+        productionresultssa7.blob.core.windows.net/ productionresultssa8.blob.core.windows.net/
+        productionresultssa9.blob.core.windows.net/ staffwus201resultssa0.blob.core.windows.net/
+        staffwus201resultssa1.blob.core.windows.net/ prodweu01resultssa0.blob.core.windows.net/
+        prodweu01resultssa1.blob.core.windows.net/ prodweu01resultssa2.blob.core.windows.net/
+        prodweu01resultssa3.blob.core.windows.net/ wss://*.actions.githubusercontent.com
+        github-production-repository-image-32fea6.s3.amazonaws.com github-production-release-asset-2e65be.s3.amazonaws.com
+        insights.github.com wss://alive.github.com; font-src github.githubassets.com;
+        form-action ''self'' github.com gist.github.com objects-origin.githubusercontent.com;
+        frame-ancestors ''none''; frame-src viewscreen.githubusercontent.com notebooks.githubusercontent.com
+        support.github.com; img-src ''self'' data: github.githubassets.com media.githubusercontent.com
+        camo.githubusercontent.com identicons.github.com avatars.githubusercontent.com
+        github-cloud.s3.amazonaws.com objects.githubusercontent.com secured-user-images.githubusercontent.com/
+        user-images.githubusercontent.com/ private-user-images.githubusercontent.com
+        opengraph.githubassets.com github-production-user-asset-6210df.s3.amazonaws.com
+        customer-stories-feed.github.com spotlights-feed.github.com objects-origin.githubusercontent.com
+        *.githubusercontent.com; manifest-src ''self''; media-src github.com user-images.githubusercontent.com/
+        secured-user-images.githubusercontent.com/ private-user-images.githubusercontent.com
+        github-production-user-asset-6210df.s3.amazonaws.com; script-src github.githubassets.com;
+        style-src ''unsafe-inline'' github.githubassets.com; upgrade-insecure-requests;
+        worker-src github.com/assets-cdn/worker/ gist.github.com/assets-cdn/worker/'
+      Content-Type:
+      - text/html; charset=utf-8
+      Date:
+      - Sat, 11 Nov 2023 03:32:58 GMT
+      Location:
+      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/d555aa7d-2f7a-43b4-a856-d6f1735d1205?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033258Z&X-Amz-Expires=300&X-Amz-Signature=35b7b25302d1b88b670ff3ea7c755dab271a8123def8dd2d8b0f8af3b8b02088&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-frame-to-burst-0.3.1.json.zip&response-content-type=application%2Foctet-stream
+      Referrer-Policy:
+      - no-referrer-when-downgrade
+      Server:
+      - GitHub.com
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubdomains; preload
+      Vary:
+      - X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, Accept-Encoding, Accept,
+        X-Requested-With
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - deny
+      X-GitHub-Request-Id:
+      - E097:2630:7FECDDA:B799086:654EF5EA
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 302
+      message: Found
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.28.2
+    method: HEAD
+    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/d555aa7d-2f7a-43b4-a856-d6f1735d1205?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033258Z&X-Amz-Expires=300&X-Amz-Signature=35b7b25302d1b88b670ff3ea7c755dab271a8123def8dd2d8b0f8af3b8b02088&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-frame-to-burst-0.3.1.json.zip&response-content-type=application%2Foctet-stream
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Age:
+      - '1396'
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - attachment; filename=opera-s1-disp-frame-to-burst-0.3.1.json.zip
+      Content-Length:
+      - '4257823'
+      Content-MD5:
+      - o7onxj/Vt+noe+25rFiGtA==
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Sat, 11 Nov 2023 03:32:59 GMT
+      ETag:
+      - '"0x8DBE25FCBF6EB02"'
+      Last-Modified:
+      - Sat, 11 Nov 2023 02:42:07 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      Via:
+      - 1.1 varnish, 1.1 varnish
+      X-Cache:
+      - MISS, HIT
+      X-Cache-Hits:
+      - 0, 1
+      X-Served-By:
+      - cache-iad-kjyo7100024-IAD, cache-bur-kbur8200045-BUR
+      X-Timer:
+      - S1699673579.221373,VS0,VE63
+      x-ms-blob-type:
+      - BlockBlob
+      x-ms-creation-time:
+      - Sat, 11 Nov 2023 02:42:07 GMT
+      x-ms-lease-state:
+      - available
+      x-ms-lease-status:
+      - unlocked
+      x-ms-request-id:
+      - e3654f7d-501e-0045-0c4c-1434b6000000
+      x-ms-server-encrypted:
+      - 'true'
+      x-ms-version:
+      - '2020-04-08'
+    status:
+      code: 200
+      message: OK
+version: 1

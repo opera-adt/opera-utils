@@ -1,0 +1,6 @@
+channels:
+  - conda-forge
+dependencies:
+  - pyogrio>=0.5
+  - gdal>=3.3
+  - geopandas-base>=0.12

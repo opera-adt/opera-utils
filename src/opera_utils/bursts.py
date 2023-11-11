@@ -149,7 +149,7 @@ def sort_by_burst_id(file_list, burst_id_fmt):
 @overload
 def filter_by_burst_id(
     files: Iterable[PathLikeT],
-    burst_ids: Iterable[str],
+    burst_ids: str | Iterable[str],
 ) -> list[PathLikeT]:
     ...
 
@@ -157,7 +157,7 @@ def filter_by_burst_id(
 @overload
 def filter_by_burst_id(
     files: Iterable[str],
-    burst_ids: Iterable[str],
+    burst_ids: str | Iterable[str],
 ) -> list[str]:
     ...
 
@@ -165,20 +165,27 @@ def filter_by_burst_id(
 def filter_by_burst_id(files, burst_ids):
     """Keep only items from `files` which contain a burst ID in `burst_ids`.
 
+    Searches only the burst ID in the base name, not the full path.
+
     Parameters
     ----------
     files : Iterable[PathLikeT] or Iterable[str]
         Iterable of files to filter
-    burst_ids : Iterable[str]
-        Iterable containing the of burst IDs to keep
+    burst_ids : str | Iterable[str]
+        Burst ID/Iterable containing the of burst IDs to keep
 
     Returns
     -------
     list[PathLikeT] or list[str]
         filtered list of files
     """
+    if isinstance(burst_ids, str):
+        burst_ids = [burst_ids]
+
     burst_id_set = set(burst_ids)
-    return [f for f in files if get_burst_id(f) in burst_id_set]
+    parsed_burst_ids = [get_burst_id(Path(f).name) for f in files]
+    # Only search the burst ID in the name, not the full path
+    return [f for (f, b) in zip(files, parsed_burst_ids) if b in burst_id_set]
 
 
 def get_cslc_polygon(
