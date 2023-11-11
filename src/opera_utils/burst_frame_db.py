@@ -49,7 +49,7 @@ def get_frame_to_burst_mapping(
         The frame data for the given frame ID.
     """
     if json_file is None:
-        json_file = datasets.fetch_burst_to_frame_mapping_file()
+        json_file = datasets.fetch_frame_to_burst_mapping_file()
     js = read_zipped_json(json_file)
     return js["data"][str(frame_id)]
 

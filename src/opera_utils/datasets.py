@@ -6,7 +6,7 @@ __all__ = [
     "fetch_frame_geometries_simple",
     "fetch_burst_id_geometries_simple",
     "fetch_burst_to_frame_mapping_file",
-    "fetch_frame_to_burst_mapping",
+    "fetch_frame_to_burst_mapping_file",
 ]
 
 # See: https://github.com/opera-adt/burst_db/tree/main/src/burst_db/data
@@ -46,7 +46,7 @@ POOCH = pooch.create(
         f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "f0094f4cdc287d56d7a126a42f1e3075e50309afe8a431f49df1ecd8d8b26c8b",
         f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "d9cfe71ec836facd5a782ea82625c30a824b78f2b2689106c4d6808bbfce0898",
         f"opera-s1-disp-burst-to-frame-{BURST_DB_VERSION}.json.zip": "436cce345378dc31e81ed661497bab2e744217a5d63c0bb92817dc837786cd22",
-        f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip": "8b7ed8c8d90ef3d3348bc226958a26a2cb8ab302a6466762aa971b8f7333517f",
+        f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip": "a48382afcb89f0ff681982b0fc24476ec9c6c1b8a67ae1a26cf380a450ffadc0",
     },
 )
 
@@ -66,6 +66,6 @@ def fetch_burst_to_frame_mapping_file() -> str:
     return POOCH.fetch(f"opera-s1-disp-burst-to-frame-{BURST_DB_VERSION}.json.zip")
 
 
-def fetch_frame_to_burst_mapping() -> str:
+def fetch_frame_to_burst_mapping_file() -> str:
     """Get the frame-to-burst mapping for the burst database."""
     return POOCH.fetch(f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip")
