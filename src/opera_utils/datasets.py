@@ -44,7 +44,7 @@ POOCH = pooch.create(
     # automatically when needed.
     registry={
         f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "f0094f4cdc287d56d7a126a42f1e3075e50309afe8a431f49df1ecd8d8b26c8b",
-        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "355e6708062d5dcd0bfba33578c75357625fd5982b4dbe197a9b95c6f50c2beb",
+        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "d9cfe71ec836facd5a782ea82625c30a824b78f2b2689106c4d6808bbfce0898",
         f"opera-s1-disp-burst-to-frame-{BURST_DB_VERSION}.json.zip": "436cce345378dc31e81ed661497bab2e744217a5d63c0bb92817dc837786cd22",
         f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip": "8b7ed8c8d90ef3d3348bc226958a26a2cb8ab302a6466762aa971b8f7333517f",
     },
