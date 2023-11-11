@@ -34,6 +34,8 @@ class BurstSubsetOption:
     """Burst IDs used in this subset."""
     dates: tuple[date, ...]
     """Dates used in this subset."""
+    # subset_selected: list[bool]
+    # """True if the corresponding file/ (burst ID, date) was selected."""
 
     @property
     def num_dates(self) -> int:
@@ -184,6 +186,26 @@ def _burst_id_mapping_from_files(
 def generate_burst_subset_options(
     B: NDArray[np.bool], burst_ids: Sequence[str], dates: Sequence[date]
 ) -> list[BurstSubsetOption]:
+    """Generate possible valid subsets of the given SLC data.
+
+    Parameters
+    ----------
+    B : NDArray[np.bool]
+        Matrix of burst ID vs. date incidence.
+        Rows correspond to burst IDs, columns correspond to dates.
+        A value of True indicates that the burst ID was acquired on that date.
+    burst_ids : Sequence[str]
+        List of all burst IDs.
+    dates : Sequence[date]
+        List of all dates.
+
+    Returns
+    -------
+    list[BurstSubsetOption]
+        List of possible subsets of the given SLC data.
+        The options will be sorted by the total number of bursts used, so
+        that the first option is the one that uses the most data.
+    """
     options = []
 
     # Get the idxs where there are any missing dates for each burst
