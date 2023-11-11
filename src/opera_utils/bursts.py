@@ -22,6 +22,7 @@ __all__ = [
     "get_burst_id",
     "group_by_burst",
     "sort_by_burst_id",
+    "filter_by_burst_id",
     "get_cslc_polygon",
     "get_union_polygon",
     "make_nodata_mask",
@@ -115,12 +116,26 @@ def sort_by_burst_id(file_list: Iterable[str], burst_id_fmt) -> list[str]:
 
 
 @overload
-def sort_by_burst_id(file_list: Iterable[Path], burst_id_fmt) -> list[Path]:
+def sort_by_burst_id(file_list: Iterable[PathLikeT], burst_id_fmt) -> list[PathLikeT]:
     ...
 
 
 def sort_by_burst_id(file_list, burst_id_fmt):
-    """Sort files/paths by burst id."""
+    """Sort files/paths by the burst ID in their names.
+
+    Parameters
+    ----------
+    file_list : Iterable[PathLikeT]
+        list of paths of CSLC files
+    burst_id_fmt : str
+        format of the burst id in the filename.
+        Default is [`OPERA_BURST_RE`][opera_utils.OPERA_BURST_RE]
+
+    Returns
+    -------
+    list[Path] or list[str]
+        sorted list of files
+    """
     file_burst_tuples = sorted(
         [(f, get_burst_id(f, burst_id_fmt)) for f in file_list],
         # use the date or dates as the key
@@ -129,6 +144,41 @@ def sort_by_burst_id(file_list, burst_id_fmt):
     # Unpack the sorted pairs with new sorted values
     out_file_list = [f for f, _ in file_burst_tuples]
     return out_file_list
+
+
+@overload
+def filter_by_burst_id(
+    files: Iterable[PathLikeT],
+    burst_ids: Iterable[str],
+) -> list[PathLikeT]:
+    ...
+
+
+@overload
+def filter_by_burst_id(
+    files: Iterable[str],
+    burst_ids: Iterable[str],
+) -> list[str]:
+    ...
+
+
+def filter_by_burst_id(files, burst_ids):
+    """Keep only items from `files` which contain a burst ID in `burst_ids`.
+
+    Parameters
+    ----------
+    files : Iterable[PathLikeT] or Iterable[str]
+        Iterable of files to filter
+    burst_ids : Iterable[str]
+        Iterable containing the of burst IDs to keep
+
+    Returns
+    -------
+    list[PathLikeT] or list[str]
+        filtered list of files
+    """
+    burst_id_set = set(burst_ids)
+    return [f for f in files if get_burst_id(f) in burst_id_set]
 
 
 def get_cslc_polygon(

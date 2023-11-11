@@ -3,15 +3,21 @@ from __future__ import annotations
 import datetime
 import re
 from pathlib import Path
+from typing import Iterable, overload
 
-from ._types import Filename
+from ._types import Filename, PathLikeT
 
 __all__ = [
     "get_dates",
+    "filter_by_date",
+    "DATE_FORMAT",
 ]
 
+DATE_FORMAT = "%Y%m%d"
+DATETIME_FORMAT = "%Y%m%dT%H%M%S"
 
-def get_dates(filename: Filename, fmt: str = "%Y%m%d") -> list[datetime.date]:
+
+def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.date]:
     """Search for dates in the stem of `filename` matching `fmt`.
 
     Excludes dates that are not in the stem of `filename` (in the directories).
@@ -21,7 +27,7 @@ def get_dates(filename: Filename, fmt: str = "%Y%m%d") -> list[datetime.date]:
     filename : str or PathLike
         Filename to search for dates.
     fmt : str, optional
-        Format of date to search for. Default is "%Y%m%d".
+        Format of date to search for. Default is %Y%m%d
 
     Returns
     -------
@@ -45,7 +51,46 @@ def get_dates(filename: Filename, fmt: str = "%Y%m%d") -> list[datetime.date]:
     return [_parse_date(d, fmt) for d in date_list]
 
 
-def _parse_date(datestr: str, fmt: str = "%Y%m%d") -> datetime.date:
+@overload
+def filter_by_date(
+    files: Iterable[PathLikeT],
+    dates: Iterable[datetime.date],
+    fmt: str = DATE_FORMAT,
+) -> list[PathLikeT]:
+    ...
+
+
+@overload
+def filter_by_date(
+    files: Iterable[str],
+    dates: Iterable[datetime.date],
+    fmt: str = DATE_FORMAT,
+) -> list[str]:
+    ...
+
+
+def filter_by_date(files, dates, fmt=DATE_FORMAT):
+    """Keep only items in `files` which have a date in `dates`.
+
+    Parameters
+    ----------
+    files : Iterable[PathLikeT] or Iterable[str]
+        Iterable of files to filter
+    dates : Iterable[datetime.date]
+        Iterable of dates to filter by
+    fmt : str, optional
+        Format of date to search for. Default is %Y%m%d
+    """
+    date_set = set(dates)
+    out = []
+    for f in list(files):
+        date_tuple = get_dates(f, fmt)
+        if any(d in date_set for d in date_tuple):
+            out.append(f)
+    return out
+
+
+def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.date:
     return datetime.datetime.strptime(datestr, fmt).date()
 
 
@@ -63,7 +108,7 @@ def _get_path_from_gdal_str(name: Filename) -> Path:
     return Path(p)
 
 
-def _date_format_to_regex(date_format):
+def _date_format_to_regex(date_format: str) -> re.Pattern:
     r"""Convert a python date format string to a regular expression.
 
     Useful for Year, month, date date formats.
@@ -71,7 +116,7 @@ def _date_format_to_regex(date_format):
     Parameters
     ----------
     date_format : str
-        Date format string, e.g. "%Y%m%d"
+        Date format string, e.g. DATE_FORMAT
 
     Returns
     -------
