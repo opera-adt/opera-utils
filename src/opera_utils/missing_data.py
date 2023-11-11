@@ -7,7 +7,6 @@ from itertools import chain, groupby
 from typing import Iterable, Mapping, Optional, Sequence
 
 import numpy as np
-from numpy.typing import NDArray
 
 from ._dates import get_dates
 from ._helpers import powerset, sorted_deduped_values
@@ -122,7 +121,7 @@ def get_missing_data_options(
 
 def get_burst_id_date_incidence(
     burst_id_to_dates: Mapping[str, list[date]]
-) -> NDArray[np.bool]:
+) -> np.ndarray:
     """Create a matrix of burst ID vs. date incidence.
 
     Parameters
@@ -132,7 +131,7 @@ def get_burst_id_date_incidence(
 
     Returns
     -------
-    NDArray[bool]
+    np.ndarray[bool]
         Matrix of burst ID vs. date incidence.
         Rows correspond to burst IDs, columns correspond to dates.
         A value of True indicates that the burst ID was acquired on that date.
@@ -184,7 +183,7 @@ def _burst_id_mapping_from_files(
 
 
 def generate_burst_subset_options(
-    B: NDArray[np.bool], burst_ids: Sequence[str], dates: Sequence[date]
+    B: np.ndarray, burst_ids: Sequence[str], dates: Sequence[date]
 ) -> list[BurstSubsetOption]:
     """Generate possible valid subsets of the given SLC data.
 
