@@ -23,7 +23,7 @@ interactions:
       Content-Security-Policy:
       - 'default-src ''none''; base-uri ''self''; child-src github.com/assets-cdn/worker/
         gist.github.com/assets-cdn/worker/; connect-src ''self'' uploads.github.com
-        www.githubstatus.com collector.github.com raw.githubusercontent.com api.githubcopilot.com
+        www.githubstatus.com collector.github.com raw.githubusercontent.com
         api.github.com github-cloud.s3.amazonaws.com github-production-repository-file-5c1aeb.s3.amazonaws.com
         github-production-upload-manifest-file-7fdce7.s3.amazonaws.com github-production-user-asset-6210df.s3.amazonaws.com
         cdn.optimizely.com logx.optimizely.com/v1/events objects-origin.githubusercontent.com
@@ -54,9 +54,9 @@ interactions:
       Content-Type:
       - text/html; charset=utf-8
       Date:
-      - Sat, 11 Nov 2023 03:18:10 GMT
+      - Sat, 11 Nov 2023 03:31:32 GMT
       Location:
-      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/57df9d7f-387b-47e9-af56-3df878a15c06?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T031810Z&X-Amz-Expires=300&X-Amz-Signature=70ee0042aed1678429606247ffb902ad2c66efb434196d07528d29f49a969275&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dframe-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
+      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/57df9d7f-387b-47e9-af56-3df878a15c06?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033132Z&X-Amz-Expires=300&X-Amz-Signature=2bf50ae7ec217a13c9547fe86c5ee85d0316ea91b5190b52e7f31d02bc1b204a&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dframe-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
       Referrer-Policy:
       - no-referrer-when-downgrade
       Server:
@@ -71,7 +71,7 @@ interactions:
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - DF55:2549:85A86C8:BF4E8CC:654EF2D5
+      - E091:67E7:1C975E4:28C2754:654EF5E7
       X-XSS-Protection:
       - '0'
     status:
@@ -89,7 +89,7 @@ interactions:
       User-Agent:
       - python-requests/2.28.2
     method: HEAD
-    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/57df9d7f-387b-47e9-af56-3df878a15c06?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T031810Z&X-Amz-Expires=300&X-Amz-Signature=70ee0042aed1678429606247ffb902ad2c66efb434196d07528d29f49a969275&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dframe-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
+    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/57df9d7f-387b-47e9-af56-3df878a15c06?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033132Z&X-Amz-Expires=300&X-Amz-Signature=2bf50ae7ec217a13c9547fe86c5ee85d0316ea91b5190b52e7f31d02bc1b204a&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dframe-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
   response:
     body:
       string: ''
@@ -97,7 +97,7 @@ interactions:
       Accept-Ranges:
       - bytes
       Age:
-      - '739'
+      - '1525'
       Connection:
       - keep-alive
       Content-Disposition:
@@ -109,7 +109,7 @@ interactions:
       Content-Type:
       - application/octet-stream
       Date:
-      - Sat, 11 Nov 2023 03:19:50 GMT
+      - Sat, 11 Nov 2023 03:32:55 GMT
       ETag:
       - '"0x8DBE25FE9FF4AFB"'
       Last-Modified:
@@ -123,9 +123,9 @@ interactions:
       X-Cache-Hits:
       - 0, 1
       X-Served-By:
-      - cache-iad-kcgs7200162-IAD, cache-bur-kbur8200050-BUR
+      - cache-iad-kcgs7200162-IAD, cache-bur-kbur8200059-BUR
       X-Timer:
-      - S1699672790.192913,VS0,VE65
+      - S1699673576.685237,VS0,VE67
       x-ms-blob-type:
       - BlockBlob
       x-ms-creation-time:
@@ -198,9 +198,9 @@ interactions:
       Content-Type:
       - text/html; charset=utf-8
       Date:
-      - Sat, 11 Nov 2023 03:18:11 GMT
+      - Sat, 11 Nov 2023 03:31:33 GMT
       Location:
-      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/f79055b9-b194-4376-ba06-bbbbda6929c9?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T031811Z&X-Amz-Expires=300&X-Amz-Signature=2e4247d0a079f2a86b24305dd6f52a62d18465a143744c76103c85a68f343f51&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dburst-id-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
+      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/f79055b9-b194-4376-ba06-bbbbda6929c9?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033133Z&X-Amz-Expires=300&X-Amz-Signature=7300caf63410be0a5203df5c9bf1db3401fd096ed7320e6d1076358817501030&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dburst-id-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
       Referrer-Policy:
       - no-referrer-when-downgrade
       Server:
@@ -215,7 +215,7 @@ interactions:
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - DF57:2B60:B0D2DA:F46DC5:654EF2D6
+      - E093:917D:89C3925:C50D71B:654EF5E8
       X-XSS-Protection:
       - '0'
     status:
@@ -233,7 +233,7 @@ interactions:
       User-Agent:
       - python-requests/2.28.2
     method: HEAD
-    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/f79055b9-b194-4376-ba06-bbbbda6929c9?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T031811Z&X-Amz-Expires=300&X-Amz-Signature=2e4247d0a079f2a86b24305dd6f52a62d18465a143744c76103c85a68f343f51&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dburst-id-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
+    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/f79055b9-b194-4376-ba06-bbbbda6929c9?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033133Z&X-Amz-Expires=300&X-Amz-Signature=7300caf63410be0a5203df5c9bf1db3401fd096ed7320e6d1076358817501030&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dburst-id-geometries-simple-0.3.1.geojson.zip&response-content-type=application%2Foctet-stream
   response:
     body:
       string: ''
@@ -241,7 +241,7 @@ interactions:
       Accept-Ranges:
       - bytes
       Age:
-      - '1567'
+      - '2353'
       Connection:
       - keep-alive
       Content-Disposition:
@@ -253,7 +253,7 @@ interactions:
       Content-Type:
       - application/octet-stream
       Date:
-      - Sat, 11 Nov 2023 03:19:51 GMT
+      - Sat, 11 Nov 2023 03:32:56 GMT
       ETag:
       - '"0x8DBE25FE822DF17"'
       Last-Modified:
@@ -267,9 +267,9 @@ interactions:
       X-Cache-Hits:
       - 0, 0
       X-Served-By:
-      - cache-iad-kjyo7100093-IAD, cache-bur-kbur8200092-BUR
+      - cache-iad-kjyo7100093-IAD, cache-bur-kbur8200130-BUR
       X-Timer:
-      - S1699672791.006316,VS0,VE70
+      - S1699673577.501861,VS0,VE70
       x-ms-blob-type:
       - BlockBlob
       x-ms-creation-time:
@@ -342,9 +342,9 @@ interactions:
       Content-Type:
       - text/html; charset=utf-8
       Date:
-      - Sat, 11 Nov 2023 03:18:12 GMT
+      - Sat, 11 Nov 2023 03:31:34 GMT
       Location:
-      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/6524dd68-f043-453f-b373-c49764f3221f?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T031812Z&X-Amz-Expires=300&X-Amz-Signature=9e59201d93c099db0aa077704683a37997f7d08e687c965072d71ea5db7e7495&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-burst-to-frame-0.3.1.json.zip&response-content-type=application%2Foctet-stream
+      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/6524dd68-f043-453f-b373-c49764f3221f?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033134Z&X-Amz-Expires=300&X-Amz-Signature=16468c8e4ad82e7fec05aeaa4d4ea69ac82ba3e1a24ddc407035f79fd820f484&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-burst-to-frame-0.3.1.json.zip&response-content-type=application%2Foctet-stream
       Referrer-Policy:
       - no-referrer-when-downgrade
       Server:
@@ -359,7 +359,7 @@ interactions:
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - DF59:04EA:B84736:FE11FB:654EF2D7
+      - E095:2630:7FECBA7:B798D8C:654EF5E8
       X-XSS-Protection:
       - '0'
     status:
@@ -377,7 +377,7 @@ interactions:
       User-Agent:
       - python-requests/2.28.2
     method: HEAD
-    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/6524dd68-f043-453f-b373-c49764f3221f?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T031812Z&X-Amz-Expires=300&X-Amz-Signature=9e59201d93c099db0aa077704683a37997f7d08e687c965072d71ea5db7e7495&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-burst-to-frame-0.3.1.json.zip&response-content-type=application%2Foctet-stream
+    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/6524dd68-f043-453f-b373-c49764f3221f?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033134Z&X-Amz-Expires=300&X-Amz-Signature=16468c8e4ad82e7fec05aeaa4d4ea69ac82ba3e1a24ddc407035f79fd820f484&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-burst-to-frame-0.3.1.json.zip&response-content-type=application%2Foctet-stream
   response:
     body:
       string: ''
@@ -385,7 +385,7 @@ interactions:
       Accept-Ranges:
       - bytes
       Age:
-      - '610'
+      - '1395'
       Connection:
       - keep-alive
       Content-Disposition:
@@ -397,7 +397,7 @@ interactions:
       Content-Type:
       - application/octet-stream
       Date:
-      - Sat, 11 Nov 2023 03:19:51 GMT
+      - Sat, 11 Nov 2023 03:32:57 GMT
       ETag:
       - '"0x8DBE25FC832FC1D"'
       Last-Modified:
@@ -411,9 +411,9 @@ interactions:
       X-Cache-Hits:
       - 0, 1
       X-Served-By:
-      - cache-iad-kiad7000111-IAD, cache-bur-kbur8200025-BUR
+      - cache-iad-kiad7000111-IAD, cache-bur-kbur8200130-BUR
       X-Timer:
-      - S1699672792.778837,VS0,VE63
+      - S1699673577.346104,VS0,VE62
       x-ms-blob-type:
       - BlockBlob
       x-ms-creation-time:
@@ -486,9 +486,9 @@ interactions:
       Content-Type:
       - text/html; charset=utf-8
       Date:
-      - Sat, 11 Nov 2023 03:19:52 GMT
+      - Sat, 11 Nov 2023 03:32:58 GMT
       Location:
-      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/d555aa7d-2f7a-43b4-a856-d6f1735d1205?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T031952Z&X-Amz-Expires=300&X-Amz-Signature=cdc6f3a5b2ce0ea981b3ac4319de5dbf047d220085224bb0eac26124e5353a07&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-frame-to-burst-0.3.1.json.zip&response-content-type=application%2Foctet-stream
+      - https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/d555aa7d-2f7a-43b4-a856-d6f1735d1205?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033258Z&X-Amz-Expires=300&X-Amz-Signature=35b7b25302d1b88b670ff3ea7c755dab271a8123def8dd2d8b0f8af3b8b02088&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-frame-to-burst-0.3.1.json.zip&response-content-type=application%2Foctet-stream
       Referrer-Policy:
       - no-referrer-when-downgrade
       Server:
@@ -503,7 +503,7 @@ interactions:
       X-Frame-Options:
       - deny
       X-GitHub-Request-Id:
-      - DF5B:435F:1C0EB73:27F12FE:654EF2D8
+      - E097:2630:7FECDDA:B799086:654EF5EA
       X-XSS-Protection:
       - '0'
     status:
@@ -521,7 +521,7 @@ interactions:
       User-Agent:
       - python-requests/2.28.2
     method: HEAD
-    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/d555aa7d-2f7a-43b4-a856-d6f1735d1205?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T031952Z&X-Amz-Expires=300&X-Amz-Signature=cdc6f3a5b2ce0ea981b3ac4319de5dbf047d220085224bb0eac26124e5353a07&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-frame-to-burst-0.3.1.json.zip&response-content-type=application%2Foctet-stream
+    uri: https://objects.githubusercontent.com/github-production-release-asset-2e65be/543891656/d555aa7d-2f7a-43b4-a856-d6f1735d1205?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIWNJYAX4CSVEH53A%2F20231111%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20231111T033258Z&X-Amz-Expires=300&X-Amz-Signature=35b7b25302d1b88b670ff3ea7c755dab271a8123def8dd2d8b0f8af3b8b02088&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=543891656&response-content-disposition=attachment%3B%20filename%3Dopera-s1-disp-frame-to-burst-0.3.1.json.zip&response-content-type=application%2Foctet-stream
   response:
     body:
       string: ''
@@ -529,7 +529,7 @@ interactions:
       Accept-Ranges:
       - bytes
       Age:
-      - '609'
+      - '1396'
       Connection:
       - keep-alive
       Content-Disposition:
@@ -541,7 +541,7 @@ interactions:
       Content-Type:
       - application/octet-stream
       Date:
-      - Sat, 11 Nov 2023 03:19:52 GMT
+      - Sat, 11 Nov 2023 03:32:59 GMT
       ETag:
       - '"0x8DBE25FCBF6EB02"'
       Last-Modified:
@@ -555,9 +555,9 @@ interactions:
       X-Cache-Hits:
       - 0, 1
       X-Served-By:
-      - cache-iad-kjyo7100024-IAD, cache-bur-kbur8200100-BUR
+      - cache-iad-kjyo7100024-IAD, cache-bur-kbur8200045-BUR
       X-Timer:
-      - S1699672793.674845,VS0,VE62
+      - S1699673579.221373,VS0,VE63
       x-ms-blob-type:
       - BlockBlob
       x-ms-creation-time:
