@@ -7,7 +7,10 @@ from ._dates import *
 from ._io import *
 from ._version import version as __version__
 from .bursts import *
+from .burst_frame_db import *
 from .constants import *
+from .datasets import *
 from .missing_data import *
+
 
 __all__ = ["__version__"]

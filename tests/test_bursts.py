@@ -6,10 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from opera_utils import (
-    get_burst_id,
-    group_by_burst,
-)
+from opera_utils import filter_by_burst_id, get_burst_id, group_by_burst
 
 
 def test_get_burst_id():
@@ -86,3 +83,24 @@ def test_group_by_burst_non_opera():
                 Path("t087_185679_iw1/20180210/t087_185679_iw1_20180210_VV.h5"),
             ]
         )
+
+
+def test_filter_by_burst_id():
+    burst_id = "t087_185678_iw2"
+    in_files = [
+        Path("t087_185678_iw1/20180210/t087_185678_iw1_20180210.h5"),
+        Path("t087_185678_iw2/20180318/t087_185678_iw2_20180318.h5"),
+        Path("t087_185678_iw3/20180423/t087_185678_iw3_20180423.h5"),
+    ]
+    expected = [in_files[1]]
+    assert filter_by_burst_id(in_files, burst_id) == expected
+
+    # Multiple burst ids
+    burst_ids = ["t087_185678_iw2", "t087_185678_iw3"]
+    expected = [in_files[1], in_files[2]]
+    assert filter_by_burst_id(in_files, burst_ids) == expected
+
+    # Any order should work
+    expected = [in_files[1]]
+    random.shuffle(in_files)
+    assert filter_by_burst_id(in_files, burst_id) == expected
