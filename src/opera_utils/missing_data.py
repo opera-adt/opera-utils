@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import date
-from itertools import chain, groupby
+from itertools import groupby
 from typing import Iterable, Mapping, Optional, Sequence
 
 import numpy as np
 
 from ._dates import get_dates
-from ._helpers import powerset, sorted_deduped_values
+from ._helpers import flatten, powerset, sorted_deduped_values
 from ._types import Filename
 from .bursts import group_by_burst
 
@@ -216,7 +216,7 @@ def generate_burst_subset_options(
 
     # Generate all unique combinations of idxs to exclude
     date_idxs_to_exclude_combinations = [
-        set(chain.from_iterable(combo)) for combo in powerset(missing_date_idxs)
+        set(flatten(combo)) for combo in powerset(missing_date_idxs)
     ]
 
     all_column_idxs = set(range(B.shape[1]))

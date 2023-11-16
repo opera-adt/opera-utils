@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import random
-from itertools import chain
 from pathlib import Path
 
 import pytest
 
 from opera_utils import filter_by_burst_id, get_burst_id, group_by_burst
+from opera_utils._helpers import flatten
 
 
 def test_get_burst_id():
@@ -36,7 +36,7 @@ def test_group_by_burst():
             Path("t087_185679_iw1/20180318/t087_185679_iw1_20180318.h5"),
         ],
     }
-    in_files = list(chain.from_iterable(expected.values()))
+    in_files = list(flatten(expected.values()))
 
     assert group_by_burst(in_files) == expected
 
@@ -68,7 +68,7 @@ def test_group_by_burst_product_version():
             Path(f"{base}_T087-185679-IW1_20180318T232711Z_{ending}"),
         ],
     }
-    in_files = list(chain.from_iterable(expected.values()))
+    in_files = list(flatten(expected.values()))
 
     assert group_by_burst(in_files) == expected
 
