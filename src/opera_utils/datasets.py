@@ -43,8 +43,8 @@ POOCH = pooch.create(
     # are their respective SHA256 hashes. Files will be downloaded
     # automatically when needed.
     registry={
-        f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "f0094f4cdc287d56d7a126a42f1e3075e50309afe8a431f49df1ecd8d8b26c8b",
-        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "d9cfe71ec836facd5a782ea82625c30a824b78f2b2689106c4d6808bbfce0898",
+        f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "963f63577221a3baa20f3a2101c7a01eefb0cc853f6f111708a5bb35bebfc0ed",
+        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "e75cc27809448d7ace2164879626fb0b5616b16981a6b2d6d234e3b17cb615fa",
         f"opera-s1-disp-burst-to-frame-{BURST_DB_VERSION}.json.zip": "436cce345378dc31e81ed661497bab2e744217a5d63c0bb92817dc837786cd22",
         f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip": "a48382afcb89f0ff681982b0fc24476ec9c6c1b8a67ae1a26cf380a450ffadc0",
     },
