@@ -40,7 +40,7 @@ Changelog = "https://github.com/opera-adt/opera-utils/releases"
 
 # Entry points for the command line interface
 [project.scripts]
-opera_utils = "opera_utils.cli:main"
+opera-utils = "opera_utils.cli:cli_app"
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }

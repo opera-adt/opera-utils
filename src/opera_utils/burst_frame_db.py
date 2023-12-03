@@ -87,8 +87,8 @@ def get_burst_id_geojson(
 def _form_where_in_query(values: Sequence[str], column_name):
     # Example:
     # "burst_id_jpl in ('t005_009471_iw2','t007_013706_iw2','t008_015794_iw1')"
-    burst_str = ",".join(f"'{b}'" for b in values)
-    return f"{column_name} IN ({burst_str})"
+    where_in_str = ",".join(f"'{b}'" for b in values)
+    return f"{column_name} IN ({where_in_str})"
 
 
 def _get_geojson(
