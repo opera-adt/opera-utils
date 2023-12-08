@@ -66,6 +66,7 @@ def get_frame_geojson(
         as_geodataframe=as_geodataframe,
         columns=columns,
         where=where,
+        index_name="frame_id",
     )
 
 
@@ -81,6 +82,7 @@ def get_burst_id_geojson(
         as_geodataframe=as_geodataframe,
         columns=columns,
         where=where,
+        index_name="burst_id_jpl",
     )
 
 
@@ -96,6 +98,7 @@ def _get_geojson(
     as_geodataframe: bool = False,
     columns: Optional[Sequence[str]] = None,
     where: Optional[str] = None,
+    index_name: Optional[str] = None,
 ) -> dict:
     # https://gdal.org/user/ogr_sql_dialect.html#where
     # https://pyogrio.readthedocs.io/en/latest/introduction.html#filter-records-by-attribute-value
@@ -104,7 +107,10 @@ def _get_geojson(
 
         # import geopandas as gpd
         # return gpd.read_file(f)
-        return read_dataframe(f, columns=columns, where=where)
+        gdf = read_dataframe(f, columns=columns, where=where, fid_as_index=True)
+        if index_name:
+            gdf.index.name = index_name
+        return gdf
 
     return read_zipped_json(f)
 

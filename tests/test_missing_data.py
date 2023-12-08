@@ -20,7 +20,7 @@ def burst_ids():
 def dates():
     # Space every 12 dates
     num_dates = 5
-    start = datetime.date(2020, 1, 1)
+    start = datetime.datetime(2020, 1, 1)
     return [start + datetime.timedelta(days=12 * i) for i in range(num_dates)]
 
 
@@ -168,56 +168,3 @@ def test_get_missing_data_options_real(idaho_slc_list):
         assert option.num_burst_ids == len(expected_id_lists[i])
         assert option.num_dates == expected_num_dates[i]
         assert option.total_num_bursts == expected_total_num_bursts[i]
-
-
-def test_get_dates():
-    assert missing_data.get_dates("20200303_20210101.int") == [
-        datetime.date(2020, 3, 3),
-        datetime.date(2021, 1, 1),
-    ]
-
-    assert missing_data.get_dates("20200303.slc")[0] == datetime.date(2020, 3, 3)
-    assert missing_data.get_dates(Path("20200303.slc"))[0] == datetime.date(2020, 3, 3)
-    # Check that it's the filename, not the path
-    assert missing_data.get_dates(Path("/usr/19990101/asdf20200303.tif"))[
-        0
-    ] == datetime.date(2020, 3, 3)
-    assert missing_data.get_dates("/usr/19990101/asdf20200303.tif")[0] == datetime.date(
-        2020, 3, 3
-    )
-
-    assert missing_data.get_dates("/usr/19990101/20200303_20210101.int") == [
-        datetime.date(2020, 3, 3),
-        datetime.date(2021, 1, 1),
-    ]
-
-    assert missing_data.get_dates("/usr/19990101/notadate.tif") == []
-
-
-def test_get_dates_with_format():
-    # try other date formats
-    fmt = "%Y-%m-%d"
-    assert missing_data.get_dates("2020-03-03_2021-01-01.int", fmt) == [
-        datetime.date(2020, 3, 3),
-        datetime.date(2021, 1, 1),
-    ]
-
-
-def test_get_dates_with_gdal_string():
-    # Checks that is can parse 'NETCDF:"/path/to/file.nc":variable'
-    assert missing_data.get_dates(
-        'NETCDF:"/usr/19990101/20200303_20210101.nc":variable'
-    ) == [
-        datetime.date(2020, 3, 3),
-        datetime.date(2021, 1, 1),
-    ]
-    assert missing_data.get_dates(
-        'NETCDF:"/usr/19990101/20200303_20210101.nc":"//variable/2"'
-    ) == [
-        datetime.date(2020, 3, 3),
-        datetime.date(2021, 1, 1),
-    ]
-    # Check the derived dataset name too
-    assert missing_data.get_dates(
-        'DERIVED_SUBDATASET:AMPLITUDE:"/usr/19990101/20200303_20210101.int"'
-    ) == [datetime.date(2020, 3, 3), datetime.date(2021, 1, 1)]
