@@ -11,3 +11,4 @@ dependencies:
   - pooch>=1.7
   - pyproj>=3.3
   - shapely>=1.8
+  - typing_extensions>=4
