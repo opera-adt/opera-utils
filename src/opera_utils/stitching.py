@@ -7,15 +7,18 @@ import subprocess
 import tempfile
 from os import fspath
 from pathlib import Path
-from typing import Iterable, Optional, Sequence, Union
+from typing import Iterable, Mapping, Optional, Sequence
 
 import numpy as np
 from numpy.typing import DTypeLike
 from osgeo import gdal, osr
 from pyproj import Transformer
 
-from opera_utils import io, utils
+from opera_utils import _io
 from opera_utils._types import Bbox, PathOrStr
+from opera_utils._utils import _get_path_from_gdal_str, numpy_to_gdal_type
+
+from .constants import DEFAULT_TIFF_OPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +29,14 @@ def merge_images(
     target_aligned_pixels: bool = True,
     out_bounds: Optional[Bbox] = None,
     out_bounds_epsg: Optional[int] = None,
-    strides: dict[str, int] = {"x": 1, "y": 1},
-    driver: str = "ENVI",
+    strides: Mapping[str, int] = {"x": 1, "y": 1},
+    driver: str = "GTiff",
     out_nodata: Optional[float] = 0,
     out_dtype: Optional[DTypeLike] = None,
     in_nodata: Optional[float] = None,
-    resample_alg: str = "lanczos",
+    resample_alg: str = "nearest",
     overwrite=False,
-    options: Optional[Sequence[str]] = io.DEFAULT_ENVI_OPTIONS,
+    options: Optional[Sequence[str]] = DEFAULT_TIFF_OPTIONS,
     create_only: bool = False,
 ) -> None:
     """Combine multiple SLC images on the same date into one image.
@@ -59,7 +62,7 @@ def merge_images(
     strides : dict[str, int]
         subsample factor: {"x": x strides, "y": y strides}
     driver : str
-        GDAL driver to use for output file. Default is ENVI.
+        GDAL driver to use for output file. Default is GTiff.
     out_nodata : Optional[float | str]
         Nodata value to use for output file. Default is 0.
     out_dtype : Optional[DTypeLike]
@@ -67,9 +70,9 @@ def merge_images(
         of the first image in the list.
     in_nodata : Optional[float | str]
         Override the files' `nodata` and use `in_nodata` during merging.
-    resample_alg : str, default="lanczos"
+    resample_alg : str, default="nearest"
         Method for gdal to use for reprojection.
-        Default is lanczos (sinc-kernel)
+        Default is nearest-neighbor.
     overwrite : bool
         Overwrite existing files. Default is False.
     options : Optional[Sequence[str]]
@@ -150,7 +153,7 @@ def merge_images(
         ndv = str(in_nodata) if in_nodata is not None else str(combined_nodata)
         args.extend(["-n", ndv])  # type: ignore
     if out_dtype is not None:
-        out_gdal_dtype = gdal.GetDataTypeName(io.numpy_to_gdal_type(out_dtype))
+        out_gdal_dtype = gdal.GetDataTypeName(numpy_to_gdal_type(out_dtype))
         args.extend(["-ot", out_gdal_dtype])
     if target_aligned_pixels:
         args.append("-tap")
@@ -169,7 +172,7 @@ def merge_images(
 
 def get_downsampled_vrts(
     filenames: Sequence[PathOrStr],
-    strides: dict[str, int],
+    strides: Mapping[str, int],
     dirname: PathOrStr,
 ) -> list[Path]:
     """Create downsampled VRTs from a list of files.
@@ -212,7 +215,7 @@ def get_downsampled_vrts(
 
 
 def _get_temp_filename(fn: Path, idx: int, extra: str = ""):
-    base = utils._get_path_from_gdal_str(fn).stem
+    base = _get_path_from_gdal_str(fn).stem
     return f"{base}_{idx}{extra}.vrt"
 
 
@@ -304,8 +307,8 @@ def get_combined_bounds_nodata(
     target_aligned_pixels: bool = False,
     out_bounds: Optional[Bbox] = None,
     out_bounds_epsg: Optional[int] = None,
-    strides: dict[str, int] = {"x": 1, "y": 1},
-) -> tuple[Bbox, Union[str, float, None]]:
+    strides: Mapping[str, int] = {"x": 1, "y": 1},
+) -> tuple[Bbox, str | float | None]:
     """Get the bounds and nodata of the combined image.
 
     Parameters
@@ -347,7 +350,7 @@ def get_combined_bounds_nodata(
     # Check all files match in resolution/projection
     for fn in filenames:
         ds = gdal.Open(fspath(fn))
-        left, bottom, right, top = io.get_raster_bounds(fn)
+        left, bottom, right, top = _io.get_raster_bounds(fn)
         gt = ds.GetGeoTransform()
         dx, dy = gt[1], gt[5]
 
@@ -357,7 +360,7 @@ def get_combined_bounds_nodata(
         xs.extend([left, right])
         ys.extend([bottom, top])
 
-        nd = io.get_raster_nodata(fn)
+        nd = _io.get_raster_nodata(fn)
         # Need to stringify 'nan', or it is repeatedly added
         nodatas.add(str(nd) if (nd is not None and np.isnan(nd)) else nd)
 
@@ -371,7 +374,7 @@ def get_combined_bounds_nodata(
 
     if out_bounds is not None:
         if out_bounds_epsg is not None:
-            dst_epsg = io.get_raster_crs(filenames[0]).to_epsg()
+            dst_epsg = _io.get_raster_crs(filenames[0]).to_epsg()
             bounds = _reproject_bounds(out_bounds, out_bounds_epsg, dst_epsg)
         else:
             bounds = out_bounds  # type: ignore
@@ -418,10 +421,10 @@ def get_transformed_bounds(filename: PathOrStr, epsg_code: Optional[int] = None)
     tuple
         The bounds of the raster as (left, bottom, right, top)
     """
-    bounds = io.get_raster_bounds(filename)
+    bounds = _io.get_raster_bounds(filename)
     if epsg_code is None:
         return bounds
-    from_epsg = io.get_raster_crs(filename=filename).to_epsg()
+    from_epsg = _io.get_raster_crs(filename=filename).to_epsg()
     assert from_epsg is not None
     if from_epsg == epsg_code:
         return bounds
@@ -435,8 +438,8 @@ def _copy_set_nodata(
     ext: Optional[str] = None,
     in_band: int = 1,
     out_nodata: float = 0,
-    driver="ENVI",
-    creation_options=io.DEFAULT_ENVI_OPTIONS,
+    driver="GTiff",
+    creation_options=DEFAULT_TIFF_OPTIONS,
 ):
     """Make a copy of infile and replace NaNs/input nodata with `out_nodata`."""
     in_p = Path(infile)
@@ -500,9 +503,9 @@ def warp_to_match(
         Path to the output image.
         Same as `output_file` if provided, otherwise a path to the in-memory VRT.
     """
-    bounds = io.get_raster_bounds(match_file)
-    crs_wkt = io.get_raster_crs(match_file).to_wkt()
-    gt = io.get_raster_gt(match_file)
+    bounds = _io.get_raster_bounds(match_file)
+    crs_wkt = _io.get_raster_crs(match_file).to_wkt()
+    gt = _io.get_raster_gt(match_file)
     resolution = (gt[1], gt[5])
 
     if output_file is None:
@@ -510,7 +513,7 @@ def warp_to_match(
         logger.debug(f"Creating in-memory warped VRT: {output_file}")
 
     if output_format is None and Path(input_file).suffix == Path(output_file).suffix:
-        output_format = io.get_raster_driver(input_file)
+        output_format = _io.get_raster_driver(input_file)
 
     options = gdal.WarpOptions(
         dstSRS=crs_wkt,

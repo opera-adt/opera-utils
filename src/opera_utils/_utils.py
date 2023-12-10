@@ -7,6 +7,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
+import numpy as np
+from numpy.typing import DTypeLike
+
 from ._types import PathOrStr
 
 __all__ = [
@@ -51,6 +54,60 @@ def format_nc_filename(filename: PathOrStr, ds_name: str | None = None) -> str:
         raise ValueError("Must provide dataset name for HDF5/NetCDF files")
 
     return f'NETCDF:"{filename}":"//{ds_name.lstrip("/")}"'
+
+
+def _get_path_from_gdal_str(name: PathOrStr) -> Path:
+    s = str(name)
+    if s.upper().startswith("DERIVED_SUBDATASET"):
+        # like DERIVED_SUBDATASET:AMPLITUDE:slc_filepath.tif
+        p = s.split(":")[-1].strip('"').strip("'")
+    elif ":" in s and (s.upper().startswith("NETCDF") or s.upper().startswith("HDF")):
+        # like NETCDF:"slc_filepath.nc":subdataset
+        p = s.split(":")[1].strip('"').strip("'")
+    else:
+        # Whole thing is the path
+        p = str(name)
+    return Path(p)
+
+
+def numpy_to_gdal_type(np_dtype: DTypeLike) -> int:
+    """Convert numpy dtype to gdal type.
+
+    Parameters
+    ----------
+    np_dtype : DTypeLike
+        Numpy dtype to convert.
+
+    Returns
+    -------
+    int
+        GDAL type code corresponding to `np_dtype`.
+
+    Raises
+    ------
+    TypeError
+        If `np_dtype` is not a numpy dtype, or if the provided dtype is not
+        supported by GDAL (for example, `np.dtype('>i4')`)
+    """
+    from osgeo import gdal_array, gdalconst
+
+    np_dtype = np.dtype(np_dtype)
+
+    if np.issubdtype(bool, np_dtype):
+        return gdalconst.GDT_Byte
+    gdal_code = gdal_array.NumericTypeCodeToGDALTypeCode(np_dtype)
+    if gdal_code is None:
+        raise TypeError(f"dtype {np_dtype} not supported by GDAL.")
+    return gdal_code
+
+
+def gdal_to_numpy_type(gdal_type: str | int) -> np.dtype:
+    """Convert gdal type to numpy type."""
+    from osgeo import gdal, gdal_array
+
+    if isinstance(gdal_type, str):
+        gdal_type = gdal.GetDataTypeByName(gdal_type)
+    return np.dtype(gdal_array.GDALTypeCodeToNumericTypeCode(gdal_type))
 
 
 @contextmanager

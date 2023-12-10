@@ -4,10 +4,10 @@ import datetime
 import itertools
 import re
 from collections import defaultdict
-from pathlib import Path
 from typing import Iterable, overload
 
 from ._types import DateOrDatetime, Filename, PathLikeT
+from ._utils import _get_path_from_gdal_str
 
 __all__ = [
     "get_dates",
@@ -143,20 +143,6 @@ def group_by_date(
 
 def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.datetime:
     return datetime.datetime.strptime(datestr, fmt)
-
-
-def _get_path_from_gdal_str(name: Filename) -> Path:
-    s = str(name)
-    if s.upper().startswith("DERIVED_SUBDATASET"):
-        # like DERIVED_SUBDATASET:AMPLITUDE:slc_filepath.tif
-        p = s.split(":")[-1].strip('"').strip("'")
-    elif ":" in s and (s.upper().startswith("NETCDF") or s.upper().startswith("HDF")):
-        # like NETCDF:"slc_filepath.nc":subdataset
-        p = s.split(":")[1].strip('"').strip("'")
-    else:
-        # Whole thing is the path
-        p = str(name)
-    return Path(p)
 
 
 def _date_format_to_regex(date_format: str) -> re.Pattern:

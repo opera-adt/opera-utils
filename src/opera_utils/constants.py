@@ -22,3 +22,18 @@ OPERA_BURST_RE = re.compile(
     r"[tT](?P<track>\d{3})[-_](?P<burst_id>\d{6})[-_](?P<subswath>iw[1-3])",
     re.IGNORECASE,
 )
+
+DEFAULT_TIFF_OPTIONS = (
+    "COMPRESS=DEFLATE",
+    "ZLEVEL=4",
+    "TILED=YES",
+    "BLOCKXSIZE=128",
+    "BLOCKYSIZE=128",
+)
+EXTRA_COMPRESSED_TIFF_OPTIONS = (
+    *DEFAULT_TIFF_OPTIONS,
+    # Note: we're dropping mantissa bits before we do not
+    # need prevision for LOS rasters (or incidence)
+    "DISCARD_LSB=6",
+    "PREDICTOR=2",
+)
