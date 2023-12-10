@@ -28,7 +28,7 @@ class Layer(Enum):
 
 
 # Layover shadow mask. 0=no layover, no shadow; 1=shadow; 2=layover; 3=shadow and layover.
-DEFAULT_LAYERS = ["los_east", "los_north", "layover_shadow_mask"]
+DEFAULT_LAYERS = list(Layer)[:3]  # Skip the local incidence, much less compressible
 DEFAULT_STRIDES = {"x": 6, "y": 3}
 LAYER_TO_NODATA = {
     Layer.LOS_EAST: 0,
@@ -40,6 +40,7 @@ LAYER_TO_NODATA = {
 
 
 def create_geometry_files(
+    *,
     frame_id: int | None = None,
     burst_ids: Sequence[str] | None = None,
     output_dir: PathOrStr = Path("."),
@@ -97,13 +98,15 @@ def create_geometry_files(
             burst_ids=burst_ids, output_dir=sd, max_jobs=max_download_jobs
         )
         for layer in layers:
+            layer_enum = Layer(layer)
+            name = layer_enum.value
             gdal_strings = [
-                format_nc_filename(f, ds_name=f"data/{layer}") for f in local_hdf5_files
+                format_nc_filename(f, ds_name=f"data/{name}") for f in local_hdf5_files
             ]
             nodata = LAYER_TO_NODATA[Layer(layer)]
-            cur_outfile = output_path / f"{layer}.tif"
+            cur_outfile = output_path / f"{name}.tif"
             output_files.append(cur_outfile)
-            logger.info(f"Merging images for {layer}")
+            logger.info(f"Merging images for {name}")
             stitching.merge_images(
                 file_list=gdal_strings,
                 outfile=cur_outfile,
@@ -120,7 +123,7 @@ def create_geometry_files(
 
 @cache
 def _search(burst_ids: Sequence[str]) -> asf.ASFSearchResults:
-    return asf.search(operaBurstID=burst_ids, processingLevel="CSLC-STATIC")
+    return asf.search(operaBurstID=list(burst_ids), processingLevel="CSLC-STATIC")
 
 
 def _get_urls(
@@ -145,7 +148,8 @@ def _get_urls(
 def _download_static_layers(
     burst_ids: Sequence[str], output_dir: Path, max_jobs: int = 3
 ) -> list[Path]:
-    results = _search(burst_ids=burst_ids)
+    # Make a tuple so it can be hashed
+    results = _search(burst_ids=tuple(burst_ids))
     session = _get_auth_session()
     urls = _get_urls(results)
     asf.download_urls(urls=urls, path=output_dir, session=session, processes=max_jobs)
