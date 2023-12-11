@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import netrc
 from enum import Enum
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from typing import Literal, Mapping, Sequence
 
@@ -121,7 +121,7 @@ def create_geometry_files(
     return output_files
 
 
-@lru_cache
+@cache
 def _search(burst_ids: Sequence[str]) -> asf.ASFSearchResults:
     return asf.search(operaBurstID=list(burst_ids), processingLevel="CSLC-STATIC")
 
