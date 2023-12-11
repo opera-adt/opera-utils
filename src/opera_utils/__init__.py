@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from ._dates import *
-from ._io import *
 from ._version import version as __version__
 from .bursts import *
 from .burst_frame_db import *
