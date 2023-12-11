@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import rasterio as rio
@@ -25,7 +25,7 @@ def get_raster_nodata(filename: PathOrStr, band: int = 1) -> float | None:
     Optional[float]
         Nodata value, or None if not found.
     """
-    nodatas = cast(tuple[float | None], _get_dataset_attr(filename, "nodatavals"))
+    nodatas = _get_dataset_attr(filename, "nodatavals")
     return nodatas[band - 1]
 
 
@@ -42,7 +42,7 @@ def get_raster_crs(filename: PathOrStr) -> CRS:
     CRS
         pyproj CRS for `filename`
     """
-    return cast(CRS, _get_dataset_attr(filename, "crs"))
+    return _get_dataset_attr(filename, "crs")
 
 
 def get_raster_transform(filename: PathOrStr) -> Affine:
@@ -58,7 +58,7 @@ def get_raster_transform(filename: PathOrStr) -> Affine:
     List[float]
         6 floats representing a GDAL Geotransform.
     """
-    return cast(Affine, _get_dataset_attr(filename, "transform"))
+    return _get_dataset_attr(filename, "transform")
 
 
 def get_raster_gt(filename: PathOrStr) -> list[float]:
@@ -92,7 +92,7 @@ def get_raster_dtype(filename: PathOrStr, band: int = 1) -> np.dtype:
     np.dtype
         Data type.
     """
-    dtype_per_band = cast(tuple[str], _get_dataset_attr(filename, "dtypes"))
+    dtype_per_band = _get_dataset_attr(filename, "dtypes")
     return np.dtype(dtype_per_band[band - 1])
 
 
@@ -109,7 +109,7 @@ def get_raster_driver(filename: PathOrStr) -> str:
     str
         Driver name.
     """
-    return cast(str, _get_dataset_attr(filename, "driver"))
+    return _get_dataset_attr(filename, "driver")
 
 
 def get_raster_bounds(filename: PathOrStr) -> Bbox:
