@@ -120,7 +120,7 @@ def get_missing_data_options(
 
 
 def get_burst_id_date_incidence(
-    burst_id_to_dates: Mapping[str, list[date]]
+    burst_id_to_dates: Mapping[str, list[date]],
 ) -> np.ndarray:
     """Create a matrix of burst ID vs. date incidence.
 
@@ -150,7 +150,7 @@ def get_burst_id_date_incidence(
 
 
 def _burst_id_mapping_from_tuples(
-    burst_id_date_tuples: Iterable[tuple[str, date]]
+    burst_id_date_tuples: Iterable[tuple[str, date]],
 ) -> dict[str, list[date]]:
     """Create a {burst_id -> [date,...]} (burst_id, date) tuples."""
     # Don't exhaust the iterator for multiple groupings
