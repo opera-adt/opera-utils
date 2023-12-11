@@ -84,4 +84,9 @@ ignore = "D100,D102,D104,D105,D106,D107,D203,D204,D213,D413"
 [tool.pytest.ini_options]
 doctest_optionflags = "NORMALIZE_WHITESPACE NUMBER"
 addopts = "  --cov=opera_utils  --doctest-modules --randomly-seed=1234 --ignore=scripts --ignore=docs"
-filterwarnings = ["error", "ignore:h5py is running against HDF5.*:UserWarning"]
+filterwarnings = [
+  "error",
+  "ignore:h5py is running against HDF5.*:UserWarning",
+  # https://github.com/dateutil/dateutil/pull/1285 will be released, but not yet
+  "ignore:datetime.datetime.utcfromtimestamp.*:DeprecationWarning",
+]
