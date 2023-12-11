@@ -17,10 +17,16 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         deps:
           - label: Latest
-            spec: "rasterio"
+            spec: >-
+              rasterio
+              gdal
+              asf_search
           - label: Minimum
             spec: >-
               python=3.8
+              rasterio=1.3
+              gdal=3.3
+              asf_search=6.7.2
 
       fail-fast: false
     name: ${{ matrix.os }} • ${{ matrix.deps.label }}
