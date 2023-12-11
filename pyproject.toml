@@ -71,7 +71,7 @@ preview = true
 
 [tool.isort]
 profile = "black"
-known_first_party = [" opera_utils"]
+known_first_party = ["opera_utils"]
 
 [tool.mypy]
 python_version = "3.10"
