@@ -11,7 +11,7 @@ from .burst_frame_db import *
 from .constants import *
 from .datasets import *
 from .missing_data import *
-from .utils import *
+from ._utils import *
 from ._gslc import *
 
 

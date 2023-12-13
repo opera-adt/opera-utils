@@ -3,14 +3,16 @@ from __future__ import annotations
 import datetime
 import itertools
 import re
-from pathlib import Path
+from collections import defaultdict
 from typing import Iterable, overload
 
-from ._types import Filename, PathLikeT
+from ._types import DateOrDatetime, Filename, PathLikeT
+from ._utils import _get_path_from_gdal_str
 
 __all__ = [
     "get_dates",
     "filter_by_date",
+    "group_by_date",
     "DATE_FORMAT",
 ]
 
@@ -22,7 +24,7 @@ __all__ = [
 ]
 
 
-def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.date]:
+def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.datetime]:
     """Search for dates in the stem of `filename` matching `fmt`.
 
     Excludes dates that are not in the stem of `filename` (in the directories).
@@ -59,7 +61,7 @@ def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.date]
 @overload
 def filter_by_date(
     files: Iterable[PathLikeT],
-    dates: Iterable[datetime.date],
+    dates: Iterable[DateOrDatetime],
     fmt: str = DATE_FORMAT,
 ) -> list[PathLikeT]:
     ...
@@ -68,7 +70,7 @@ def filter_by_date(
 @overload
 def filter_by_date(
     files: Iterable[str],
-    dates: Iterable[datetime.date],
+    dates: Iterable[DateOrDatetime],
     fmt: str = DATE_FORMAT,
 ) -> list[str]:
     ...
@@ -95,7 +97,7 @@ def filter_by_date(files, dates, fmt=DATE_FORMAT):
     return out
 
 
-def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.date:
+def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.datetime:
     """Parse a date string into a datetime.date object.
 
     Parameters
@@ -110,33 +112,7 @@ def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.date:
     datetime.date
         Parsed date object.
     """
-    return datetime.datetime.strptime(datestr, fmt).date()
-
-
-def _get_path_from_gdal_str(name: Filename) -> Path:
-    """Extract a Path object from a GDAL-formatted string.
-
-    Parameters
-    ----------
-    name : Filename
-        GDAL-formatted string.
-
-    Returns
-    -------
-    Path
-        Extracted Path object.
-    """
-    s = str(name)
-    if s.upper().startswith("DERIVED_SUBDATASET"):
-        # like DERIVED_SUBDATASET:AMPLITUDE:slc_filepath.tif
-        p = s.split(":")[-1].strip('"').strip("'")
-    elif ":" in s and (s.upper().startswith("NETCDF") or s.upper().startswith("HDF")):
-        # like NETCDF:"slc_filepath.nc":subdataset
-        p = s.split(":")[1].strip('"').strip("'")
-    else:
-        # Whole thing is the path
-        p = str(name)
-    return Path(p)
+    return datetime.datetime.strptime(datestr, fmt)
 
 
 def _date_format_to_regex(date_format: str) -> re.Pattern:
@@ -176,17 +152,17 @@ def _date_format_to_regex(date_format: str) -> re.Pattern:
 
 
 def group_by_date(
-    file_list: Iterable[Filename], file_date_fmt: str = "%Y%m%d"
-) -> dict[datetime.date, list[Filename]]:
+    files: Iterable[PathLikeT], file_date_fmt: str = DATE_FORMAT
+) -> dict[tuple[datetime.datetime, ...], list[PathLikeT]]:
     """Combine files by date into a dict.
 
     Parameters
     ----------
-    file_list: Iterable[Filename]
+    files: Iterable[Filename]
         Path to folder containing files with dates in the filename.
     file_date_fmt: str
         Format of the date in the filename.
-        Default is [dolphin.io.DEFAULT_DATETIME_FORMAT][]
+        Default is [dolphin.DEFAULT_DATETIME_FORMAT][]
 
     Returns
     -------
@@ -194,25 +170,27 @@ def group_by_date(
         key is a list of dates in the filenames.
         Value is a list of Paths on that date.
         E.g.:
-        {(datetime.date(2017, 10, 13),
+        {(datetime.datetime(2017, 10, 13),
           [Path(...)
             Path(...),
             ...]),
-         (datetime.date(2017, 10, 25),
+         (datetime.datetime(2017, 10, 25),
           [Path(...)
             Path(...),
             ...]),
         }
     """
-    sorted_file_list, _ = sort_files_by_date(file_list, file_date_fmt=file_date_fmt)
+    # collapse into groups of dates
+    # Use a `defaultdict` so we dont have to sort the files by date in advance,
+    # but rather just extend the list each time there's a new group
+    grouped_images: dict[tuple[datetime.datetime, ...], list[PathLikeT]] = defaultdict(
+        list
+    )
 
-    # Now collapse into groups, sorted by the date
-    grouped_images = {
-        dates: list(g)
-        for dates, g in itertools.groupby(
-            sorted_file_list, key=lambda x: get_dates(x)[0]
-        )
-    }
+    for dates, g in itertools.groupby(
+        files, key=lambda x: tuple(get_dates(x, fmt=file_date_fmt))
+    ):
+        grouped_images[dates].extend(list(g))
     return grouped_images
 
 
