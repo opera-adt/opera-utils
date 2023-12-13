@@ -19,10 +19,6 @@ __all__ = [
 DATE_FORMAT = "%Y%m%d"
 DATETIME_FORMAT = "%Y%m%dT%H%M%S"
 
-__all__ = [
-    "group_by_date",
-]
-
 
 def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.datetime]:
     """Search for dates in the stem of `filename` matching `fmt`.
@@ -38,15 +34,15 @@ def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.datet
 
     Returns
     -------
-    list[datetime.date]
+    list[datetime.datetime]
         list of dates found in the stem of `filename` matching `fmt`.
 
     Examples
     --------
     >>> get_dates("/path/to/20191231.slc.tif")
-    [datetime.date(2019, 12, 31)]
+    [datetime.datetime(2019, 12, 31, 0, 0)]
     >>> get_dates("S1A_IW_SLC__1SDV_20191231T000000_20191231T000000_032123_03B8F1_1C1D.nc")
-    [datetime.date(2019, 12, 31), datetime.date(2019, 12, 31)]
+    [datetime.datetime(2019, 12, 31, 0, 0), datetime.datetime(2019, 12, 31, 0, 0)]
     >>> get_dates("/not/a/date_named_file.tif")
     []
     """  # noqa: E501
@@ -87,6 +83,11 @@ def filter_by_date(files, dates, fmt=DATE_FORMAT):
         Iterable of dates to filter by
     fmt : str, optional
         Format of date to search for. Default is %Y%m%d
+
+    Returns
+    -------
+    list[PathLikeT]
+        Items in `files`
     """
     date_set = set(dates)
     out = []
@@ -98,27 +99,11 @@ def filter_by_date(files, dates, fmt=DATE_FORMAT):
 
 
 def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.datetime:
-    """Parse a date string into a datetime.date object.
-
-    Parameters
-    ----------
-    datestr : str
-        Date string to be parsed.
-    fmt : str, optional
-        Format of the date string. Default is %Y%m%d.
-
-    Returns
-    -------
-    datetime.date
-        Parsed date object.
-    """
     return datetime.datetime.strptime(datestr, fmt)
 
 
 def _date_format_to_regex(date_format: str) -> re.Pattern:
     r"""Convert a python date format string to a regular expression.
-
-    Useful for Year, month, date date formats.
 
     Parameters
     ----------
@@ -146,6 +131,9 @@ def _date_format_to_regex(date_format: str) -> re.Pattern:
     date_format = date_format.replace("%Y", r"\d{4}")
     date_format = date_format.replace("%m", r"\d{2}")
     date_format = date_format.replace("%d", r"\d{2}")
+    date_format = date_format.replace("%H", r"\d{2}")
+    date_format = date_format.replace("%M", r"\d{2}")
+    date_format = date_format.replace("%S", r"\d{2}")
 
     # Return the resulting regular expression
     return re.compile(date_format)

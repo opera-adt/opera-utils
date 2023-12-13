@@ -16,13 +16,17 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         deps:
-            # Note: for now we're manually adding tophu deps,
-            # will change once it's on conda forge
           - label: Latest
-            spec: ""
+            spec: >-
+              rasterio
+              gdal
+              asf_search
           - label: Minimum
             spec: >-
-              python=3.8
+              python=3.9
+              rasterio=1.3
+              gdal=3.5
+              asf_search=6.7.2
 
       fail-fast: false
     name: ${{ matrix.os }} • ${{ matrix.deps.label }}

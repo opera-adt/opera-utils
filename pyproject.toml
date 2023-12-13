@@ -9,13 +9,12 @@ authors = [
 ]
 description = "Miscellaneous utilities for working with OPERA data products"
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 classifiers = [
   "Intended Audience :: Developers",
   "Intended Audience :: Science/Research",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -71,7 +70,7 @@ preview = true
 
 [tool.isort]
 profile = "black"
-known_first_party = [" opera_utils"]
+known_first_party = ["opera_utils"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -84,4 +83,9 @@ ignore = "D100,D102,D104,D105,D106,D107,D203,D204,D213,D413"
 [tool.pytest.ini_options]
 doctest_optionflags = "NORMALIZE_WHITESPACE NUMBER"
 addopts = "  --cov=opera_utils  --doctest-modules --randomly-seed=1234 --ignore=scripts --ignore=docs"
-filterwarnings = ["error"]
+filterwarnings = [
+  "error",
+  "ignore:h5py is running against HDF5.*:UserWarning",
+  # https://github.com/dateutil/dateutil/pull/1285 will be released, but not yet
+  "ignore:datetime.datetime.utcfromtimestamp.*:DeprecationWarning",
+]

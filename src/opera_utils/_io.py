@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import logging
 from os import fspath
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
+import rasterio as rio
+from affine import Affine
 from numpy.typing import ArrayLike
 from osgeo import gdal, gdal_array
 from pyproj import CRS
 
-from ._types import Bbox, Filename
+from ._types import Bbox, Filename, PathOrStr
 
 __all__ = [
     "load_gdal",
@@ -117,50 +119,6 @@ def load_gdal(
         return np.ma.masked_equal(out, nd)
 
 
-def get_raster_bounds(
-    filename: Optional[Filename] = None, ds: Optional[gdal.Dataset] = None
-) -> Bbox:
-    """Get the (left, bottom, right, top) bounds of the image."""
-    if ds is None:
-        if filename is None:
-            raise ValueError("Must provide either `filename` or `ds`")
-        ds = gdal.Open(fspath(filename))
-
-    gt = ds.GetGeoTransform()
-    xsize, ysize = ds.RasterXSize, ds.RasterYSize
-
-    x = 0
-    y = 0
-    left = gt[0] + x * gt[1] + y * gt[2]
-    top = gt[3] + x * gt[4] + y * gt[5]
-
-    x = xsize
-    y = ysize
-
-    right = gt[0] + x * gt[1] + y * gt[2]
-    bottom = gt[3] + x * gt[4] + y * gt[5]
-
-    return (left, bottom, right, top)
-
-
-def get_raster_crs(filename: Filename) -> CRS:
-    """Get the CRS from a file.
-
-    Parameters
-    ----------
-    filename : Filename
-        Path to the file to load.
-
-    Returns
-    -------
-    CRS
-        CRS.
-    """
-    ds = gdal.Open(fspath(filename))
-    crs = CRS.from_wkt(ds.GetProjection())
-    return crs
-
-
 def gdal_to_numpy_type(gdal_type: Union[str, int]) -> np.dtype:
     """Convert gdal type to numpy type."""
     if isinstance(gdal_type, str):
@@ -168,12 +126,12 @@ def gdal_to_numpy_type(gdal_type: Union[str, int]) -> np.dtype:
     return np.dtype(gdal_array.GDALTypeCodeToNumericTypeCode(gdal_type))
 
 
-def get_raster_nodata(filename: Filename, band: int = 1) -> Optional[float]:
+def get_raster_nodata(filename: PathOrStr, band: int = 1) -> float | None:
     """Get the nodata value from a file.
 
     Parameters
     ----------
-    filename : Filename
+    filename : PathOrStr
         Path to the file to load.
     band : int, optional
         Band to get nodata value for, by default 1.
@@ -183,6 +141,98 @@ def get_raster_nodata(filename: Filename, band: int = 1) -> Optional[float]:
     Optional[float]
         Nodata value, or None if not found.
     """
-    ds = gdal.Open(fspath(filename))
-    nodata = ds.GetRasterBand(band).GetNoDataValue()
-    return nodata
+    nodatas = _get_dataset_attr(filename, "nodatavals")
+    return nodatas[band - 1]
+
+
+def get_raster_crs(filename: PathOrStr) -> CRS:
+    """Get the CRS from a file.
+
+    Parameters
+    ----------
+    filename : PathOrStr
+        Path to the file to load.
+
+    Returns
+    -------
+    CRS
+        pyproj CRS for `filename`
+    """
+    return _get_dataset_attr(filename, "crs")
+
+
+def get_raster_transform(filename: PathOrStr) -> Affine:
+    """Get the rasterio `Affine` transform from a file.
+
+    Parameters
+    ----------
+    filename : PathOrStr
+        Path to the file to load.
+
+    Returns
+    -------
+    List[float]
+        6 floats representing a GDAL Geotransform.
+    """
+    return _get_dataset_attr(filename, "transform")
+
+
+def get_raster_gt(filename: PathOrStr) -> list[float]:
+    """Get the gdal geotransform from a file.
+
+    Parameters
+    ----------
+    filename : PathOrStr
+        Path to the file to load.
+
+    Returns
+    -------
+    Affine
+        Two dimensional affine transform for 2D linear mapping.
+    """
+    return get_raster_transform(filename).to_gdal()
+
+
+def get_raster_dtype(filename: PathOrStr, band: int = 1) -> np.dtype:
+    """Get the numpy data type from a raster file.
+
+    Parameters
+    ----------
+    filename : PathOrStr
+        Path to the file to load.
+    band : int, optional
+        Band to get nodata value for, by default 1.
+
+    Returns
+    -------
+    np.dtype
+        Data type.
+    """
+    dtype_per_band = _get_dataset_attr(filename, "dtypes")
+    return np.dtype(dtype_per_band[band - 1])
+
+
+def get_raster_driver(filename: PathOrStr) -> str:
+    """Get the GDAL driver `ShortName` from a file.
+
+    Parameters
+    ----------
+    filename : PathOrStr
+        Path to the file to load.
+
+    Returns
+    -------
+    str
+        Driver name.
+    """
+    return _get_dataset_attr(filename, "driver")
+
+
+def get_raster_bounds(filename: PathOrStr) -> Bbox:
+    """Get the (left, bottom, right, top) bounds of the image."""
+    return _get_dataset_attr(filename, "bounds")
+
+
+def _get_dataset_attr(filename: PathOrStr, attr_name: str) -> Any:
+    with rio.open(filename) as src:
+        return getattr(src, attr_name)

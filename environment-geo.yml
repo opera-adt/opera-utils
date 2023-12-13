@@ -1,6 +1,6 @@
 channels:
   - conda-forge
 dependencies:
-  - pyogrio>=0.5
-  - gdal>=3.3
-  - geopandas-base>=0.12
+  - asf_search>=6.7
+  - gdal>=3.5
+  - rasterio>=1.3
