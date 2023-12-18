@@ -6,7 +6,7 @@ import tempfile
 from contextlib import contextmanager
 from os import fspath
 from pathlib import Path
-from typing import Generator, Tuple
+from typing import Generator
 
 import numpy as np
 from numpy.typing import ArrayLike, DTypeLike
@@ -170,12 +170,12 @@ def get_snwe(epsg: int, bounds: Bbox) -> Bbox:
     ----------
     epsg : int
         EPSG code.
-    bounds : Tuple[float, float, float, float]
+    bounds : tuple[float, float, float, float]
         Bounds in WSEN format.
 
     Returns
     -------
-    Tuple[float, float, float, float]
+    tuple[float, float, float, float]
         Bounds in SNWE (lat/lon) format.
     """
     if epsg != 4326:
@@ -220,12 +220,12 @@ def create_yx_arrays(
     ----------
     gt : List[float]
         Geotransform list.
-    shape : Tuple[int, int]
+    shape : tuple[int, int]
         Shape of the dataset (ysize, xsize).
 
     Returns
     -------
-    Tuple[np.ndarray, np.ndarray]
+    tuple[np.ndarray, np.ndarray]
         x and y coordinate arrays.
     """
     ysize, xsize = shape
@@ -242,7 +242,7 @@ def create_yx_arrays(
 
 def transform_xy_to_latlon(
     epsg: int, x: ArrayLike, y: ArrayLike
-) -> Tuple[ArrayLike, ArrayLike]:
+) -> tuple[ArrayLike, ArrayLike]:
     """Convert the x, y coordinates in the source projection to WGS84 lat/lon.
 
     Parameters
@@ -256,7 +256,7 @@ def transform_xy_to_latlon(
 
     Returns
     -------
-    Tuple[ArrayLike, ArrayLike]
+    tuple[ArrayLike, ArrayLike]
         Latitude and longitude arrays.
     """
     # x, y to Lat/Lon
