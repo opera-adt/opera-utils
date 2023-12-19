@@ -37,3 +37,14 @@ def reproject_bounds(bounds: Bbox, src_epsg: int, dst_epsg: int) -> Bbox:
     left, bottom, right, top = bounds
     bbox: Bbox = (*t.transform(left, bottom), *t.transform(right, top))  # type: ignore
     return bbox
+
+
+def reproject_coordinates(
+    x: list[float], y: list[float], src_epsg: int, dst_epsg: int
+) -> tuple[list[float], list[float]]:
+    """Reproject the coordinates from `src_epsg` to `dst_epsg`."""
+    from pyproj import Transformer
+
+    t = Transformer.from_crs(src_epsg, dst_epsg, always_xy=True)
+    lons, lats = t.transform(x, y)
+    return lons, lats
