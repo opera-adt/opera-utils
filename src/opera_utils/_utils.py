@@ -10,11 +10,15 @@ from typing import Generator
 import numpy as np
 from numpy.typing import DTypeLike
 
-from ._types import PathOrStr
+from ._helpers import reproject_bounds, reproject_coordinates
+from ._types import Bbox, PathOrStr
 
 __all__ = [
     "format_nc_filename",
     "scratch_directory",
+    "create_yx_arrays",
+    "get_snwe",
+    "transform_xy_to_latlon",
 ]
 
 
@@ -153,3 +157,97 @@ def scratch_directory(
 
     if delete and not dir_already_existed:
         shutil.rmtree(scratchdir)
+
+
+def get_snwe(epsg: int, bounds: Bbox) -> Bbox:
+    """Convert bounds from (west, south, east, north) (WSEN) to SNWE in lat/lon.
+
+    This box format is used by the `RAiDER` library for its area of interest tracking:
+    https://github.com/dbekaert/RAiDER/blob/38eab3969ac762bc59502d7eb482fd73d6a0deef/tools/RAiDER/llreader.py#L30
+
+    Parameters
+    ----------
+    epsg : int
+        EPSG code of the input coordinates in `bounds`.
+    bounds : tuple[float, float, float, float]
+        Bounds in WSEN format.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        Bounds in SNWE (lat/lon) format.
+    """
+    if epsg != 4326:
+        bounds = reproject_bounds(bounds, epsg, 4326)
+
+    snwe = (bounds[1], bounds[3], bounds[0], bounds[2])
+
+    return snwe
+
+
+def create_yx_arrays(
+    gt: list[float], shape: tuple[int, int], step_size: float = 500
+) -> tuple[np.ndarray, np.ndarray]:
+    """Create the x and y coordinate datasets.
+
+    Assumes that the `y` output coordinates will be north-up, so that the
+    `y` array is in decreasing order.
+
+    Parameters
+    ----------
+    gt : List[float]
+        Geotransform list.
+    shape : tuple[int, int]
+        Shape of the dataset (ysize, xsize).
+    step_size : float
+        Pixel spacing, in units matching the projection of `gt` (e.g. meters for a UTM geotransform)
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        x and y coordinate arrays.
+    """
+    ysize, xsize = shape
+    # Parse the geotransform
+    x_origin, x_res, _, y_origin, _, y_res = gt
+    y_end = y_origin + y_res * ysize
+    x_end = x_origin + x_res * xsize
+
+    # Make the x/y arrays
+    y = np.arange(y_origin, y_end - step_size, -1 * step_size)
+    x = np.arange(x_origin, x_end + step_size, step_size)
+    return y, x
+
+
+def transform_xy_to_latlon(
+    epsg: int, x: np.ndarray, y: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert the x, y coordinates in the source projection to WGS84 lat/lon.
+
+    Parameters
+    ----------
+    epsg : int
+        EPSG code.
+    x : np.ndarray
+        x coordinates.
+    y : np.ndarray
+        y coordinates.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Latitude and longitude arrays.
+    """
+    if epsg != 4326:
+        lon_datacube, lat_datacube = reproject_coordinates(
+            x.flatten(), y.flatten(), epsg, 4326
+        )
+
+        # # reshape Lat lon of data cube
+        lat_datacube = np.array(lat_datacube).reshape(x.shape)
+        lon_datacube = np.array(lon_datacube).reshape(x.shape)
+    else:
+        lat_datacube = y.copy()
+        lon_datacube = x.copy()
+
+    return lat_datacube, lon_datacube

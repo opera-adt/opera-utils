@@ -98,6 +98,47 @@ def filter_by_date(files, dates, fmt=DATE_FORMAT):
     return out
 
 
+def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.datetime:
+    return datetime.datetime.strptime(datestr, fmt)
+
+
+def _date_format_to_regex(date_format: str) -> re.Pattern:
+    r"""Convert a python date format string to a regular expression.
+
+    Parameters
+    ----------
+    date_format : str
+        Date format string, e.g. DATE_FORMAT
+
+    Returns
+    -------
+    re.Pattern
+        Regular expression that matches the date format string.
+
+    Examples
+    --------
+    >>> pat2 = _date_format_to_regex("%Y%m%d").pattern
+    >>> pat2 == re.compile(r'\d{4}\d{2}\d{2}').pattern
+    True
+    >>> pat = _date_format_to_regex("%Y-%m-%d").pattern
+    >>> pat == re.compile(r'\d{4}\-\d{2}\-\d{2}').pattern
+    True
+    """
+    # Escape any special characters in the date format string
+    date_format = re.escape(date_format)
+
+    # Replace each format specifier with a regular expression that matches it
+    date_format = date_format.replace("%Y", r"\d{4}")
+    date_format = date_format.replace("%m", r"\d{2}")
+    date_format = date_format.replace("%d", r"\d{2}")
+    date_format = date_format.replace("%H", r"\d{2}")
+    date_format = date_format.replace("%M", r"\d{2}")
+    date_format = date_format.replace("%S", r"\d{2}")
+
+    # Return the resulting regular expression
+    return re.compile(date_format)
+
+
 def group_by_date(
     files: Iterable[PathLikeT], file_date_fmt: str = DATE_FORMAT
 ) -> dict[tuple[datetime.datetime, ...], list[PathLikeT]]:
@@ -141,42 +182,47 @@ def group_by_date(
     return grouped_images
 
 
-def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.datetime:
-    return datetime.datetime.strptime(datestr, fmt)
+def sort_files_by_date(
+    files: Iterable[Filename], file_date_fmt: str = "%Y%m%d"
+) -> tuple[list[Filename], list[list[datetime.date]]]:
+    """Sort a list of files by date.
 
+    If some files have multiple dates, the files with the most dates are sorted
+    first. Within each group of files with the same number of dates, the files
+    with the earliest dates are sorted first.
 
-def _date_format_to_regex(date_format: str) -> re.Pattern:
-    r"""Convert a python date format string to a regular expression.
+    The multi-date files are placed first so that compressed SLCs are sorted
+    before the individual SLCs that make them up.
 
     Parameters
     ----------
-    date_format : str
-        Date format string, e.g. DATE_FORMAT
+    files : Iterable[Filename]
+        list of files to sort.
+    file_date_fmt : str, optional
+        Datetime format passed to `strptime`, by default "%Y%m%d"
 
     Returns
     -------
-    re.Pattern
-        Regular expression that matches the date format string.
-
-    Examples
-    --------
-    >>> pat2 = _date_format_to_regex("%Y%m%d").pattern
-    >>> pat2 == re.compile(r'\d{4}\d{2}\d{2}').pattern
-    True
-    >>> pat = _date_format_to_regex("%Y-%m-%d").pattern
-    >>> pat == re.compile(r'\d{4}\-\d{2}\-\d{2}').pattern
-    True
+    file_list : list[Filename]
+        list of files sorted by date.
+    dates : list[list[datetime.date,...]]
+        Sorted list, where each entry has all the dates from the corresponding file.
     """
-    # Escape any special characters in the date format string
-    date_format = re.escape(date_format)
 
-    # Replace each format specifier with a regular expression that matches it
-    date_format = date_format.replace("%Y", r"\d{4}")
-    date_format = date_format.replace("%m", r"\d{2}")
-    date_format = date_format.replace("%d", r"\d{2}")
-    date_format = date_format.replace("%H", r"\d{2}")
-    date_format = date_format.replace("%M", r"\d{2}")
-    date_format = date_format.replace("%S", r"\d{2}")
+    def sort_key(file_date_tuple):
+        # Key for sorting:
+        # To sort the files with the most dates first (the compressed SLCs which
+        # span a date range), sort the longer date lists first.
+        # Then, within each group of dates of the same length, use the date/dates
+        _, dates = file_date_tuple
+        try:
+            return (-len(dates), dates)
+        except TypeError:
+            return (-1, dates)
 
-    # Return the resulting regular expression
-    return re.compile(date_format)
+    file_date_tuples = [(f, get_dates(f, fmt=file_date_fmt)) for f in files]
+    file_dates = sorted([fd_tuple for fd_tuple in file_date_tuples], key=sort_key)
+
+    # Unpack the sorted pairs with new sorted values
+    file_list, dates = zip(*file_dates)  # type: ignore
+    return list(file_list), list(dates)
