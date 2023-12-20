@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from opera_utils._utils import format_nc_filename, scratch_directory
+from opera_utils._utils import format_nc_filename, get_snwe, scratch_directory
 
 
 def test_scratch_directory(tmp_path):
@@ -56,3 +56,8 @@ def test_format_nc_filename():
     with pytest.raises(ValueError):
         # Missing the subdataset name
         format_nc_filename("/usr/19990101/20200303_20210101.nc")
+
+
+def test_get_snwe():
+    bounds = (-110, 32, -109, 33)
+    assert get_snwe(4326, bounds) == (32, 33, -110, -109)

@@ -168,7 +168,7 @@ def get_snwe(epsg: int, bounds: Bbox) -> Bbox:
     Parameters
     ----------
     epsg : int
-        EPSG code.
+        EPSG code of the input coordinates in `bounds`.
     bounds : tuple[float, float, float, float]
         Bounds in WSEN format.
 
@@ -178,10 +178,9 @@ def get_snwe(epsg: int, bounds: Bbox) -> Bbox:
         Bounds in SNWE (lat/lon) format.
     """
     if epsg != 4326:
-        snwe = reproject_bounds(bounds, epsg, 4326)
+        bounds = reproject_bounds(bounds, epsg, 4326)
 
-    else:
-        snwe = (bounds[1], bounds[3], bounds[0], bounds[2])
+    snwe = (bounds[1], bounds[3], bounds[0], bounds[2])
 
     return snwe
 
@@ -191,14 +190,18 @@ def create_yx_arrays(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Create the x and y coordinate datasets.
 
+    Assumes that the `y` output coordinates will be north-up, so that the
+    `y` array is in decreasing order.
+
     Parameters
     ----------
     gt : List[float]
         Geotransform list.
     shape : tuple[int, int]
         Shape of the dataset (ysize, xsize).
-    step_size :
-        Pixel spacing
+    step_size : float
+        Pixel spacing, in units matching the projection of `gt` (e.g. meters for a UTM geotransform)
+
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
