@@ -1,4 +1,22 @@
-# [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.1.4...main)
+# [v0.1.5](https://github.com/opera-adt/opera-utils/compare/v0.1.4...v0.1.5)
+
+**Added**
+- Creates first version of the `_gslc.py` for functions working with geocoded SLCs.
+  - Includes reading dataset and attributes, wavelength and zero doppler time.
+- Adds methods to `_dates.py` for reformatting, sorting and grouping based on date
+- Adds method to `_helpers.py` for reprojecting coordinates
+- Adds methods to `_io.py` to read data with gdal and change datatype from gdal to numpy
+- Adds a method to `_utils.py` to reproject and reformat the bounds from WSEN to SNWE to be compatible with some softwares like RAiDER
+  - A method to create an array of x and y coordinates based on shape, geotransform and pixel size
+  - A method to transform coordinates from any projection to lat/lon
+- Adds test for reformatting bounds
+
+
+**Requirements**
+- scipy>=1.5
+
+
+# [v0.1.4](https://github.com/opera-adt/opera-utils/compare/v0.1.0...v0.1.4)
 
 **Added**
 - Based raster metadata convenience functions as `_io.get_raster_*`
