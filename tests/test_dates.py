@@ -62,9 +62,6 @@ def test_get_dates():
     assert _dates.get_dates("/usr/19990101/asdf20200303.tif")[0] == datetime.datetime(
         2020, 3, 3
     )
-    assert _dates.get_dates("/usr/19990101/jplg0900.23i")[0] == datetime.datetime(
-        2023, 3, 31
-    )
     assert _dates.get_dates("/usr/19990101/20200303_20210101.int") == [
         datetime.datetime(2020, 3, 3),
         datetime.datetime(2021, 1, 1),
@@ -80,6 +77,12 @@ def test_get_dates_with_format():
         datetime.datetime(2020, 3, 3),
         datetime.datetime(2021, 1, 1),
     ]
+
+    fmt = "%j0.%y"
+    # check for TEC file format
+    assert _dates.get_dates("/usr/19990101/jplg0900.23i", fmt)[0] == datetime.datetime(
+        2023, 3, 31, 0, 0
+    )
 
     fmt = "%Y%m%dT%H%M%S"
     # Check the OPERA name
