@@ -6,14 +6,14 @@ from opera_utils import _dates
 
 def test_date_format_to_regex():
     # Test date format strings with different specifiers and delimiters
-    date_formats = ["%Y-%m-%d", "%Y/%m/%d", "%Y%m%d", "%d-%m-%Y", "%m/%d/%Y"]
+    date_formats = ["%Y-%m-%d", "%Y/%m/%d", "%Y%m%d", "%d-%m-%Y", "%m/%d/%Y", "%j0.%y"]
     matching_dates = [
         "2021-01-01",
         "2022/02/02",
         "20230103",
         "01-04-2024",
         "05/06/2025",
-        "20210301",
+        "1300.23",
     ]
     for date_format, date in zip(date_formats, matching_dates):
         pattern = _dates._date_format_to_regex(date_format)
@@ -22,7 +22,14 @@ def test_date_format_to_regex():
         assert pattern.match(date) is not None
 
     # Test date formats that should not match the dates in "non_matching_dates"
-    non_matching_dates = ["01-01-2021", "2022-02-03", "2022-03-04", "2022/05/06"]
+    non_matching_dates = [
+        "01-01-2021",
+        "2022-02-03",
+        "2022-03-04",
+        "2022/05/06",
+        "117.22",
+        "23.0090",
+    ]
     for date, date_format in zip(non_matching_dates, date_formats):
         pattern = _dates._date_format_to_regex(date_format)
 
@@ -55,7 +62,9 @@ def test_get_dates():
     assert _dates.get_dates("/usr/19990101/asdf20200303.tif")[0] == datetime.datetime(
         2020, 3, 3
     )
-
+    assert _dates.get_dates("/usr/19990101/jplg0900.23i")[0] == datetime.datetime(
+        2023, 3, 31
+    )
     assert _dates.get_dates("/usr/19990101/20200303_20210101.int") == [
         datetime.datetime(2020, 3, 3),
         datetime.datetime(2021, 1, 1),
