@@ -12,6 +12,7 @@ from .datasets import *
 from .missing_data import *
 from ._utils import *
 from ._gslc import *
+from ._helpers import *
 
 
 __all__ = ["__version__"]
