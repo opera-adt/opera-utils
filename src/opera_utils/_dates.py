@@ -48,10 +48,7 @@ def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.datet
     """  # noqa: E501
     path = _get_path_from_gdal_str(filename)
     pattern = _date_format_to_regex(fmt)
-    date_list = re.findall(pattern, path.stem)
-    if not date_list:
-        # This is for ionosphere tec files that there is a "." in the file name
-        date_list = re.findall(pattern, path.name)
+    date_list = re.findall(pattern, path.name)
     if not date_list:
         return []
     return [_parse_date(d, fmt) for d in date_list]
