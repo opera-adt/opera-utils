@@ -216,6 +216,7 @@ def create_yx_arrays(
     # Make the x/y arrays
     y = np.arange(y_origin, y_end - step_size, -1 * step_size)
     x = np.arange(x_origin, x_end + step_size, step_size)
+
     return y, x
 
 
@@ -239,15 +240,15 @@ def transform_xy_to_latlon(
         Latitude and longitude arrays.
     """
     if epsg != 4326:
-        lon_datacube, lat_datacube = reproject_coordinates(
+        longitude, latitude = reproject_coordinates(
             x.flatten(), y.flatten(), epsg, 4326
         )
 
         # # reshape Lat lon of data cube
-        lat_datacube = np.array(lat_datacube).reshape(x.shape)
-        lon_datacube = np.array(lon_datacube).reshape(x.shape)
+        latitude = np.array(latitude).reshape(x.shape)
+        longitude = np.array(longitude).reshape(x.shape)
     else:
-        lat_datacube = y.copy()
-        lon_datacube = x.copy()
+        latitude = y.copy()
+        longitude = x.copy()
 
-    return lat_datacube, lon_datacube
+    return latitude, longitude

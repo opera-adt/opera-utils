@@ -5,6 +5,8 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from ._types import Bbox
 
+__all__ = ["reproject_bounds"]
+
 
 def flatten(list_of_lists: Iterable[Iterable[Any]]) -> chain[Any]:
     """Flatten one level of nesting."""

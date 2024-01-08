@@ -48,7 +48,7 @@ def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.datet
     """  # noqa: E501
     path = _get_path_from_gdal_str(filename)
     pattern = _date_format_to_regex(fmt)
-    date_list = re.findall(pattern, path.stem)
+    date_list = re.findall(pattern, path.name)
     if not date_list:
         return []
     return [_parse_date(d, fmt) for d in date_list]
@@ -129,11 +129,13 @@ def _date_format_to_regex(date_format: str) -> re.Pattern:
 
     # Replace each format specifier with a regular expression that matches it
     date_format = date_format.replace("%Y", r"\d{4}")
+    date_format = date_format.replace("%y", r"\d{2}")
     date_format = date_format.replace("%m", r"\d{2}")
     date_format = date_format.replace("%d", r"\d{2}")
     date_format = date_format.replace("%H", r"\d{2}")
     date_format = date_format.replace("%M", r"\d{2}")
     date_format = date_format.replace("%S", r"\d{2}")
+    date_format = date_format.replace("%j", r"\d{3}")
 
     # Return the resulting regular expression
     return re.compile(date_format)
