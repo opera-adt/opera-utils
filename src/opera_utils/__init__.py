@@ -4,15 +4,14 @@
 from __future__ import annotations
 
 from ._dates import *
+from ._gslc import *
+from ._helpers import *
+from ._utils import *
 from ._version import version as __version__
-from .bursts import *
 from .burst_frame_db import *
+from .bursts import *
 from .constants import *
 from .datasets import *
 from .missing_data import *
-from ._utils import *
-from ._gslc import *
-from ._helpers import *
-
 
 __all__ = ["__version__"]
