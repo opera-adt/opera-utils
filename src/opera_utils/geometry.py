@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import logging
-import netrc
 from enum import Enum
-from functools import cache
 from pathlib import Path
-from typing import Literal, Mapping, Sequence
-
-import asf_search as asf
+from typing import Mapping, Sequence
 
 from opera_utils import get_burst_ids_for_frame, stitching
 from opera_utils._types import PathOrStr
 from opera_utils._utils import format_nc_filename, scratch_directory
-
-from .constants import EXTRA_COMPRESSED_TIFF_OPTIONS
+from opera_utils.constants import EXTRA_COMPRESSED_TIFF_OPTIONS
+from opera_utils.download import download_cslc_static_layers
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +90,7 @@ def create_geometry_files(
     output_files: list[Path] = []
 
     with scratch_directory(download_dir, delete=not save_hdf5_files) as sd:
-        local_hdf5_files = _download_static_layers(
+        local_hdf5_files = download_cslc_static_layers(
             burst_ids=burst_ids, output_dir=sd, max_jobs=max_download_jobs
         )
         for layer in layers:
@@ -119,48 +115,3 @@ def create_geometry_files(
             )
 
     return output_files
-
-
-@cache
-def _search(burst_ids: Sequence[str]) -> asf.ASFSearchResults:
-    return asf.search(operaBurstID=list(burst_ids), processingLevel="CSLC-STATIC")
-
-
-def _get_urls(
-    results: asf.ASFSearchResults,
-    type_: Literal["https", "s3"] = "https",
-) -> list[str]:
-    if type_ == "https":
-        return [r.properties["url"] for r in results]
-    elif type_ == "s3":
-        # TODO: go through .umm, find s3 url
-        raise NotImplementedError()
-    else:
-        raise ValueError(f"type_ must be 'https' or 's3'. Got {type_}")
-    # r.umm
-    # 'RelatedUrls': [...
-    #     {'URL': 's3://asf-cumulus-prod-opera-products/OPERA_L2_CSLC
-    #    'Type': 'GET DATA VIA DIRECT ACCESS',
-    #    'Description': 'This link provides direct download access vi
-    #    'Format': 'HDF5'},
-
-
-def _download_static_layers(
-    burst_ids: Sequence[str], output_dir: Path, max_jobs: int = 3
-) -> list[Path]:
-    # Make a tuple so it can be hashed
-    results = _search(burst_ids=tuple(burst_ids))
-    session = _get_auth_session()
-    urls = _get_urls(results)
-    asf.download_urls(urls=urls, path=output_dir, session=session, processes=max_jobs)
-    return [output_dir / r.properties["fileName"] for r in results]
-
-
-def _get_auth_session() -> asf.ASFSession:
-    host = "urs.earthdata.nasa.gov"
-
-    auth = netrc.netrc().authenticators(host)
-    if auth is None:
-        raise ValueError(f"No .netrc entry foudn for {host}")
-    username, _, password = auth
-    return asf.ASFSession().auth_with_creds(username, password)
