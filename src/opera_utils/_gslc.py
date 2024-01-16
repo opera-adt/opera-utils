@@ -7,6 +7,11 @@ import h5py
 
 from ._types import Filename
 
+__all__ = [
+    "get_zero_doppler_time",
+    "get_radar_wavelength",
+]
+
 
 def get_zero_doppler_time(
     filename: Filename, type_: str = "start"
@@ -80,7 +85,7 @@ def get_radar_wavelength(filename: Filename):
     Returns
     -------
     wavelength : float
-        Radar wavelength.
+        Radar wavelength in meters.
     """
     dset = "/metadata/processing_information/input_burst_metadata/wavelength"
     value = _get_dset_and_attrs(filename, dset)[0]

@@ -12,7 +12,7 @@ from typing import Iterable, Mapping, Optional, Sequence
 import numpy as np
 from numpy.typing import DTypeLike
 from osgeo import gdal, osr
-from pyproj import Transformer
+from rasterio.warp import transform_bounds
 
 from opera_utils import _io
 from opera_utils._types import Bbox, PathOrStr
@@ -377,12 +377,12 @@ def get_combined_bounds_nodata(
             dst_epsg = _io.get_raster_crs(filenames[0]).to_epsg()
             bounds = _reproject_bounds(out_bounds, out_bounds_epsg, dst_epsg)
         else:
-            bounds = out_bounds  # type: ignore
+            bounds = Bbox(*out_bounds)
     else:
-        bounds = min(xs), min(ys), max(xs), max(ys)
+        bounds = Bbox(min(xs), min(ys), max(xs), max(ys))
 
     if target_aligned_pixels:
-        bounds = _align_bounds(bounds, res)
+        bounds = Bbox(*_align_bounds(bounds, res))
 
     return bounds, list(nodatas)[0]
 
@@ -398,10 +398,8 @@ def _align_bounds(bounds: Iterable[float], res: tuple[float, float]):
 
 
 def _reproject_bounds(bounds: Bbox, src_epsg: int, dst_epsg: int) -> Bbox:
-    t = Transformer.from_crs(src_epsg, dst_epsg, always_xy=True)
-    left, bottom, right, top = bounds
-    bbox: Bbox = (*t.transform(left, bottom), *t.transform(right, top))  # type: ignore
-    return bbox
+    left, bottom, right, top = transform_bounds(src_epsg, dst_epsg, *bounds)
+    return Bbox(left, bottom, right, top)
 
 
 def get_transformed_bounds(filename: PathOrStr, epsg_code: Optional[int] = None):

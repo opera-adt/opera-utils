@@ -143,7 +143,7 @@ def get_frame_bbox(
         float(frame_dict["xmax"]),
         float(frame_dict["ymax"]),
     )
-    return epsg, bounds
+    return epsg, Bbox(*bounds)
 
 
 def get_burst_ids_for_frame(
