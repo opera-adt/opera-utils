@@ -15,6 +15,7 @@ except ImportError:
     warnings.warn("Can't import `asf_search`. Unable to search/download data. ")
 
 from opera_utils._types import PathOrStr
+from opera_utils._utils import LoggingContext
 
 __all__ = [
     "download_cslc_static_layers",
@@ -22,6 +23,17 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+class _DummyContext:
+    """Context manager that does nothing, for use when verbose=False."""
+
+    # return nullcontext(None)
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __enter__(self):
+        pass
 
 
 class L2Product(str, Enum):
@@ -38,7 +50,10 @@ DatetimeInput = datetime.datetime | str | None
 
 
 def download_cslc_static_layers(
-    burst_ids: Sequence[str], output_dir: PathOrStr, max_jobs: int = 3
+    burst_ids: Sequence[str],
+    output_dir: PathOrStr,
+    max_jobs: int = 3,
+    verbose: bool = False,
 ) -> list[Path]:
     """Download the static layers for a sequence of burst IDs.
 
@@ -50,6 +65,8 @@ def download_cslc_static_layers(
         Location to save output rasters to
     max_jobs : int, optional
         Number of parallel downloads to run, by default 3
+    verbose : bool, optional
+        Whether to print verbose output, by default False
 
     Returns
     -------
@@ -61,6 +78,7 @@ def download_cslc_static_layers(
         output_dir=output_dir,
         max_jobs=max_jobs,
         product=L2Product.CSLC_STATIC,
+        verbose=verbose,
     )
 
 
@@ -70,6 +88,7 @@ def download_cslcs(
     start: DatetimeInput = None,
     end: DatetimeInput = None,
     max_jobs: int = 3,
+    verbose: bool = False,
 ) -> list[Path]:
     """Download the static layers for a sequence of burst IDs.
 
@@ -85,6 +104,8 @@ def download_cslcs(
         end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
     max_jobs : int, optional
         Number of parallel downloads to run, by default 3
+    verbose : bool, optional
+        Whether to print verbose output, by default False
 
     Returns
     -------
@@ -98,6 +119,7 @@ def download_cslcs(
         start=start,
         end=end,
         product=L2Product.CSLC,
+        verbose=verbose,
     )
 
 
@@ -108,6 +130,7 @@ def _download_for_burst_ids(
     max_jobs: int = 3,
     start: DatetimeInput = None,
     end: DatetimeInput = None,
+    verbose: bool = False,
 ) -> list[Path]:
     """Download files for one product type fo static layers for a sequence of burst IDs.
 
@@ -125,22 +148,32 @@ def _download_for_burst_ids(
         Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
     end: datetime.datetime | str, optional
         end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    verbose : bool, optional
+        Whether to print verbose output, by default False
 
     Returns
     -------
     list[Path]
         Locations to saved raster files.
     """
-    # Make a tuple so it can be hashed
-    logger.debug(f"Searching {len(burst_ids)} for {product} from {start} to {end}")
-    results = _search(burst_ids=tuple(burst_ids), product=product, start=start, end=end)
-    logger.info(f"Found {len(results)} results")
-    session = _get_auth_session()
-    urls = _get_urls(results)
-    asf.download_urls(
-        urls=urls, path=str(output_dir), session=session, processes=max_jobs
-    )
-    return [Path(output_dir) / r.properties["fileName"] for r in results]
+    # cm = LoggingContext if verbose else _DummyContext
+    cm = LoggingContext
+    # cm = _DummyContext
+    with cm(logger, level=logging.INFO, handler=logging.StreamHandler()):
+        # Make a tuple so it can be hashed
+        logger.info(
+            f"Searching {len(burst_ids)} for {product} (Dates:{start} to {end})"
+        )
+        results = _search(
+            burst_ids=tuple(burst_ids), product=product, start=start, end=end
+        )
+        logger.info(f"Found {len(results)} results")
+        session = _get_auth_session()
+        urls = _get_urls(results)
+        asf.download_urls(
+            urls=urls, path=str(output_dir), session=session, processes=max_jobs
+        )
+        return [Path(output_dir) / r.properties["fileName"] for r in results]
 
 
 @cache
