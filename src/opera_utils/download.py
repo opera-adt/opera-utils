@@ -156,9 +156,7 @@ def _download_for_burst_ids(
     list[Path]
         Locations to saved raster files.
     """
-    # cm = LoggingContext if verbose else _DummyContext
-    cm = LoggingContext
-    # cm = _DummyContext
+    cm = LoggingContext if verbose else _DummyContext
     with cm(logger, level=logging.INFO, handler=logging.StreamHandler()):
         # Make a tuple so it can be hashed
         logger.info(
