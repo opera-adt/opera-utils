@@ -7,7 +7,7 @@ import warnings
 from enum import Enum
 from functools import cache
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal, Sequence, Union
 
 try:
     import asf_search as asf
@@ -46,7 +46,7 @@ class L2Product(str, Enum):
 
 
 # Type for ASF Search start/end times
-DatetimeInput = datetime.datetime | str | None
+DatetimeInput = Union[datetime.datetime, str, None]
 
 
 def download_cslc_static_layers(
