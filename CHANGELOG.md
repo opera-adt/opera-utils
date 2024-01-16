@@ -1,3 +1,16 @@
+# [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.1.6...HEAD)
+
+# [v0.1.6](https://github.com/opera-adt/opera-utils/compare/v0.1.5...v0.1.6)
+
+**Added**
+
+- functions for ionosphere correction, used in `dolphin`
+- Convenience functions for downloading OPERA CSLCs from ASF
+
+**Fixed**
+- changed `reproject_bounds` to use `rasterio's transform_bounds` instead of only warping 2 corners.
+
+
 # [v0.1.5](https://github.com/opera-adt/opera-utils/compare/v0.1.4...v0.1.5)
 
 **Added**

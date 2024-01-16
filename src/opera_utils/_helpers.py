@@ -33,12 +33,10 @@ def powerset(iterable: Iterable[Any]) -> chain[tuple[Any, ...]]:
 
 def reproject_bounds(bounds: Bbox, src_epsg: int, dst_epsg: int) -> Bbox:
     """Reproject the (left, bottom, right top) from `src_epsg to `dst_epsg`."""
-    from pyproj import Transformer
+    from rasterio.warp import transform_bounds
 
-    t = Transformer.from_crs(src_epsg, dst_epsg, always_xy=True)
-    left, bottom, right, top = bounds
-    bbox: Bbox = (*t.transform(left, bottom), *t.transform(right, top))  # type: ignore
-    return bbox
+    left, bottom, right, top = transform_bounds(src_epsg, dst_epsg, *bounds)
+    return Bbox(left, bottom, right, top)
 
 
 def reproject_coordinates(
