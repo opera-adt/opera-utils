@@ -35,6 +35,9 @@ class _DummyContext:
     def __enter__(self):
         pass
 
+    def __exit__(self, *args, **kwargs):
+        pass
+
 
 class L2Product(str, Enum):
     """OPERA Level 2 product types available on ASF."""
