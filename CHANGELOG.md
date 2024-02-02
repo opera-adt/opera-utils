@@ -1,5 +1,10 @@
 # [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.1.6...HEAD)
 
+
+**Requirements**
+- Remove scipy
+
+
 # [v0.1.6](https://github.com/opera-adt/opera-utils/compare/v0.1.5...v0.1.6)
 
 **Added**
