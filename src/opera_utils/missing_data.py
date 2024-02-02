@@ -34,7 +34,8 @@ class BurstSubsetOption:
     dates: tuple[date, ...]
     """Dates used in this subset."""
     # subset_selected: list[bool]
-    # """True if the corresponding file/ (burst ID, date) was selected."""
+    num_candidate_bursts: int
+    """The number of (burst_id, date) pairs that were passed as options."""
 
     @property
     def num_dates(self) -> int:
@@ -207,6 +208,8 @@ def generate_burst_subset_options(
     """
     options = []
 
+    num_candidate_bursts = B.sum()
+    logger.debug("Number of candidates: %s", num_candidate_bursts)
     # Get the idxs where there are any missing dates for each burst
     # We're going to try all possible combinations of these *groups*,
     # not all possible combinations of the individual missing dates
@@ -272,6 +275,7 @@ def generate_burst_subset_options(
                 total_num_bursts=total_num_bursts,
                 burst_ids=selected_burst_ids,
                 dates=selected_dates,
+                num_candidate_bursts=num_candidate_bursts,
             )
         )
 
