@@ -99,18 +99,21 @@ def test_get_missing_data_options(filenames):
     assert len(mdo.burst_ids) == 2
     assert mdo.num_burst_ids == 2
     assert mdo.total_num_bursts == 8
+    assert mdo.num_candidate_bursts == len(filenames)
 
     mdo = mdos[1]
     assert mdo.num_dates == 2
     assert len(mdo.burst_ids) == 3
     assert mdo.num_burst_ids == 3
     assert mdo.total_num_bursts == 6
+    assert mdo.num_candidate_bursts == len(filenames)
 
     mdo = mdos[2]
     assert mdo.num_dates == 3
     assert len(mdo.burst_ids) == 1
     assert mdo.num_burst_ids == 1
     assert mdo.total_num_bursts == 3
+    assert mdo.num_candidate_bursts == len(filenames)
 
 
 @pytest.fixture

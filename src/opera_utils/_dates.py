@@ -13,7 +13,9 @@ __all__ = [
     "get_dates",
     "filter_by_date",
     "group_by_date",
+    "sort_files_by_date",
     "DATE_FORMAT",
+    "DATETIME_FORMAT",
 ]
 
 DATE_FORMAT = "%Y%m%d"
