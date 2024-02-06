@@ -1,11 +1,16 @@
-# [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.1.6...HEAD)
+# [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.2.1...HEAD)
 
+# [v0.2.1](https://github.com/opera-adt/opera-utils/compare/v0.2.0...v0.2.1)
+
+**Fixed**
+- Export `sort_files_by_date`
+- Stop considering missing data options after 10,000 in `get_missing_data_options`
 
 **Requirements**
 - Remove scipy
 
 
-# [v0.1.6](https://github.com/opera-adt/opera-utils/compare/v0.1.5...v0.1.6)
+# [v0.2.0](https://github.com/opera-adt/opera-utils/compare/v0.1.5...v0.2.0)
 
 **Added**
 
