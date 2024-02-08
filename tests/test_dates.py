@@ -227,11 +227,12 @@ def test_sort_by_date_different_fmt():
     ]
     expected_files = sorted(files)
 
-    sorted_files, sorted_dates = _dates.sort_files_by_date(files)
+    sorted_files, sorted_dates = _dates.sort_files_by_date(
+        files, file_date_fmt="%Y-%m-%d"
+    )
     assert sorted_files == expected_files
     assert sorted_dates == expected_dates
 
-    # Check that it works with different date formats
     files = [
         "slc_2020-03-03_2021-01-01.tif",
         "slc_2020-03-03_2022-01-01.tif",
@@ -246,6 +247,8 @@ def test_sort_by_date_different_fmt():
     ]
     expected_files = sorted(files)
 
-    sorted_files, sorted_dates = _dates.sort_files_by_date(files)
+    sorted_files, sorted_dates = _dates.sort_files_by_date(
+        files, file_date_fmt="%Y-%m-%d"
+    )
     assert sorted_files == expected_files
     assert sorted_dates == expected_dates
