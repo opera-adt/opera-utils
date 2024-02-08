@@ -124,7 +124,7 @@ def get_missing_data_options(
     dupes = _duplicated_bursts(burst_id_to_dates)
     if dupes:
         s = "\n".join(f'{b}_{d.strftime("%Y%m%d")}' for (b, d) in dupes)
-        msg = f"Duplicated (burst_id, datetime) pairs passed: {s}."
+        msg = f"Duplicated (burst_id, datetime) pairs passed:\n{s}."
         raise ValueError(msg)
 
     all_burst_ids = list(burst_id_to_dates.keys())
