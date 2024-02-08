@@ -122,3 +122,133 @@ def test_get_dates_with_gdal_string():
     assert _dates.get_dates(
         'DERIVED_SUBDATASET:AMPLITUDE:"/usr/19990101/20200303_20210101.int"'
     ) == [datetime.datetime(2020, 3, 3), datetime.datetime(2021, 1, 1)]
+
+
+def test_sort_files_by_date():
+    files = [
+        "slc_20200303.tif",
+        "slc_20210101.tif",
+        "slc_20190101.tif",
+        "slc_20180101.tif",
+    ]
+    expected_dates = [
+        [datetime.datetime(2018, 1, 1)],
+        [datetime.datetime(2019, 1, 1)],
+        [datetime.datetime(2020, 3, 3)],
+        [datetime.datetime(2021, 1, 1)],
+    ]
+    expected_files = sorted(files)
+
+    sorted_files, sorted_dates = _dates.sort_files_by_date(files)
+    assert sorted_files == expected_files
+    assert sorted_dates == expected_dates
+
+    # Check that it works with Path objects
+    files = [Path(f) for f in files]
+    sorted_files, sorted_dates = _dates.sort_files_by_date(files)
+    assert [Path(f) for f in expected_files] == sorted_files
+    assert sorted_dates == expected_dates
+
+    # check it ignores paths leading up to file name
+    files = [
+        "/usr/20200101/asdf20180101.tif",
+        "/usr/19900101/asdf20190101.tif",
+        "/usr/20000101/asdf20200303.tif",
+        "/usr/19990101/asdf20210101.tif",
+    ]
+    sorted_files, sorted_dates = _dates.sort_files_by_date(files)
+    assert sorted_files == files  # they were in sorted order already
+    assert sorted_dates == expected_dates
+
+
+def test_sort_files_by_date_interferograms():
+    # Make files with 2-date names
+    files = [
+        "ifg_20200303_20210101.tif",
+        "ifg_20200303_20220101.tif",
+        "ifg_20190101_20200303.tif",
+        "ifg_20180101_20210101.tif",
+    ]
+    dates = [
+        [datetime.datetime(2018, 1, 1), datetime.datetime(2021, 1, 1)],
+        [datetime.datetime(2019, 1, 1), datetime.datetime(2020, 3, 3)],
+        [datetime.datetime(2020, 3, 3), datetime.datetime(2021, 1, 1)],
+        [datetime.datetime(2020, 3, 3), datetime.datetime(2022, 1, 1)],
+    ]
+    sorted_files, sorted_dates = _dates.sort_files_by_date(files)
+    assert sorted_files == sorted(files)  # here lexicographic order is correct
+    assert sorted_dates == sorted(dates)
+
+
+def test_sort_files_by_date_compressed_first():
+    # Check that compressed SLCs go first, then SLCs are sorted by date
+    unsorted_files = [
+        "slc_20200101.tif",
+        "slc_20210101.tif",
+        "slc_20190101.tif",
+        "compressed_20180101_20200101.tif",
+        "slc_20180101.tif",
+        "compressed_20200101_20210101.tif",
+    ]
+    expected_dates = [
+        [datetime.datetime(2018, 1, 1), datetime.datetime(2020, 1, 1)],
+        [datetime.datetime(2020, 1, 1), datetime.datetime(2021, 1, 1)],
+        [datetime.datetime(2018, 1, 1)],
+        [datetime.datetime(2019, 1, 1)],
+        [datetime.datetime(2020, 1, 1)],
+        [datetime.datetime(2021, 1, 1)],
+    ]
+
+    sorted_files, sorted_dates = _dates.sort_files_by_date(unsorted_files)
+    assert sorted_files == [
+        "compressed_20180101_20200101.tif",
+        "compressed_20200101_20210101.tif",
+        "slc_20180101.tif",
+        "slc_20190101.tif",
+        "slc_20200101.tif",
+        "slc_20210101.tif",
+    ]
+    assert sorted_dates == expected_dates
+
+
+def test_sort_by_date_different_fmt():
+    # Check that it works with different date formats
+    files = [
+        "slc_2020-03-03.tif",
+        "slc_2021-01-01.tif",
+        "slc_2019-01-01.tif",
+        "slc_2018-01-01.tif",
+    ]
+    expected_dates = [
+        [datetime.datetime(2018, 1, 1)],
+        [datetime.datetime(2019, 1, 1)],
+        [datetime.datetime(2020, 3, 3)],
+        [datetime.datetime(2021, 1, 1)],
+    ]
+    expected_files = sorted(files)
+
+    sorted_files, sorted_dates = _dates.sort_files_by_date(
+        files, file_date_fmt="%Y-%m-%d"
+    )
+    assert sorted_files == expected_files
+    assert sorted_dates == expected_dates
+
+    files = [
+        "slc_2020-03-03_2021-01-01.tif",
+        "slc_2020-03-03_2022-01-01.tif",
+        "slc_2019-01-01_2020-03-03.tif",
+        "slc_2018-01-01_2021-01-01.tif",
+    ]
+    expected_dates = [
+        [datetime.datetime(2018, 1, 1), datetime.datetime(2021, 1, 1)],
+        [datetime.datetime(2019, 1, 1), datetime.datetime(2020, 3, 3)],
+        [datetime.datetime(2020, 3, 3), datetime.datetime(2021, 1, 1)],
+        [datetime.datetime(2020, 3, 3), datetime.datetime(2022, 1, 1)],
+    ]
+    expected_files = sorted(files)
+
+    sorted_files, sorted_dates = _dates.sort_files_by_date(
+        files, file_date_fmt="%Y-%m-%d"
+    )
+    assert sorted_files == expected_files
+    assert sorted_dates == expected_dates
