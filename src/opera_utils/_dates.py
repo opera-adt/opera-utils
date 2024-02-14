@@ -144,17 +144,24 @@ def _date_format_to_regex(date_format: str) -> re.Pattern:
 
 
 def group_by_date(
-    files: Iterable[PathLikeT], file_date_fmt: str = DATE_FORMAT
+    files: Iterable[PathLikeT],
+    file_date_fmt: str = DATE_FORMAT,
+    date_idx: int | None = None,
 ) -> dict[tuple[datetime.datetime, ...], list[PathLikeT]]:
     """Combine files by date into a dict.
 
     Parameters
     ----------
-    files: Iterable[Filename]
+    files : Iterable[Filename]
         Path to folder containing files with dates in the filename.
-    file_date_fmt: str
+    file_date_fmt : str
         Format of the date in the filename.
         Default is [dolphin.DEFAULT_DATETIME_FORMAT][]
+    date_idx : int, optional
+        If provided, uses only this index of the dates found in each filename.
+        For example, if `file_date_fmt='%Y%m%d'`, and the files have pairs of
+        these date strings but you only wish to group by the first, use
+        `date_idx=0`.
 
     Returns
     -------
@@ -182,7 +189,11 @@ def group_by_date(
     for dates, g in itertools.groupby(
         files, key=lambda x: tuple(get_dates(x, fmt=file_date_fmt))
     ):
-        grouped_images[dates].extend(list(g))
+        if date_idx is None:
+            key = dates
+        else:
+            key = (dates[date_idx],)
+        grouped_images[key].extend(list(g))
     return grouped_images
 
 
