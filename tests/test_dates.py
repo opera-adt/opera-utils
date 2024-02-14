@@ -252,3 +252,76 @@ def test_sort_by_date_different_fmt():
     )
     assert sorted_files == expected_files
     assert sorted_dates == expected_dates
+
+
+def test_group_by_date():
+    files = [
+        "slc_20180101.tif",
+        "slc_1_20190101.tif",
+        "slc_2_20190101.tif",
+        "slc_20210101.tif",
+    ]
+    expected = {
+        (datetime.datetime(2018, 1, 1),): [
+            "slc_20180101.tif",
+        ],
+        (datetime.datetime(2019, 1, 1),): [
+            "slc_1_20190101.tif",
+            "slc_2_20190101.tif",
+        ],
+        (datetime.datetime(2021, 1, 1),): [
+            "slc_20210101.tif",
+        ],
+    }
+    assert expected == _dates.group_by_date(files)
+
+
+def test_group_by_date_with_idx():
+    files = [
+        "slc_20170101_20180101.tif",
+        "slc_20170101_20190101.tif",
+        "slc_20170101_20210101.tif",
+    ]
+    expected = {
+        (
+            datetime.datetime(2017, 1, 1),
+            datetime.datetime(2018, 1, 1),
+        ): [
+            "slc_20170101_20180101.tif",
+        ],
+        (
+            datetime.datetime(2017, 1, 1),
+            datetime.datetime(2019, 1, 1),
+        ): [
+            "slc_20170101_20190101.tif",
+        ],
+        (
+            datetime.datetime(2017, 1, 1),
+            datetime.datetime(2021, 1, 1),
+        ): [
+            "slc_20170101_20210101.tif",
+        ],
+    }
+    assert expected == _dates.group_by_date(files)
+
+    expected_idx1 = {
+        (datetime.datetime(2018, 1, 1),): [
+            "slc_20170101_20180101.tif",
+        ],
+        (datetime.datetime(2019, 1, 1),): [
+            "slc_20170101_20190101.tif",
+        ],
+        (datetime.datetime(2021, 1, 1),): [
+            "slc_20170101_20210101.tif",
+        ],
+    }
+    assert expected_idx1 == _dates.group_by_date(files, date_idx=1)
+
+    expected_idx0 = {
+        (datetime.datetime(2017, 1, 1),): [
+            "slc_20170101_20180101.tif",
+            "slc_20170101_20190101.tif",
+            "slc_20170101_20210101.tif",
+        ]
+    }
+    assert expected_idx0 == _dates.group_by_date(files, date_idx=0)
