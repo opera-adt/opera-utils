@@ -3,12 +3,16 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Iterable, Optional, Sequence
 
-import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.cm import ScalarMappable
-from matplotlib.colors import ListedColormap, Normalize
 from numpy.typing import NDArray
+
+try:
+    import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.colors import ListedColormap, Normalize
+except ImportError:
+    print("matplotlib is not installed: unable to use `missing_data_plots`")
 
 import opera_utils
 from opera_utils._types import PathOrStr
