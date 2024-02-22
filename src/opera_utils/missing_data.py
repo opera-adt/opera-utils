@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime
 from itertools import groupby
 from typing import Iterable, Mapping, Optional, Sequence
 
@@ -31,11 +31,11 @@ class BurstSubsetOption:
     """Total number of bursts used in this subset."""
     burst_ids: tuple[str, ...]
     """Burst IDs used in this subset."""
-    dates: tuple[date, ...]
+    dates: tuple[datetime, ...]
     """Dates used in this subset."""
     # subset_selected: list[bool]
     num_candidate_bursts: int
-    """The number of (burst_id, date) pairs that were passed as options."""
+    """The number of (burst_id, datetime) pairs that were passed as options."""
 
     @property
     def num_dates(self) -> int:
@@ -48,12 +48,12 @@ class BurstSubsetOption:
 
 def get_burst_id_to_dates(
     slc_files: Optional[Iterable[Filename]] = None,
-    burst_id_date_tuples: Optional[Iterable[tuple[str, date]]] = None,
-) -> dict[str, list[date]]:
+    burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
+) -> dict[str, list[datetime]]:
     """Get a mapping of burst ID to list of dates.
 
-    Assumes that the `slc_files` have only one date in the name, or
-    that the first date in the `burst_id_date_tuples` is the relevant
+    Assumes that the `slc_files` have only one datetime in the name, or
+    that the first datetime in the `burst_id_date_tuples` is the relevant
     one (as is the case for OPERA CSLCs).
 
 
@@ -61,12 +61,12 @@ def get_burst_id_to_dates(
     ----------
     slc_files : Optional[Iterable[Filename]]
         List of OPERA CSLC filenames.
-    burst_id_date_tuples : Optional[Iterable[tuple[str, date]]]
-        Alternative input: list of all existing (burst_id, date) tuples.
+    burst_id_date_tuples : Optional[Iterable[tuple[str, datetime]]]
+        Alternative input: list of all existing (burst_id, datetime) tuples.
 
     Returns
     -------
-    dict[str, list[date]]
+    dict[str, list[datetime]]
         Mapping of burst ID to list of dates.
     """
     if slc_files is not None:
@@ -77,9 +77,21 @@ def get_burst_id_to_dates(
         raise ValueError("Must provide either slc_files or burst_id_date_tuples")
 
 
+def _duplicated_bursts(burst_id_to_dates: Mapping[str, Sequence[datetime]]):
+    from collections import Counter
+
+    counts: Counter = Counter()
+    for burst_id, d_list in burst_id_to_dates.items():
+        for d in d_list:
+            counts[(burst_id, d)] += 1
+    # total_sum = sum([len(v) for k, v in burst_id_to_dates.items()])
+    # deduped_sum = sum([len(set(v)) for k, v in burst_id_to_dates.items()])
+    return [pair for pair, count in counts.items() if count > 1]
+
+
 def get_missing_data_options(
     slc_files: Optional[Iterable[Filename]] = None,
-    burst_id_date_tuples: Optional[Iterable[tuple[str, date]]] = None,
+    burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
 ) -> list[BurstSubsetOption]:
     """Get a list of possible data subsets for a set of burst SLCs.
 
@@ -96,8 +108,8 @@ def get_missing_data_options(
     ----------
     slc_files : Optional[Iterable[Filename]]
         list of OPERA CSLC filenames.
-    burst_id_date_tuples : Optional[Iterable[tuple[str, date]]]
-        Alternative input: list of all existing (burst_id, date) tuples.
+    burst_id_date_tuples : Optional[Iterable[tuple[str, datetime]]]
+        Alternative input: list of all existing (burst_id, datetime) tuples.
 
     Returns
     -------
@@ -109,6 +121,11 @@ def get_missing_data_options(
     burst_id_to_dates = get_burst_id_to_dates(
         slc_files=slc_files, burst_id_date_tuples=burst_id_date_tuples
     )
+    dupes = _duplicated_bursts(burst_id_to_dates)
+    if dupes:
+        s = "\n".join(f'{b}_{d.strftime("%Y%m%d")}' for (b, d) in dupes)
+        msg = f"Duplicated (burst_id, datetime) pairs passed:\n{s}."
+        raise ValueError(msg)
 
     all_burst_ids = list(burst_id_to_dates.keys())
     all_dates = sorted_deduped_values(burst_id_to_dates)
@@ -121,21 +138,21 @@ def get_missing_data_options(
 
 
 def get_burst_id_date_incidence(
-    burst_id_to_dates: Mapping[str, list[date]],
+    burst_id_to_dates: Mapping[str, list[datetime]],
 ) -> np.ndarray:
-    """Create a matrix of burst ID vs. date incidence.
+    """Create a matrix of burst ID vs. datetime incidence.
 
     Parameters
     ----------
-    burst_id_to_dates : Mapping[str, list[date]]
+    burst_id_to_dates : Mapping[str, list[datetime]]
         Mapping of burst ID to list of dates.
 
     Returns
     -------
     np.ndarray[bool]
-        Matrix of burst ID vs. date incidence.
+        Matrix of burst ID vs. datetime incidence.
         Rows correspond to burst IDs, columns correspond to dates.
-        A value of True indicates that the burst ID was acquired on that date.
+        A value of True indicates that the burst ID was acquired on that datetime.
     """
     all_dates = sorted_deduped_values(burst_id_to_dates)
 
@@ -151,27 +168,27 @@ def get_burst_id_date_incidence(
 
 
 def _burst_id_mapping_from_tuples(
-    burst_id_date_tuples: Iterable[tuple[str, date]],
-) -> dict[str, list[date]]:
-    """Create a {burst_id -> [date,...]} (burst_id, date) tuples."""
+    burst_id_date_tuples: Iterable[tuple[str, datetime]],
+) -> dict[str, list[datetime]]:
+    """Create a {burst_id -> [datetime,...]} (burst_id, datetime) tuples."""
     # Don't exhaust the iterator for multiple groupings
     burst_id_date_tuples = list(burst_id_date_tuples)
 
-    # Group the possible SLC files by their date and by their Burst ID
+    # Group the possible SLC files by their datetime and by their Burst ID
     return {
-        burst_id: [date for burst_id, date in g]
+        burst_id: [d for burst_id, d in g]
         for burst_id, g in groupby(burst_id_date_tuples, key=lambda x: x[0])
     }
 
 
 def _burst_id_mapping_from_files(
     slc_files: Iterable[Filename],
-) -> dict[str, list[date]]:
-    """Create a {burst_id -> [date,...]} mapping from filenames."""
+) -> dict[str, list[datetime]]:
+    """Create a {burst_id -> [datetime,...]} mapping from filenames."""
     # Don't exhaust the iterator for multiple groupings
     slc_file_list = list(map(str, slc_files))
 
-    # Group the possible SLC files by their date and by their Burst ID
+    # Group the possible SLC files by their datetime and by their Burst ID
     burst_id_to_files = group_by_burst(slc_file_list)
 
     date_tuples = [get_dates(f) for f in slc_file_list]
@@ -184,19 +201,19 @@ def _burst_id_mapping_from_files(
 
 
 def generate_burst_subset_options(
-    B: np.ndarray, burst_ids: Sequence[str], dates: Sequence[date]
+    B: np.ndarray, burst_ids: Sequence[str], dates: Sequence[datetime]
 ) -> list[BurstSubsetOption]:
     """Generate possible valid subsets of the given SLC data.
 
     Parameters
     ----------
     B : NDArray[np.bool]
-        Matrix of burst ID vs. date incidence.
+        Matrix of burst ID vs. datetime incidence.
         Rows correspond to burst IDs, columns correspond to dates.
-        A value of True indicates that the burst ID was acquired on that date.
+        A value of True indicates that the burst ID was acquired on that datetime.
     burst_ids : Sequence[str]
         List of all burst IDs.
-    dates : Sequence[date]
+    dates : Sequence[datetime]
         List of all dates.
 
     Returns
@@ -267,7 +284,7 @@ def generate_burst_subset_options(
         if not np.all(B_sub2 == B_sub2[[0]]):
             logger.debug("Not all rows have the same pattern in the remaining columns")
             continue
-        # Create a BurstSubsetOption if we have at least one burst and one date
+        # Create a BurstSubsetOption if we have at least one burst and one datetime
         assert np.all(B_sub2)
 
         selected_burst_ids = tuple(burst_ids[i] for i in valid_row_idxs)
