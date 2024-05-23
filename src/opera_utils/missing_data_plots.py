@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 from typing import Iterable, Optional, Sequence
 
 import numpy as np
@@ -20,21 +20,21 @@ from opera_utils._types import PathOrStr
 
 def plot_burst_id_date_incidence(
     slc_files: Optional[Iterable[PathOrStr]] = None,
-    burst_id_date_tuples: Optional[Iterable[tuple[str, date]]] = None,
+    burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
     ax=None,
     output_file: Optional[PathOrStr] = None,
 ) -> tuple[plt.figure, plt.Axes]:
-    """Plot a matrix of burst ID vs. date incidence.
+    """Plot a matrix of burst ID vs. datetime incidence.
 
-    Make a scatter plot of burst ID vs. date, where the x-axis spacing is uniform
+    Make a scatter plot of burst ID vs. datetime, where the x-axis spacing is uniform
     over time (dots may be irregularly spaced).
 
     Parameters
     ----------
     slc_files : Optional[Iterable[Filename]]
         List of OPERA CSLC filenames.
-    burst_id_date_tuples : Optional[Iterable[tuple[str, date]]]
-        Alternative input: list of all existing (burst_id, date) tuples.
+    burst_id_date_tuples : Optional[Iterable[tuple[str, datetime]]]
+        Alternative input: list of all existing (burst_id, datetime) tuples.
     ax : Optional[matplotlib.axes.Axes]
         Axes to plot on. If None, a new figure and axes will be created.
     output_file : Optional[PathOrStr]
@@ -88,7 +88,7 @@ def _save_fig(fig, output_file: PathOrStr, title: str):
 def _plot_incidence_per_date(
     matrix: NDArray,
     *,
-    dates: Sequence[date],
+    dates: Sequence[datetime],
     fig,
     ax,
     colors: Sequence[str] = ["#a2cffe", "#fdae61"],
@@ -131,27 +131,27 @@ def _plot_incidence_per_date(
     fixed_dates = _generate_fixed_spacing_dates(dates)
     fixed_date_nums = mdates.date2num(fixed_dates)
 
-    # Draw gridlines for each fixed date
+    # Draw gridlines for each fixed datetime
     ax.grid(True, which="both", linestyle="--", linewidth=0.5)
     ax.set_xticks(fixed_date_nums, minor=True)
     return fig, ax
 
 
-def _generate_fixed_spacing_dates(dates: Sequence[date]) -> list[date]:
-    """Generate a date list with fixed spacing using the given dates.
+def _generate_fixed_spacing_dates(dates: Sequence[datetime]) -> list[datetime]:
+    """Generate a datetime list with fixed spacing using the given dates.
 
     Sets the interval to be the smallest timedelta from `dates`.
 
     Parameters
     ----------
     dates : list
-        A list of date strings.
+        A list of datetime strings.
     date_format : str
-        The format of the date strings in the list.
+        The format of the datetime strings in the list.
 
     Returns
     -------
-    list[date]
+    list[datetime]
         A list of datetime objects with fixed spacing.
     """
     date_list = list(dates)
