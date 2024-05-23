@@ -105,9 +105,9 @@ def create_geometry_files(
 
 def stitch_geometry_layers(
     local_hdf5_files: list[Path],
-    layers: Sequence[Layer | str],
-    strides: Mapping[str, int],
-    output_dir: PathOrStr,
+    layers: Sequence[Layer | str] = DEFAULT_LAYERS,
+    strides: Mapping[str, int] = DEFAULT_STRIDES,
+    output_dir: PathOrStr = Path("."),
 ) -> list[Path]:
     """Stitch geometry layers from downloaded HDF5 files.
 
