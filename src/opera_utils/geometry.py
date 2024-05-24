@@ -59,23 +59,23 @@ def create_geometry_files(
     download_dir : PathOrStr | None, optional
         Directory to save files, by default None
     save_hdf5_files : bool, optional
-        _description_, by default False
-    layers : Sequence[Layer  |  str], optional
-        _description_, by default DEFAULT_LAYERS
+        Flag to retain HDF5 files. Defaults to False.
+    layers : Sequence[Layer | str], optional
+        Layers to process. Defaults to DEFAULT_LAYERS.
     strides : Mapping[str, int], optional
-        _description_, by default DEFAULT_STRIDES
+        Stride values for merging images. Defaults to DEFAULT_STRIDES.
     max_download_jobs : int, optional
-        _description_, by default 3
+        Maximum number of download jobs to run in parallel. Defaults to 3.
 
     Returns
     -------
     list[Path]
-        _description_
+        List of output files with paths.
 
     Raises
     ------
     ValueError
-        _description_
+        If neither `frame_id` nor `burst_ids` are provided.
     """
     if frame_id is not None:
         burst_ids = get_burst_ids_for_frame(frame_id=frame_id)
@@ -93,25 +93,60 @@ def create_geometry_files(
         local_hdf5_files = download_cslc_static_layers(
             burst_ids=burst_ids, output_dir=sd, max_jobs=max_download_jobs
         )
-        for layer in layers:
-            layer_enum = Layer(layer)
-            name = layer_enum.value
-            gdal_strings = [
-                format_nc_filename(f, ds_name=f"data/{name}") for f in local_hdf5_files
-            ]
-            nodata = LAYER_TO_NODATA[Layer(layer)]
-            cur_outfile = output_path / f"{name}.tif"
-            output_files.append(cur_outfile)
-            logger.info(f"Merging images for {name}")
-            stitching.merge_images(
-                file_list=gdal_strings,
-                outfile=cur_outfile,
-                strides=strides,
-                driver="GTIff",
-                options=EXTRA_COMPRESSED_TIFF_OPTIONS,
-                resample_alg="nearest",
-                in_nodata=nodata,
-                out_nodata=nodata,
-            )
+        output_files = stitch_geometry_layers(
+            local_hdf5_files=local_hdf5_files,
+            layers=layers,
+            strides=strides,
+            output_dir=output_path,
+        )
 
+    return output_files
+
+
+def stitch_geometry_layers(
+    local_hdf5_files: list[Path],
+    layers: Sequence[Layer | str] = DEFAULT_LAYERS,
+    strides: Mapping[str, int] = DEFAULT_STRIDES,
+    output_dir: PathOrStr = Path("."),
+) -> list[Path]:
+    """Stitch geometry layers from downloaded HDF5 files.
+
+    Parameters
+    ----------
+    local_hdf5_files : list[Path]
+        List of paths to the downloaded HDF5 files.
+    layers : Sequence[Layer | str]
+        Layers to be processed.
+    strides : Mapping[str, int]
+        Stride values for merging images.
+    output_dir : PathOrStr
+        Directory to store output Geotiffs.
+
+    Returns
+    -------
+    list[Path]
+        List of output files with paths.
+    """
+    output_files: list[Path] = []
+
+    for layer in layers:
+        layer_enum = Layer(layer)
+        name = layer_enum.value
+        gdal_strings = [
+            format_nc_filename(f, ds_name=f"data/{name}") for f in local_hdf5_files
+        ]
+        nodata = LAYER_TO_NODATA[Layer(layer)]
+        cur_outfile = Path(output_dir) / f"{name}.tif"
+        output_files.append(cur_outfile)
+        logger.info(f"Merging images for {name}")
+        stitching.merge_images(
+            file_list=gdal_strings,
+            outfile=cur_outfile,
+            strides=strides,
+            driver="GTIff",
+            options=EXTRA_COMPRESSED_TIFF_OPTIONS,
+            resample_alg="nearest",
+            in_nodata=nodata,
+            out_nodata=nodata,
+        )
     return output_files
