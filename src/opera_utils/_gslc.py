@@ -4,6 +4,7 @@ import datetime
 from typing import Any, Callable
 
 import h5py
+import numpy as np
 
 from ._types import Filename
 
@@ -90,3 +91,37 @@ def get_radar_wavelength(filename: Filename):
     dset = "/metadata/processing_information/input_burst_metadata/wavelength"
     value = _get_dset_and_attrs(filename, dset)[0]
     return value
+
+
+def get_orbit_arrays(
+    h5file: Filename,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime.datetime]:
+    """Parse orbit info from OPERA S1 CSLC HDF5 file into python types.
+
+    Parameters
+    ----------
+    h5file : Filename
+        Path to OPERA S1 CSLC HDF5 file.
+
+    Returns
+    -------
+    times : np.ndarray
+        Array of times in seconds since reference epoch.
+    positions : np.ndarray
+        Array of positions in meters.
+    velocities : np.ndarray
+        Array of velocities in meters per second.
+    reference_epoch : datetime.datetime
+        Reference epoch of orbit.
+
+    """
+    with h5py.File(h5file) as hf:
+        orbit_group = hf["/metadata/orbit"]
+        times = orbit_group["time"][:]
+        positions = np.stack([orbit_group[f"position_{p}"] for p in ["x", "y", "z"]]).T
+        velocities = np.stack([orbit_group[f"velocity_{p}"] for p in ["x", "y", "z"]]).T
+        reference_epoch = datetime.datetime.fromisoformat(
+            orbit_group["reference_epoch"][()].decode()
+        )
+
+    return times, positions, velocities, reference_epoch
