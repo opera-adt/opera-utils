@@ -11,6 +11,7 @@ from ._types import Filename
 __all__ = [
     "get_zero_doppler_time",
     "get_radar_wavelength",
+    "get_orbit_arrays",
 ]
 
 
