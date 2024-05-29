@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import itertools
+import operator
 import re
 from collections import defaultdict
 from typing import Iterable, overload
@@ -223,20 +224,11 @@ def sort_files_by_date(
     dates : list[list[datetime.date,...]]
         Sorted list, where each entry has all the dates from the corresponding file.
     """
-
-    def sort_key(file_date_tuple):
-        # Key for sorting:
-        # To sort the files with the most dates first (the compressed SLCs which
-        # span a date range), sort the longer date lists first.
-        # Then, within each group of dates of the same length, use the date/dates
-        _, dates = file_date_tuple
-        try:
-            return (-len(dates), dates)
-        except TypeError:
-            return (-1, dates)
-
     file_date_tuples = [(f, get_dates(f, fmt=file_date_fmt)) for f in files]
-    file_dates = sorted([fd_tuple for fd_tuple in file_date_tuples], key=sort_key)
+    # Get the second item in the tuple for the key
+    file_dates = sorted(
+        [fd_tuple for fd_tuple in file_date_tuples], key=operator.itemgetter(1)
+    )
 
     # Unpack the sorted pairs with new sorted values
     file_list, dates = zip(*file_dates)  # type: ignore
