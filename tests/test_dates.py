@@ -180,32 +180,32 @@ def test_sort_files_by_date_interferograms():
     assert sorted_dates == sorted(dates)
 
 
-def test_sort_files_by_date_compressed_first():
-    # Check that compressed SLCs go first, then SLCs are sorted by date
+def test_sort_files_with_varying_date_lengths():
+    """Check we handle files with varying date lengths, looking at first date only."""
     unsorted_files = [
         "slc_20200101.tif",
         "slc_20210101.tif",
         "slc_20190101.tif",
         "compressed_20180101_20200101.tif",
-        "slc_20180101.tif",
-        "compressed_20200101_20210101.tif",
+        "slc_20180102.tif",
+        "compressed_20200102_20210101.tif",
     ]
     expected_dates = [
         [datetime.datetime(2018, 1, 1), datetime.datetime(2020, 1, 1)],
-        [datetime.datetime(2020, 1, 1), datetime.datetime(2021, 1, 1)],
-        [datetime.datetime(2018, 1, 1)],
+        [datetime.datetime(2018, 1, 2)],
         [datetime.datetime(2019, 1, 1)],
         [datetime.datetime(2020, 1, 1)],
+        [datetime.datetime(2020, 1, 2), datetime.datetime(2021, 1, 1)],
         [datetime.datetime(2021, 1, 1)],
     ]
 
     sorted_files, sorted_dates = _dates.sort_files_by_date(unsorted_files)
     assert sorted_files == [
         "compressed_20180101_20200101.tif",
-        "compressed_20200101_20210101.tif",
-        "slc_20180101.tif",
+        "slc_20180102.tif",
         "slc_20190101.tif",
         "slc_20200101.tif",
+        "compressed_20200102_20210101.tif",
         "slc_20210101.tif",
     ]
     assert sorted_dates == expected_dates
