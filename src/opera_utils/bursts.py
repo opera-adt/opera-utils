@@ -63,16 +63,14 @@ def get_burst_id(
 def group_by_burst(
     file_list: Iterable[str],
     burst_id_fmt: Union[str, Pattern[str]] = OPERA_BURST_RE,
-) -> dict[str, list[str]]:
-    ...
+) -> dict[str, list[str]]: ...
 
 
 @overload
 def group_by_burst(
     file_list: Iterable[PathLikeT],
     burst_id_fmt: Union[str, Pattern[str]] = OPERA_BURST_RE,
-) -> dict[str, list[PathLikeT]]:
-    ...
+) -> dict[str, list[PathLikeT]]: ...
 
 
 def group_by_burst(file_list, burst_id_fmt=OPERA_BURST_RE):
@@ -111,13 +109,13 @@ def group_by_burst(file_list, burst_id_fmt=OPERA_BURST_RE):
 
 
 @overload
-def sort_by_burst_id(file_list: Iterable[str], burst_id_fmt) -> list[str]:
-    ...
+def sort_by_burst_id(file_list: Iterable[str], burst_id_fmt) -> list[str]: ...
 
 
 @overload
-def sort_by_burst_id(file_list: Iterable[PathLikeT], burst_id_fmt) -> list[PathLikeT]:
-    ...
+def sort_by_burst_id(
+    file_list: Iterable[PathLikeT], burst_id_fmt
+) -> list[PathLikeT]: ...
 
 
 def sort_by_burst_id(file_list, burst_id_fmt):
@@ -150,16 +148,14 @@ def sort_by_burst_id(file_list, burst_id_fmt):
 def filter_by_burst_id(
     files: Iterable[PathLikeT],
     burst_ids: str | Iterable[str],
-) -> list[PathLikeT]:
-    ...
+) -> list[PathLikeT]: ...
 
 
 @overload
 def filter_by_burst_id(
     files: Iterable[str],
     burst_ids: str | Iterable[str],
-) -> list[str]:
-    ...
+) -> list[str]: ...
 
 
 def filter_by_burst_id(files, burst_ids):

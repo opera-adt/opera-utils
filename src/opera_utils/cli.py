@@ -1,4 +1,5 @@
 """Command-line interface for opera-utils."""
+
 from __future__ import annotations
 
 import json

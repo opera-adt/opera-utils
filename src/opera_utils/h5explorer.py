@@ -1,4 +1,5 @@
 """Module for exploring HDF5 files interactively in Jupyter."""
+
 from __future__ import annotations
 
 from typing import Any
