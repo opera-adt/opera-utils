@@ -62,8 +62,7 @@ def filter_by_date(
     files: Iterable[PathLikeT],
     dates: Iterable[DateOrDatetime],
     fmt: str = DATE_FORMAT,
-) -> list[PathLikeT]:
-    ...
+) -> list[PathLikeT]: ...
 
 
 @overload
@@ -71,8 +70,7 @@ def filter_by_date(
     files: Iterable[str],
     dates: Iterable[DateOrDatetime],
     fmt: str = DATE_FORMAT,
-) -> list[str]:
-    ...
+) -> list[str]: ...
 
 
 def filter_by_date(files, dates, fmt=DATE_FORMAT):
