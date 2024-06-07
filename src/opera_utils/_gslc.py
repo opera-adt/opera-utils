@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 import h5py
 import numpy as np
+from pyproj import CRS, Transformer
 
 from ._types import Filename
 
@@ -12,6 +13,9 @@ __all__ = [
     "get_zero_doppler_time",
     "get_radar_wavelength",
     "get_orbit_arrays",
+    "get_xy_coords",
+    "get_lonlat_grid",
+    "get_cslc_orbit",
 ]
 
 
@@ -126,3 +130,98 @@ def get_orbit_arrays(
         )
 
     return times, positions, velocities, reference_epoch
+
+
+def get_cslc_orbit(h5file: Filename):
+    """Parse orbit info from OPERA S1 CSLC HDF5 file into an isce3.core.Orbit.
+
+    `isce3` must be installed to use this function.
+
+    Parameters
+    ----------
+    h5file : Filename
+        Path to OPERA S1 CSLC HDF5 file.
+
+    Returns
+    -------
+    orbit : isce3.core.Orbit
+        Orbit object.
+
+    """
+    from isce3.core import DateTime, Orbit, StateVector
+
+    times, positions, velocities, reference_epoch = get_orbit_arrays(h5file)
+    orbit_svs = []
+
+    for t, x, v in zip(times, positions, velocities):
+        orbit_svs.append(
+            StateVector(
+                DateTime(reference_epoch + datetime.timedelta(seconds=t)),
+                x,
+                v,
+            )
+        )
+
+    return Orbit(orbit_svs)
+
+
+def get_xy_coords(h5file: Filename, subsample: int = 100) -> tuple:
+    """Get x and y grid from OPERA S1 CSLC HDF5 file.
+
+    Parameters
+    ----------
+    h5file : Filename
+        Path to OPERA S1 CSLC HDF5 file.
+    subsample : int, optional
+        Subsampling factor, by default 100
+
+    Returns
+    -------
+    x : np.ndarray
+        Array of x coordinates in meters.
+    y : np.ndarray
+        Array of y coordinates in meters.
+    projection : int
+        EPSG code of projection.
+
+    """
+    with h5py.File(h5file) as hf:
+        x = hf["/data/x_coordinates"][:]
+        y = hf["/data/y_coordinates"][:]
+        projection = hf["/data/projection"][()]
+
+    return x[::subsample], y[::subsample], projection
+
+
+def get_lonlat_grid(
+    h5file: Filename, subsample: int = 100
+) -> tuple[np.ndarray, np.ndarray]:
+    """Get 2D latitude and longitude grid from OPERA S1 CSLC HDF5 file.
+
+    Parameters
+    ----------
+    h5file : Filename
+        Path to OPERA S1 CSLC HDF5 file.
+    subsample : int, optional
+        Subsampling factor, by default 100
+
+    Returns
+    -------
+    lat : np.ndarray
+        2D Array of latitude coordinates in degrees.
+    lon : np.ndarray
+        2D Array of longitude coordinates in degrees.
+    projection : int
+        EPSG code of projection.
+
+    """
+    x, y, projection = get_xy_coords(h5file, subsample)
+    X, Y = np.meshgrid(x, y)
+    xx = X.flatten()
+    yy = Y.flatten()
+    crs = CRS.from_epsg(projection)
+    transformer = Transformer.from_crs(crs, CRS.from_epsg(4326), always_xy=True)
+    lon, lat = transformer.transform(xx=xx, yy=yy, radians=True)
+    lon = lon.reshape(X.shape)
+    lat = lat.reshape(Y.shape)
+    return lon, lat
