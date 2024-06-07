@@ -1,5 +1,4 @@
 import datetime
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -21,14 +20,11 @@ TEST_FILE = (
 )
 
 
-@pytest.fixture(autouse=True)
-def ignore_deprecation_warning():
-    warnings.filterwarnings(
-        "ignore",
-        message="`product` is deprecated as of NumPy 1.25.0, and will be removed in NumPy 2.0. Please use `prod` instead.",
-        category=DeprecationWarning,
-        module=r"h5py\._hl\.dataset",
-    )
+pytestmark = pytest.mark.filterwarnings(
+    # h5py: `product` is deprecated as of NumPy 1.25.0, and will be removed in NumPy 2.0.
+    # Please use `prod` instead.:DeprecationWarning:h5py/_hl/dataset.py
+    "ignore:.*product.*:DeprecationWarning",
+)
 
 
 def test_get_radar_wavelength():
