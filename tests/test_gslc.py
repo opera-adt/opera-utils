@@ -1,7 +1,9 @@
 import datetime
+import warnings
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from opera_utils._gslc import (
     get_orbit_arrays,
@@ -14,6 +16,16 @@ TEST_FILE = (
     / "data"
     / "OPERA_L2_CSLC-S1_T042-088905-IW1_20231009T140757Z_20231010T204936Z_S1A_VV_v1.0.h5"
 )
+
+
+@pytest.fixture(autouse=True)
+def ignore_deprecation_warning():
+    warnings.filterwarnings(
+        "ignore",
+        message="`product` is deprecated as of NumPy 1.25.0, and will be removed in NumPy 2.0. Please use `prod` instead.",
+        category=DeprecationWarning,
+        module=r"h5py\._hl\.dataset",
+    )
 
 
 def test_get_radar_wavelength():
