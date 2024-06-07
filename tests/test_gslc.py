@@ -6,8 +6,11 @@ import numpy as np
 import pytest
 
 from opera_utils._gslc import (
+    get_cslc_orbit,
+    get_lonlat_grid,
     get_orbit_arrays,
     get_radar_wavelength,
+    get_xy_coords,
     get_zero_doppler_time,
 )
 
@@ -93,3 +96,59 @@ def test_get_orbit_arrays():
     np.testing.assert_equal(orbit_arrays[1], pos)
     np.testing.assert_equal(orbit_arrays[2], vel)
     assert orbit_arrays[3] == ref_epoch
+
+
+# Skip if isce3 not installed
+try:
+    import isce3
+except ImportError:
+    isce3 = None
+
+
+@pytest.mark.skipif(isce3 is None, reason="isce3 not installed")
+def test_get_cslc_orbit():
+    orbit = get_cslc_orbit(TEST_FILE)
+    assert isinstance(orbit, isce3.core.Orbit)
+
+    assert orbit.size == 12
+    expected = datetime.datetime(2023, 10, 9, 14, 7, 1, 903933)
+    # Ignore the nanosecond:
+    assert orbit.start_datetime.isoformat()[:-3] == expected.isoformat()
+    assert orbit.mid_time == 55.0
+    assert orbit.spacing == 10
+
+    orbit_arrays = get_orbit_arrays(TEST_FILE)
+    # orbit.time is a "linspace"
+    np.testing.assert_array_equal(orbit.position, orbit_arrays[1])
+    np.testing.assert_array_equal(orbit.velocity, orbit_arrays[2])
+
+
+def test_get_lonlat_grid():
+    lons, lats = get_lonlat_grid(TEST_FILE)
+    assert lons.shape == (46, 199)
+    assert lons.dtype == np.float64
+    assert lons[0, 0] == -2.0990052428418124
+    assert lats.shape == (46, 199)
+    assert lats.dtype == np.float64
+    assert lats[0, 0] == 0.6928179204952867
+    assert np.all(np.diff(lons) > 0)
+    # Lats are in descending order
+    assert np.all(np.diff(lats) < 0)
+    # It's *not* exactly a square regular grid in lat/lon, dur to warping
+    assert lons[0, 0] != lons[-1, 0]
+
+
+def test_get_xy_coords():
+    x, y, epsg = get_xy_coords(TEST_FILE)
+
+    assert x.shape == (199,)
+    assert x.dtype == np.float64
+    assert x[0] == 734582.5
+    assert x[-1] == 833582.5
+
+    assert y.shape == (46,)
+    assert y.dtype == np.float64
+    assert y[0] == 4397545.0
+    assert y[-1] == 4352545.0
+
+    assert epsg == 32610
