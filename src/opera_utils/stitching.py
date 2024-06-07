@@ -1,4 +1,5 @@
 """stitching.py: utilities for merging geographic rasters."""
+
 from __future__ import annotations
 
 import logging
