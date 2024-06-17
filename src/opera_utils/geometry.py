@@ -5,6 +5,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Mapping, Sequence
 
+import h5py
+import numpy as np
+
 from opera_utils import get_burst_ids_for_frame, stitching
 from opera_utils._types import PathOrStr
 from opera_utils._utils import format_nc_filename, scratch_directory
@@ -150,3 +153,100 @@ def stitch_geometry_layers(
             out_nodata=nodata,
         )
     return output_files
+
+
+def get_incidence_angles(static_h5file: PathOrStr, subsample_factor: int = 10):
+    """Calculate incidence angles from Line Of Sight (LOS) east and north components.
+
+    This function reads the LOS east and north components from the HDF5 file,
+    downsamples them, and then calculates the incidence angle based on
+    the LOS vectors.
+
+    Parameters
+    ----------
+    static_h5file : PathOrStr
+        Path to the HDF5 file containing the static data.
+    subsample_factor : int, optional
+        Factor by which to subsample the data, by default 10.
+
+    Returns
+    -------
+    np.ndarray
+        Array of incidence angles in degrees.
+
+    """
+    with h5py.File(static_h5file) as hf:
+        ds_east = hf[f"data/{Layer.LOS_EAST.value}"]
+        ds_north = hf[f"data/{Layer.LOS_NORTH.value}"]
+        los_east = ds_east[::subsample_factor, ::subsample_factor]
+        los_north = ds_north[::subsample_factor, ::subsample_factor]
+
+        inc_angle_rad = np.arccos(np.sqrt(1 - los_east**2 - los_north**2))
+        return np.degrees(inc_angle_rad)
+
+    # los_east_raster = format_nc_filename(
+    #     static_h5file, ds_name=f"data/{Layer.LOS_EAST.value}"
+    # )
+    # los_north_raster = format_nc_filename(
+    #     static_h5file, ds_name=f"data/{Layer.LOS_NORTH.value}"
+    # )
+    # from osgeo_utils import gdal_calc
+
+    # return gdal_calc.Calc(
+    #     NoDataValue=0,
+    #     format="MEM",
+    #     outfile="",
+    #     # type=output_type,
+    #     # quiet=True,
+    #     # overwrite=True,
+    #     # creation_options=io.DEFAULT_TIFF_OPTIONS,
+    #     E=los_east_raster,
+    #     N=los_north_raster,
+    #     calc="degrees(arccos(sqrt(1 - E**2 - N**2)))",
+    # ).ReadAsArray()
+
+
+def get_slant_range(
+    cslc_h5file: PathOrStr, static_h5file: PathOrStr, subsample: int = 100
+):
+    """Calculate the approximate slant range for CSLC products.
+
+    Parameters
+    ----------
+    cslc_h5file : PathOrStr
+        Path to the HDF5 file containing the CSLC data.
+    static_h5file : PathOrStr
+        Path to the HDF5 file containing the static data.
+    subsample : int, optional
+        Factor by which to subsample the incidence data, by default 100.
+
+    Returns
+    -------
+    np.ndarray
+        Array of slant range values.
+
+    Notes
+    -----
+    This function reads the orbit data from the CSLC HDF5 file, calculates
+    the incidence angles from the static HDF5 file, and then computes the
+    slant range using geometric relationships.
+    """
+    from opera_utils._gslc import get_orbit_arrays
+
+    _t, x, _v, _t0 = get_orbit_arrays(cslc_h5file)
+    R = np.linalg.norm(x, axis=1).mean()
+    # sat_altitude = R - radius_of_earth
+
+    # See here for other implementation
+    # https://github.com/insarlab/MintPy/blob/2012127edbe81b6b0817cc6a27283eb33dfca466/src/mintpy/utils/utils0.py#L175
+
+    incidence = get_incidence_angles(static_h5file, subsample_factor=subsample)
+    incidence_rad = np.radians(incidence)
+    earth_radius = 6371.0088e3
+
+    # calculate 2R based on the law of sines
+    two_times_circ = R / np.sin(np.pi - incidence_rad)
+
+    look_angle_rad = np.arcsin(earth_radius / two_times_circ)
+    range_angle_rad = incidence_rad - look_angle_rad
+    return two_times_circ * np.sin(range_angle_rad)
