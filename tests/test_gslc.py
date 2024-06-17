@@ -123,10 +123,10 @@ def test_get_lonlat_grid():
     lons, lats = get_lonlat_grid(TEST_FILE)
     assert lons.shape == (46, 199)
     assert lons.dtype == np.float64
-    assert lons[0, 0] == -2.0990052428418124
+    assert lons[0, 0] == -120.2641415906683
     assert lats.shape == (46, 199)
     assert lats.dtype == np.float64
-    assert lats[0, 0] == 0.6928179204952867
+    assert lats[0, 0] == 39.69554281541014
     assert np.all(np.diff(lons) > 0)
     # Lats are in descending order
     assert np.all(np.diff(lats) < 0)

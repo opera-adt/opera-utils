@@ -221,7 +221,7 @@ def get_lonlat_grid(
     yy = Y.flatten()
     crs = CRS.from_epsg(projection)
     transformer = Transformer.from_crs(crs, CRS.from_epsg(4326), always_xy=True)
-    lon, lat = transformer.transform(xx=xx, yy=yy, radians=True)
+    lon, lat = transformer.transform(xx=xx, yy=yy, radians=False)
     lon = lon.reshape(X.shape)
     lat = lat.reshape(Y.shape)
     return lon, lat
