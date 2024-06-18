@@ -5,7 +5,6 @@ import logging
 import netrc
 import warnings
 from enum import Enum
-from functools import cache
 from itertools import groupby
 from pathlib import Path
 from typing import Literal, Sequence, Union
@@ -169,8 +168,11 @@ def _download_for_burst_ids(
         logger.info(
             f"Searching {len(burst_ids)} for {product} (Dates:{start} to {end})"
         )
-        results = _search(
-            burst_ids=tuple(burst_ids), product=product, start=start, end=end
+        results = asf.search(
+            operaBurstID=list(burst_ids),
+            processingLevel=product.value,
+            start=start,
+            end=end,
         )
         logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
         results = filter_results_by_date_and_version(results)
@@ -222,7 +224,6 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
     return filtered_results
 
 
-@cache
 def _search(
     burst_ids: Sequence[str],
     product: L2Product,
