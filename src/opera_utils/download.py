@@ -224,20 +224,6 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
     return filtered_results
 
 
-def _search(
-    burst_ids: Sequence[str],
-    product: L2Product,
-    start: DatetimeInput,
-    end: DatetimeInput,
-) -> asf.ASFSearchResults:
-    return asf.search(
-        operaBurstID=list(burst_ids),
-        processingLevel=product.value,
-        start=start,
-        end=end,
-    )
-
-
 def _get_urls(
     results: asf.ASFSearchResults,
     type_: Literal["https", "s3"] = "https",
