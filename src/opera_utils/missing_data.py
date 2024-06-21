@@ -184,15 +184,15 @@ def _burst_id_mapping_from_tuples(
 def _burst_id_mapping_from_files(
     slc_files: Iterable[Filename],
 ) -> dict[str, list[datetime]]:
-    """Create a {burst_id -> [datetime,...]} mapping from filenames."""
+    """Create a {burst_id -> [datetime,...]} mapping from filenames.
+
+    Assumes the first datetime in the filename is the relevant one.
+    """
     # Don't exhaust the iterator for multiple groupings
     slc_file_list = list(map(str, slc_files))
 
     # Group the possible SLC files by their datetime and by their Burst ID
     burst_id_to_files = group_by_burst(slc_file_list)
-
-    date_tuples = [get_dates(f) for f in slc_file_list]
-    assert all(len(tup) == 1 for tup in date_tuples)
 
     return {
         burst_id: [get_dates(f)[0] for f in file_list]
