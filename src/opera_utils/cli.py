@@ -70,10 +70,10 @@ def frame_bbox(frame_id, latlon: bool, bounds_only: bool):
     show_default=True,
 )
 @click.option(
-    "--verbose", is_flag=True, help="Print full list of burst IDs for each option"
+    "--max-options", type=int, default=5, help="Maximum number of options to show"
 )
 def missing_data_options(
-    namelist, write_options: bool, output_prefix: str, verbose: bool
+    namelist, write_options: bool, output_prefix: str, max_options: int
 ):
     """Get a list of options for how to handle missing data.
 
@@ -120,7 +120,7 @@ def missing_data_options(
         console.print(table)
 
     file_list = [f.strip() for f in namelist.read().splitlines()]
-    options = get_missing_data_options(file_list)
+    options = get_missing_data_options(file_list)[:max_options]
 
     try:
         print_with_rich(options)
