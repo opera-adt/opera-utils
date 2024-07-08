@@ -45,8 +45,8 @@ POOCH = pooch.create(
     registry={
         f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "df795cdad6e3f85c29aafd2ca4bbc60a7f011319eb428f0c036d49361a3cb205",
         f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "120560ea7af47c492477e2803c4a42ff3c7cb0dfe0d867d7a81ff0ef138ea05b",
-        f"opera-s1-disp-burst-to-frame-{BURST_DB_VERSION}.json.zip": "2909b1065f41f753c203be8a567c2e6770a047f1c863f04db8efd2d13e353854",
-        f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip": "14d62b32a76a24937c8c73dc88ce60a0ea02c4458d102c9ba1b1191b147e045f",
+        f"opera-s1-disp-{BURST_DB_VERSION}-burst-to-frame.json.zip": "2909b1065f41f753c203be8a567c2e6770a047f1c863f04db8efd2d13e353854",
+        f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip": "14d62b32a76a24937c8c73dc88ce60a0ea02c4458d102c9ba1b1191b147e045f",
     },
 )
 
@@ -63,9 +63,9 @@ def fetch_burst_id_geometries_simple() -> str:
 
 def fetch_burst_to_frame_mapping_file() -> str:
     """Get the burst-to-frame mapping for the burst database."""
-    return POOCH.fetch(f"opera-s1-disp-burst-to-frame-{BURST_DB_VERSION}.json.zip")
+    return POOCH.fetch(f"opera-s1-disp-{BURST_DB_VERSION}-burst-to-frame.json.zip")
 
 
 def fetch_frame_to_burst_mapping_file() -> str:
     """Get the frame-to-burst mapping for the burst database."""
-    return POOCH.fetch(f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip")
+    return POOCH.fetch(f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip")
