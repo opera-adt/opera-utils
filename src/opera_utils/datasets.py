@@ -15,12 +15,12 @@ __all__ = [
 BASE_URL = "https://github.com/opera-adt/burst_db/releases/download/v{version}/"
 
 # $ ls *json.zip | xargs -n1 shasum -a 256
-# 8ee9cae079b9adb24e223b9ff9c81c66506a2a1a72a456220133a9f7f5d4d93b  burst_id_geometries_simple.geojson.zip
-# 86657e4e578cfced18a66984758fff9a1bf94e8591a288be0d1ad391399f2e59  frame_geometries_simple.geojson.zip
-# 436cce345378dc31e81ed661497bab2e744217a5d63c0bb92817dc837786cd22  opera-s1-disp-burst-to-frame.json.zip
-# 8b7ed8c8d90ef3d3348bc226958a26a2cb8ab302a6466762aa971b8f7333517f  opera-s1-disp-frame-to-burst.json.zip
+# df795cdad6e3f85c29aafd2ca4bbc60a7f011319eb428f0c036d49361a3cb205  burst-id-geometries-simple-0.5.0.geojson.zip
+# 120560ea7af47c492477e2803c4a42ff3c7cb0dfe0d867d7a81ff0ef138ea05b  frame-geometries-simple-0.5.0.geojson.zip
+# 2909b1065f41f753c203be8a567c2e6770a047f1c863f04db8efd2d13e353854  opera-s1-disp-0.5.0-burst-to-frame.json.zip
+# 14d62b32a76a24937c8c73dc88ce60a0ea02c4458d102c9ba1b1191b147e045f  opera-s1-disp-0.5.0-frame-to-burst.json.zip
 
-BURST_DB_VERSION = "0.3.1"
+BURST_DB_VERSION = "0.5.0"
 
 POOCH = pooch.create(
     # Folder where the data will be stored. For a sensible default, use the
@@ -43,10 +43,10 @@ POOCH = pooch.create(
     # are their respective SHA256 hashes. Files will be downloaded
     # automatically when needed.
     registry={
-        f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "963f63577221a3baa20f3a2101c7a01eefb0cc853f6f111708a5bb35bebfc0ed",
-        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "e75cc27809448d7ace2164879626fb0b5616b16981a6b2d6d234e3b17cb615fa",
-        f"opera-s1-disp-burst-to-frame-{BURST_DB_VERSION}.json.zip": "436cce345378dc31e81ed661497bab2e744217a5d63c0bb92817dc837786cd22",
-        f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip": "a48382afcb89f0ff681982b0fc24476ec9c6c1b8a67ae1a26cf380a450ffadc0",
+        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "df795cdad6e3f85c29aafd2ca4bbc60a7f011319eb428f0c036d49361a3cb205",
+        f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "120560ea7af47c492477e2803c4a42ff3c7cb0dfe0d867d7a81ff0ef138ea05b",
+        f"opera-s1-disp-{BURST_DB_VERSION}-burst-to-frame.json.zip": "2909b1065f41f753c203be8a567c2e6770a047f1c863f04db8efd2d13e353854",
+        f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip": "14d62b32a76a24937c8c73dc88ce60a0ea02c4458d102c9ba1b1191b147e045f",
     },
 )
 
@@ -63,9 +63,9 @@ def fetch_burst_id_geometries_simple() -> str:
 
 def fetch_burst_to_frame_mapping_file() -> str:
     """Get the burst-to-frame mapping for the burst database."""
-    return POOCH.fetch(f"opera-s1-disp-burst-to-frame-{BURST_DB_VERSION}.json.zip")
+    return POOCH.fetch(f"opera-s1-disp-{BURST_DB_VERSION}-burst-to-frame.json.zip")
 
 
 def fetch_frame_to_burst_mapping_file() -> str:
     """Get the frame-to-burst mapping for the burst database."""
-    return POOCH.fetch(f"opera-s1-disp-frame-to-burst-{BURST_DB_VERSION}.json.zip")
+    return POOCH.fetch(f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip")
