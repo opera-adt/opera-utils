@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Literal, Sequence, Union
 
 from packaging.version import parse
+from shapely.geometry import box
 
 try:
     import asf_search as asf
@@ -18,28 +19,14 @@ except ImportError:
     warnings.warn("Can't import `asf_search`. Unable to search/download data. ")
 
 from opera_utils._types import PathOrStr
-from opera_utils._utils import LoggingContext
 
 __all__ = [
     "download_cslc_static_layers",
     "download_cslcs",
+    "search_cslcs",
 ]
 
-logger = logging.getLogger(__name__)
-
-
-class _DummyContext:
-    """Context manager that does nothing, for use when verbose=False."""
-
-    # return nullcontext(None)
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, *args, **kwargs):
-        pass
+logger = logging.getLogger("opera_utils")
 
 
 class L2Product(str, Enum):
@@ -86,6 +73,64 @@ def download_cslc_static_layers(
         product=L2Product.CSLC_STATIC,
         verbose=verbose,
     )
+
+
+def search_cslcs(
+    start: DatetimeInput | None = None,
+    end: DatetimeInput | None = None,
+    bounds: Sequence[float] | None = None,
+    aoi_polygon: str | None = None,
+    track: int | None = None,
+    burst_ids: Sequence[str] | None = None,
+    max_results: int | None = None,
+    verbose: bool = False,
+) -> ASFSearchResults:
+    """Search for OPERA CSLC products on ASF.
+
+    Parameters
+    ----------
+    start : datetime.datetime | str, optional
+        Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    end : datetime.datetime | str, optional
+        end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    bounds : Sequence[float], optional
+        Bounding box coordinates (min lon, min lat, max lon, max lat)
+    aoi_polygon : str, optional
+        GeoJSON polygon string, alternative to `bounds`.
+    track : int, optional
+        Relative orbit number / track / path
+    burst_ids : Sequence[str], optional
+        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
+    max_results : int, optional
+        Maximum number of results to return
+    verbose : bool, optional
+        Whether to print verbose output, by default False
+
+    Returns
+    -------
+    asf_search.ASFSearchResults.ASFSearchResults
+        Search results from ASF.
+    """
+    logger.info("Searching for OPERA CSLC products")
+    # If they passed a bounding box, need a WKT polygon
+    if bounds is not None:
+        if aoi_polygon is not None:
+            raise ValueError("Can't pass both `bounds` and `aoi_polygon`")
+        aoi = box(*bounds).wkt
+    else:
+        aoi = aoi_polygon
+
+    results = asf.search(
+        start=start,
+        end=end,
+        intersectsWith=aoi,
+        relativeOrbit=track,
+        operaBurstID=list(burst_ids) if burst_ids is not None else None,
+        processingLevel=L2Product.CSLC.value,
+        maxResults=max_results,
+    )
+    logger.info(f"Found {len(results)} results")
+    return results
 
 
 def download_cslcs(
@@ -162,27 +207,22 @@ def _download_for_burst_ids(
     list[Path]
         Locations to saved raster files.
     """
-    cm = LoggingContext if verbose else _DummyContext
-    with cm(logger, level=logging.INFO, handler=logging.StreamHandler()):
-        # Make a tuple so it can be hashed
-        logger.info(
-            f"Searching {len(burst_ids)} for {product} (Dates:{start} to {end})"
-        )
-        results = asf.search(
-            operaBurstID=list(burst_ids),
-            processingLevel=product.value,
-            start=start,
-            end=end,
-        )
-        logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
-        results = filter_results_by_date_and_version(results)
-        logger.info(f"Found {len(results)} results")
-        session = _get_auth_session()
-        urls = _get_urls(results)
-        asf.download_urls(
-            urls=urls, path=str(output_dir), session=session, processes=max_jobs
-        )
-        return [Path(output_dir) / r.properties["fileName"] for r in results]
+    logger.info(f"Searching {len(burst_ids)} for {product} (Dates:{start} to {end})")
+    results = asf.search(
+        operaBurstID=list(burst_ids),
+        processingLevel=product.value,
+        start=start,
+        end=end,
+    )
+    logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
+    results = filter_results_by_date_and_version(results)
+    logger.info(f"Found {len(results)} results")
+    session = _get_auth_session()
+    urls = _get_urls(results)
+    asf.download_urls(
+        urls=urls, path=str(output_dir), session=session, processes=max_jobs
+    )
+    return [Path(output_dir) / r.properties["fileName"] for r in results]
 
 
 def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchResults:
