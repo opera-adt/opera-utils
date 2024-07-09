@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import shutil
 import tempfile
@@ -253,45 +252,3 @@ def transform_xy_to_latlon(
         longitude = x.copy()
 
     return latitude, longitude
-
-
-# https://docs.python.org/3/howto/logging-cookbook.html#using-a-context-manager-for-selective-logging
-class LoggingContext:
-    """A logging context manager.
-
-    This class is used to temporarily add a logging handler to a logger. It can be used
-    as follows:
-
-    >>> logger = logging.getLogger(__name__)
-    >>> with LoggingContext(logger, level=logging.DEBUG, handler=logging.StreamHandler()):
-    ...     logger.debug("This is a debug message")
-
-    >>> logger.debug("This is a debug message")  # won't be printed
-    """
-
-    def __init__(
-        self,
-        logger: logging.Logger,
-        level: int | str | None = None,
-        handler: logging.Handler | None = None,
-        close: bool = True,
-    ):
-        self.logger = logger
-        self.level = level
-        self.handler = handler
-        self.close = close
-
-    def __enter__(self):
-        if self.level is not None:
-            self.old_level = self.logger.level
-            self.logger.setLevel(self.level)
-        if self.handler:
-            self.logger.addHandler(self.handler)
-
-    def __exit__(self, et, ev, tb):
-        if self.level is not None:
-            self.logger.setLevel(self.old_level)
-        if self.handler:
-            self.logger.removeHandler(self.handler)
-        if self.handler and self.close:
-            self.handler.close()
