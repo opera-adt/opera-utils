@@ -18,7 +18,8 @@ try:
 except ImportError:
     warnings.warn("Can't import `asf_search`. Unable to search/download data. ")
 
-from opera_utils._types import PathOrStr
+from ._types import PathOrStr
+from .missing_data import BurstSubsetOption, get_missing_data_options
 
 __all__ = [
     "download_cslc_static_layers",
@@ -84,7 +85,8 @@ def search_cslcs(
     burst_ids: Sequence[str] | None = None,
     max_results: int | None = None,
     verbose: bool = False,
-) -> ASFSearchResults:
+    check_missing_data: bool = False,
+) -> ASFSearchResults | tuple[ASFSearchResults, list[BurstSubsetOption]]:
     """Search for OPERA CSLC products on ASF.
 
     Parameters
@@ -105,6 +107,8 @@ def search_cslcs(
         Maximum number of results to return
     verbose : bool, optional
         Whether to print verbose output, by default False
+    check_missing_data : bool, optional
+        Whether to remove missing data options from the search results, by default False
 
     Returns
     -------
@@ -130,7 +134,12 @@ def search_cslcs(
         maxResults=max_results,
     )
     logger.info(f"Found {len(results)} results")
-    return results
+    if not check_missing_data:
+        return results
+    missing_data_options = get_missing_data_options(
+        slc_files=[r.properties["fileName"] for r in results]
+    )
+    return results, missing_data_options
 
 
 def download_cslcs(
