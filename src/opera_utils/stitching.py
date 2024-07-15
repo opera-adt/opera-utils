@@ -89,6 +89,7 @@ def merge_images(
             logger.info(f"Overwrite=True: removing {outfile}")
             Path(outfile).unlink()
 
+    is_downsampled = strides is not None and strides["x"] > 1 and strides["y"] > 1
     if len(file_list) == 1:
         logger.info("Only one image, no stitching needed")
         logger.info(f"Copying {file_list[0]} to {outfile} and zeroing nodata values.")
@@ -106,7 +107,7 @@ def merge_images(
     # If not, warp them to the most common projection using VRT files in a tempdir
     temp_dir = tempfile.TemporaryDirectory()
 
-    if strides is not None and strides["x"] > 1 and strides["y"] > 1:
+    if is_downsampled:
         file_list = get_downsampled_vrts(
             file_list,
             strides=strides,
