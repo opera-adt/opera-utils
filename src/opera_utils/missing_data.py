@@ -46,49 +46,6 @@ class BurstSubsetOption:
         return len(self.burst_ids)
 
 
-def get_burst_id_to_dates(
-    slc_files: Optional[Iterable[Filename]] = None,
-    burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
-) -> dict[str, list[datetime]]:
-    """Get a mapping of burst ID to list of dates.
-
-    Assumes that the `slc_files` have only one datetime in the name, or
-    that the first datetime in the `burst_id_date_tuples` is the relevant
-    one (as is the case for OPERA CSLCs).
-
-
-    Parameters
-    ----------
-    slc_files : Optional[Iterable[Filename]]
-        List of OPERA CSLC filenames.
-    burst_id_date_tuples : Optional[Iterable[tuple[str, datetime]]]
-        Alternative input: list of all existing (burst_id, datetime) tuples.
-
-    Returns
-    -------
-    dict[str, list[datetime]]
-        Mapping of burst ID to list of dates.
-    """
-    if slc_files is not None:
-        return _burst_id_mapping_from_files(slc_files)
-    elif burst_id_date_tuples is not None:
-        return _burst_id_mapping_from_tuples(burst_id_date_tuples)
-    else:
-        raise ValueError("Must provide either slc_files or burst_id_date_tuples")
-
-
-def _duplicated_bursts(burst_id_to_dates: Mapping[str, Sequence[datetime]]):
-    from collections import Counter
-
-    counts: Counter = Counter()
-    for burst_id, d_list in burst_id_to_dates.items():
-        for d in d_list:
-            counts[(burst_id, d)] += 1
-    # total_sum = sum([len(v) for k, v in burst_id_to_dates.items()])
-    # deduped_sum = sum([len(set(v)) for k, v in burst_id_to_dates.items()])
-    return [pair for pair, count in counts.items() if count > 1]
-
-
 def get_missing_data_options(
     slc_files: Optional[Iterable[Filename]] = None,
     burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
@@ -135,6 +92,49 @@ def get_missing_data_options(
     # - Each row corresponds to one of the possible burst IDs
     # - Each column corresponds to one of the possible dates
     return generate_burst_subset_options(B, all_burst_ids, all_dates)
+
+
+def get_burst_id_to_dates(
+    slc_files: Optional[Iterable[Filename]] = None,
+    burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
+) -> dict[str, list[datetime]]:
+    """Get a mapping of burst ID to list of dates.
+
+    Assumes that the `slc_files` have only one datetime in the name, or
+    that the first datetime in the `burst_id_date_tuples` is the relevant
+    one (as is the case for OPERA CSLCs).
+
+
+    Parameters
+    ----------
+    slc_files : Optional[Iterable[Filename]]
+        List of OPERA CSLC filenames.
+    burst_id_date_tuples : Optional[Iterable[tuple[str, datetime]]]
+        Alternative input: list of all existing (burst_id, datetime) tuples.
+
+    Returns
+    -------
+    dict[str, list[datetime]]
+        Mapping of burst ID to list of dates.
+    """
+    if slc_files is not None:
+        return _burst_id_mapping_from_files(slc_files)
+    elif burst_id_date_tuples is not None:
+        return _burst_id_mapping_from_tuples(burst_id_date_tuples)
+    else:
+        raise ValueError("Must provide either slc_files or burst_id_date_tuples")
+
+
+def _duplicated_bursts(burst_id_to_dates: Mapping[str, Sequence[datetime]]):
+    from collections import Counter
+
+    counts: Counter = Counter()
+    for burst_id, d_list in burst_id_to_dates.items():
+        for d in d_list:
+            counts[(burst_id, d)] += 1
+    # total_sum = sum([len(v) for k, v in burst_id_to_dates.items()])
+    # deduped_sum = sum([len(set(v)) for k, v in burst_id_to_dates.items()])
+    return [pair for pair, count in counts.items() if count > 1]
 
 
 def get_burst_id_date_incidence(
@@ -184,15 +184,15 @@ def _burst_id_mapping_from_tuples(
 def _burst_id_mapping_from_files(
     slc_files: Iterable[Filename],
 ) -> dict[str, list[datetime]]:
-    """Create a {burst_id -> [datetime,...]} mapping from filenames."""
+    """Create a {burst_id -> [datetime,...]} mapping from filenames.
+
+    Assumes the first datetime in the filename is the relevant one.
+    """
     # Don't exhaust the iterator for multiple groupings
     slc_file_list = list(map(str, slc_files))
 
     # Group the possible SLC files by their datetime and by their Burst ID
     burst_id_to_files = group_by_burst(slc_file_list)
-
-    date_tuples = [get_dates(f) for f in slc_file_list]
-    assert all(len(tup) == 1 for tup in date_tuples)
 
     return {
         burst_id: [get_dates(f)[0] for f in file_list]

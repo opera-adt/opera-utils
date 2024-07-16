@@ -85,6 +85,7 @@ def create_geometry_files(
 
     if not burst_ids:
         raise ValueError("Must provide frame_id or burst_ids")
+    logger.debug("Using burst IDs: %s", burst_ids)
 
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True, parents=True)

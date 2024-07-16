@@ -5,38 +5,29 @@ import logging
 import netrc
 import warnings
 from enum import Enum
-from functools import cache
+from itertools import groupby
 from pathlib import Path
 from typing import Literal, Sequence, Union
 
+from packaging.version import parse
+from shapely.geometry import box
+
 try:
     import asf_search as asf
+    from asf_search.ASFSearchResults import ASFSearchResults
 except ImportError:
     warnings.warn("Can't import `asf_search`. Unable to search/download data. ")
 
-from opera_utils._types import PathOrStr
-from opera_utils._utils import LoggingContext
+from ._types import PathOrStr
+from .missing_data import BurstSubsetOption, get_missing_data_options
 
 __all__ = [
     "download_cslc_static_layers",
     "download_cslcs",
+    "search_cslcs",
 ]
 
-logger = logging.getLogger(__name__)
-
-
-class _DummyContext:
-    """Context manager that does nothing, for use when verbose=False."""
-
-    # return nullcontext(None)
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, *args, **kwargs):
-        pass
+logger = logging.getLogger("opera_utils")
 
 
 class L2Product(str, Enum):
@@ -83,6 +74,72 @@ def download_cslc_static_layers(
         product=L2Product.CSLC_STATIC,
         verbose=verbose,
     )
+
+
+def search_cslcs(
+    start: DatetimeInput | None = None,
+    end: DatetimeInput | None = None,
+    bounds: Sequence[float] | None = None,
+    aoi_polygon: str | None = None,
+    track: int | None = None,
+    burst_ids: Sequence[str] | None = None,
+    max_results: int | None = None,
+    verbose: bool = False,
+    check_missing_data: bool = False,
+) -> ASFSearchResults | tuple[ASFSearchResults, list[BurstSubsetOption]]:
+    """Search for OPERA CSLC products on ASF.
+
+    Parameters
+    ----------
+    start : datetime.datetime | str, optional
+        Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    end : datetime.datetime | str, optional
+        end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    bounds : Sequence[float], optional
+        Bounding box coordinates (min lon, min lat, max lon, max lat)
+    aoi_polygon : str, optional
+        GeoJSON polygon string, alternative to `bounds`.
+    track : int, optional
+        Relative orbit number / track / path
+    burst_ids : Sequence[str], optional
+        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
+    max_results : int, optional
+        Maximum number of results to return
+    verbose : bool, optional
+        Whether to print verbose output, by default False
+    check_missing_data : bool, optional
+        Whether to remove missing data options from the search results, by default False
+
+    Returns
+    -------
+    asf_search.ASFSearchResults.ASFSearchResults
+        Search results from ASF.
+    """
+    logger.info("Searching for OPERA CSLC products")
+    # If they passed a bounding box, need a WKT polygon
+    if bounds is not None:
+        if aoi_polygon is not None:
+            raise ValueError("Can't pass both `bounds` and `aoi_polygon`")
+        aoi = box(*bounds).wkt
+    else:
+        aoi = aoi_polygon
+
+    results = asf.search(
+        start=start,
+        end=end,
+        intersectsWith=aoi,
+        relativeOrbit=track,
+        operaBurstID=list(burst_ids) if burst_ids is not None else None,
+        processingLevel=L2Product.CSLC.value,
+        maxResults=max_results,
+    )
+    logger.info(f"Found {len(results)} results")
+    if not check_missing_data:
+        return results
+    missing_data_options = get_missing_data_options(
+        slc_files=[r.properties["fileName"] for r in results]
+    )
+    return results, missing_data_options
 
 
 def download_cslcs(
@@ -159,37 +216,64 @@ def _download_for_burst_ids(
     list[Path]
         Locations to saved raster files.
     """
-    cm = LoggingContext if verbose else _DummyContext
-    with cm(logger, level=logging.INFO, handler=logging.StreamHandler()):
-        # Make a tuple so it can be hashed
-        logger.info(
-            f"Searching {len(burst_ids)} for {product} (Dates:{start} to {end})"
-        )
-        results = _search(
-            burst_ids=tuple(burst_ids), product=product, start=start, end=end
-        )
-        logger.info(f"Found {len(results)} results")
-        session = _get_auth_session()
-        urls = _get_urls(results)
-        asf.download_urls(
-            urls=urls, path=str(output_dir), session=session, processes=max_jobs
-        )
-        return [Path(output_dir) / r.properties["fileName"] for r in results]
-
-
-@cache
-def _search(
-    burst_ids: Sequence[str],
-    product: L2Product,
-    start: DatetimeInput,
-    end: DatetimeInput,
-) -> asf.ASFSearchResults:
-    return asf.search(
+    logger.info(
+        f"Searching {len(burst_ids)} bursts, {product=} (Dates: {start} to {end})"
+    )
+    results = asf.search(
         operaBurstID=list(burst_ids),
         processingLevel=product.value,
         start=start,
         end=end,
     )
+    if product == L2Product.CSLC:
+        logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
+        results = filter_results_by_date_and_version(results)
+    logger.info(f"Found {len(results)} results")
+    session = _get_auth_session()
+    urls = _get_urls(results)
+    asf.download_urls(
+        urls=urls, path=str(output_dir), session=session, processes=max_jobs
+    )
+    return [Path(output_dir) / r.properties["fileName"] for r in results]
+
+
+def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchResults:
+    """Filter ASF search results to retain only one result per unique 'startTime'.
+
+    Function selects the result with the latest 'pgeVersion' if multiple results
+    exist for the same 'startTime'.
+
+    Parameters
+    ----------
+    results : asf_search.ASFSearchResults.ASFSearchResults
+        List of ASF search results to filter.
+
+    Returns
+    -------
+    asf_search.ASFSearchResults.ASFSearchResults
+        Filtered list of ASF search results with unique 'startTime',
+        each having the latest 'pgeVersion'.
+    """
+    # First, sort the results primarily by 'startTime' and secondarily by 'pgeVersion' in descending order
+    sorted_results = sorted(
+        results,
+        key=lambda r: (r.properties["startTime"], parse(r.properties["pgeVersion"])),
+        reverse=True,
+    )
+
+    # It is important to sort by startTime before using groupby,
+    # as groupby only works correctly if the input data is sorted by the key
+    grouped_by_start_time = groupby(
+        sorted_results, key=lambda r: r.properties["startTime"]
+    )
+
+    # Extract the result with the highest pgeVersion for each group
+    filtered_results = [
+        max(group, key=lambda r: parse(r.properties["pgeVersion"]))
+        for _, group in grouped_by_start_time
+    ]
+
+    return filtered_results
 
 
 def _get_urls(
