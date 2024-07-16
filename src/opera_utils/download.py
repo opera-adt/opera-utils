@@ -228,7 +228,11 @@ def _download_for_burst_ids(
     if product == L2Product.CSLC:
         logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
         results = filter_results_by_date_and_version(results)
-    logger.info(f"Found {len(results)} results")
+
+    msg = f"Found {len(results)} results"
+    if len(results) == 0:
+        raise ValueError(msg)
+    logger.info(msg)
     session = _get_auth_session()
     urls = _get_urls(results)
     asf.download_urls(
