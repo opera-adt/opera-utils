@@ -24,6 +24,8 @@ class Layer(Enum):
     LOS_NORTH = "los_north"
     LAYOVER_SHADOW_MASK = "layover_shadow_mask"
     LOCAL_INCIDENCE_ANGLE = "local_incidence_angle"
+    SLANT_RANGE_DISTANCE = "slant_range_distance"
+    INCIDENCE_ANGLE = "incidence_angle"
 
 
 # Layover shadow mask. 0=no layover, no shadow; 1=shadow; 2=layover; 3=shadow and layover.
@@ -35,6 +37,8 @@ LAYER_TO_NODATA = {
     Layer.LOCAL_INCIDENCE_ANGLE: 0,
     # layover_shadow_mask is Int8 with 127 meaning nodata
     Layer.LAYOVER_SHADOW_MASK: 127,
+    Layer.SLANT_RANGE_DISTANCE: 0,
+    Layer.INCIDENCE_ANGLE: 0,
 }
 
 
@@ -124,7 +128,7 @@ def stitch_geometry_layers(
     strides : Mapping[str, int]
         Stride values for merging images.
     output_dir : PathOrStr
-        Directory to store output Geotiffs.
+        Directory to store output GeoTIFFs.
 
     Returns
     -------
