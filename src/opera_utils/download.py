@@ -216,15 +216,18 @@ def _download_for_burst_ids(
     list[Path]
         Locations to saved raster files.
     """
-    logger.info(f"Searching {len(burst_ids)} for {product} (Dates:{start} to {end})")
+    logger.info(
+        f"Searching {len(burst_ids)} bursts, {product=} (Dates: {start} to {end})"
+    )
     results = asf.search(
         operaBurstID=list(burst_ids),
         processingLevel=product.value,
         start=start,
         end=end,
     )
-    logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
-    results = filter_results_by_date_and_version(results)
+    if product == L2Product.CSLC:
+        logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
+        results = filter_results_by_date_and_version(results)
     logger.info(f"Found {len(results)} results")
     session = _get_auth_session()
     urls = _get_urls(results)

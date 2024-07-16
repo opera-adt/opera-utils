@@ -166,3 +166,51 @@ def get_burst_ids_for_frame(
     """
     frame_data = get_frame_to_burst_mapping(frame_id, json_file)
     return frame_data["burst_ids"]
+
+
+def get_burst_to_frame_mapping(
+    burst_id: str, json_file: Optional[PathOrStr] = None
+) -> dict:
+    """Get the burst data for one burst ID.
+
+    Parameters
+    ----------
+    burst_id : str
+        The ID of the burst to get the frame IDs for.
+    json_file : PathOrStr, optional
+        The path to the JSON file containing the burst-to-frame mapping.
+        If `None`, uses the zip file fetched from `datasets`
+
+    Returns
+    -------
+    dict
+        The burst data for the given burst ID.
+    """
+    if json_file is None:
+        json_file = datasets.fetch_burst_to_frame_mapping_file()
+    js = read_zipped_json(json_file)
+    return js["data"][burst_id.lower().replace("-", "_")]
+
+
+def get_frame_ids_for_burst(
+    burst_id: str, json_file: Optional[PathOrStr] = None
+) -> list[int]:
+    """Get the frame IDs for one burst ID.
+
+    Parameters
+    ----------
+    burst_id : str
+        The ID of the burst to get the frame IDs for.
+    json_file : PathOrStr, optional
+        The path to the JSON file containing the burst-to-frame mapping.
+        If `None`, fetches the remote zip file from `datasets`
+
+    Returns
+    -------
+    list[int]
+        The frame IDs for the given burst ID.
+        Most burst IDs have 1, but burst IDs in the overlap are in
+        2 frames.
+    """
+    burst_data = get_burst_to_frame_mapping(burst_id, json_file)
+    return burst_data["frame_ids"]
