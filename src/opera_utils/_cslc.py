@@ -449,8 +449,8 @@ def make_nodata_mask(
             )
 
         # Open the input vector file
-        src_ds = gdal.OpenEx(temp_vector_file, gdal.OF_VECTOR)
-        dst_ds = gdal.Open(out_file, gdal.GA_Update)
+        src_ds = gdal.OpenEx(fspath(temp_vector_file), gdal.OF_VECTOR)
+        dst_ds = gdal.Open(fspath(out_file), gdal.GA_Update)
 
         # Now burn in the union of all polygons
         gdal.Rasterize(dst_ds, src_ds, burnValues=[1])
