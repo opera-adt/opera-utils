@@ -54,9 +54,32 @@ class CslcParseError(ValueError):
 
 
 def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
-    """Get the complex valued dataset from the CSLC HDF5 file.
+    """Parse the filename of a CSLC HDF5 file.
 
-    ...
+    Parameters
+    ----------
+    h5_filename : Filename
+        The path or name of the CSLC HDF5 file.
+
+    Returns
+    -------
+    dict[str, str | datetime]
+        A dictionary containing parsed components of the filename:
+        - project: str
+        - level: str
+        - product_type: str
+        - burst_id: str (normalized to lowercase with underscores)
+        - start_datetime: datetime
+        - end_datetime: datetime
+        - sensor: str
+        - polarization: str
+        - product_version: str
+
+    Raises
+    ------
+    CslcParseError
+        If the filename does not match the expected pattern.
+
     """
     name = Path(h5_filename).name
     match = re.match(CSLC_S1_FILE_REGEX, name)
@@ -69,6 +92,29 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
     result["start_datetime"] = datetime.fromisoformat(result["start_datetime"])
     result["end_datetime"] = datetime.fromisoformat(result["end_datetime"])
     return result
+
+
+def get_dataset_name(h5_filename: Filename) -> str:
+    """Get the complex valued dataset from the CSLC HDF5 file.
+
+    Parameters
+    ----------
+    h5_filename : Filename
+        The path or name of the CSLC HDF5 file.
+
+    Returns
+    -------
+    str
+        The name of the complex dataset in the format "/data/{polarization}".
+
+    Raises
+    ------
+    CslcParseError
+        If the filename cannot be parsed.
+
+    """
+    pol = parse_filename(h5_filename)["polarization"]
+    return f"/data/{pol}"
 
 
 def get_zero_doppler_time(filename: Filename, type_: str = "start") -> datetime:
@@ -354,12 +400,11 @@ def make_nodata_mask(
 
     # Check these are the right format to get nodata polygons
     try:
-        dataset_name = parse_filename(opera_file_list[-1])
+        dataset_name = get_dataset_name(opera_file_list[-1])
     except CslcParseError:
         raise ValueError(f"{opera_file_list[-1]} is not a CSLC file")
 
     try:
-        dataset_name = parse_filename(opera_file_list[-1])
         test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"
         # convert pixels to degrees lat/lon
         gt = _get_raster_gt(test_f)

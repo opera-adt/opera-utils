@@ -198,6 +198,11 @@ def test_get_xy_coords():
 
 def test_make_nodata_mask(tmp_path):
     out_file = tmp_path / "mask.tif"
-    make_nodata_mask(
-        [f"NETCDF:{TEST_FILE}:/data/VV"], out_file=out_file, buffer_pixels=100
-    )
+    make_nodata_mask([TEST_FILE], out_file=out_file, buffer_pixels=100)
+    from osgeo import gdal
+
+    ds = gdal.Open(out_file)
+    bnd = ds.GetRasterBand(1)
+    assert bnd.DataType == gdal.GDT_Byte
+    data = bnd.ReadAsArray()
+    assert data.sum() > 0
