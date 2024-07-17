@@ -5,7 +5,7 @@ import logging
 import re
 import subprocess
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from os import fspath
 from pathlib import Path
 from typing import Any, Callable, Sequence, Union
@@ -89,9 +89,13 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
     result = match.groupdict()
     # Normalize to lowercase / underscore
     result["burst_id"] = result["burst_id"].lower().replace("-", "_")
-    fmt = "%Y%m%dT%H%m%SZ"
-    result["start_datetime"] = datetime.strptime(result["start_datetime"], fmt)
-    result["end_datetime"] = datetime.strptime(result["end_datetime"], fmt)
+    fmt = "%Y%m%dT%H%M%SZ"
+    result["start_datetime"] = datetime.strptime(result["start_datetime"], fmt).replace(
+        tzinfo=timezone.utc
+    )
+    result["end_datetime"] = datetime.strptime(result["end_datetime"], fmt).replace(
+        tzinfo=timezone.utc
+    )
     return result
 
 
