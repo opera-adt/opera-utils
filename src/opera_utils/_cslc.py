@@ -89,8 +89,9 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
     result = match.groupdict()
     # Normalize to lowercase / underscore
     result["burst_id"] = result["burst_id"].lower().replace("-", "_")
-    result["start_datetime"] = datetime.fromisoformat(result["start_datetime"])
-    result["end_datetime"] = datetime.fromisoformat(result["end_datetime"])
+    fmt = "%Y%m%dT%H%m%SZ"
+    result["start_datetime"] = datetime.strptime(result["start_datetime"], fmt)
+    result["end_datetime"] = datetime.strptime(result["end_datetime"], fmt)
     return result
 
 
