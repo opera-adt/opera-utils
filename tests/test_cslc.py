@@ -70,6 +70,7 @@ pytestmark = pytest.mark.filterwarnings(
     # h5py: `product` is deprecated as of NumPy 1.25.0, and will be removed in NumPy 2.0.
     # Please use `prod` instead.:DeprecationWarning:h5py/_hl/dataset.py
     "ignore:.*product.*:DeprecationWarning",
+    "ignore:invalid value encountered in intersection:RuntimeWarning",
 )
 
 
