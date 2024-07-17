@@ -247,6 +247,10 @@ def make_nodata_mask(
     overwrite : bool, optional
         Overwrite the output file if it already exists, by default False
     """
+    from osgeo import gdal
+
+    gdal.UseExceptions()
+
     if Path(out_file).exists():
         if not overwrite:
             logger.debug(f"Skipping {out_file} since it already exists.")
@@ -295,10 +299,20 @@ def make_nodata_mask(
                 )
             )
 
+        # Open the input vector file
+        src_ds = gdal.OpenEx(temp_vector_file, gdal.OF_VECTOR)
+        dst_ds = gdal.Open(out_file, gdal.GA_Update)
+
+        # cmd = f"gdal_rasterize -q -burn 1 {temp_vector_file} {out_file}"
         # Now burn in the union of all polygons
-        cmd = f"gdal_rasterize -q -burn 1 {temp_vector_file} {out_file}"
-        logger.info(cmd)
-        subprocess.check_call(cmd, shell=True)
+        # rasterize_options = gdal.RasterizeOptions()
+        gdal.Rasterize(
+            dst_ds,
+            src_ds,
+            burnValues=[1],
+            outputType=gdal.GDT_Byte,
+            creationOptions=["COMPRESS=LZW"],
+        )
 
 
 def _get_raster_gt(filename: Filename) -> list[float]:
