@@ -80,8 +80,9 @@ def get_missing_data_options(
     )
     dupes = _duplicated_bursts(burst_id_to_dates)
     if dupes:
-        s = "\n".join(f'{b}_{d.strftime("%Y%m%d")}' for (b, d) in dupes)
+        s = "\n".join(f'{b}:{d.strftime("%Y%m%d")}' for (b, d) in dupes)
         msg = f"Duplicated (burst_id, datetime) pairs passed:\n{s}."
+        # TODO: is there a better way to echo this back to them?
         raise ValueError(msg)
 
     all_burst_ids = list(burst_id_to_dates.keys())
@@ -132,8 +133,6 @@ def _duplicated_bursts(burst_id_to_dates: Mapping[str, Sequence[datetime]]):
     for burst_id, d_list in burst_id_to_dates.items():
         for d in d_list:
             counts[(burst_id, d)] += 1
-    # total_sum = sum([len(v) for k, v in burst_id_to_dates.items()])
-    # deduped_sum = sum([len(set(v)) for k, v in burst_id_to_dates.items()])
     return [pair for pair, count in counts.items() if count > 1]
 
 

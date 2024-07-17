@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from opera_utils import filter_by_burst_id, get_burst_id, group_by_burst
+from opera_utils import (
+    filter_by_burst_id,
+    get_burst_id,
+    group_by_burst,
+)
 from opera_utils._helpers import flatten
 
 
