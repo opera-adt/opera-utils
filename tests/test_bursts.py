@@ -9,7 +9,6 @@ from opera_utils import (
     filter_by_burst_id,
     get_burst_id,
     group_by_burst,
-    make_nodata_mask,
 )
 from opera_utils._helpers import flatten
 
@@ -109,15 +108,3 @@ def test_filter_by_burst_id():
     expected = [in_files[1]]
     random.shuffle(in_files)
     assert filter_by_burst_id(in_files, burst_id) == expected
-
-
-def test_make_nodata_mask(tmp_path):
-    test_file = (
-        Path(__file__).parent
-        / "data"
-        / "OPERA_L2_CSLC-S1_T042-088905-IW1_20231009T140757Z_20231010T204936Z_S1A_VV_v1.0.h5"
-    )
-    out_file = tmp_path / "mask.tif"
-    make_nodata_mask(
-        [f"NETCDF:{test_file}:/data/VV"], out_file=out_file, buffer_pixels=100
-    )

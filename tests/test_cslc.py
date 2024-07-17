@@ -11,6 +11,7 @@ from opera_utils._cslc import (
     get_radar_wavelength,
     get_xy_coords,
     get_zero_doppler_time,
+    make_nodata_mask,
     parse_filename,
 )
 
@@ -19,6 +20,50 @@ TEST_FILE = (
     / "data"
     / "OPERA_L2_CSLC-S1_T042-088905-IW1_20231009T140757Z_20231010T204936Z_S1A_VV_v1.0.h5"
 )
+
+
+def test_file_regex():
+    filename = (
+        "OPERA_L2_CSLC-S1_T113-241377-IW2_20240716T105712Z_20240717T073255Z_S1A_VV_v1.1"
+    )
+    result = parse_filename(filename)
+    expected = {
+        "project": "OPERA",
+        "level": "L2",
+        "product_type": "CSLC-S1",
+        "burst_id": "t113_241377_iw2",
+        "start_datetime": datetime.datetime(
+            2024, 7, 16, 10, 57, 12, tzinfo=datetime.timezone.utc
+        ),
+        "end_datetime": datetime.datetime(
+            2024, 7, 17, 7, 32, 55, tzinfo=datetime.timezone.utc
+        ),
+        "sensor": "S1A",
+        "polarization": "VV",
+        "product_version": "1.1",
+    }
+    assert result == expected
+
+    filename = (
+        "OPERA_L2_CSLC-S1_T056-123456-IW1_20230101T000000Z_20230102T235959Z_S1B_HH_v1.0"
+    )
+    expected = {
+        "project": "OPERA",
+        "level": "L2",
+        "product_type": "CSLC-S1",
+        "burst_id": "t056_123456_iw1",
+        "start_datetime": datetime.datetime(
+            2023, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
+        ),
+        "end_datetime": datetime.datetime(
+            2023, 1, 2, 23, 59, 59, tzinfo=datetime.timezone.utc
+        ),
+        "sensor": "S1B",
+        "polarization": "HH",
+        "product_version": "1.0",
+    }
+    result = parse_filename(filename)
+    assert result == expected
 
 
 pytestmark = pytest.mark.filterwarnings(
@@ -151,45 +196,8 @@ def test_get_xy_coords():
     assert epsg == 32610
 
 
-def test_file_regex():
-    filename = (
-        "OPERA_L2_CSLC-S1_T113-241377-IW2_20240716T105712Z_20240717T073255Z_S1A_VV_v1.1"
+def test_make_nodata_mask(tmp_path):
+    out_file = tmp_path / "mask.tif"
+    make_nodata_mask(
+        [f"NETCDF:{TEST_FILE}:/data/VV"], out_file=out_file, buffer_pixels=100
     )
-    result = parse_filename(filename)
-    expected = {
-        "project": "OPERA",
-        "level": "L2",
-        "product_type": "CSLC-S1",
-        "burst_id": "t113_241377_iw2",
-        "start_datetime": datetime.datetime(
-            2024, 7, 16, 10, 57, 12, tzinfo=datetime.timezone.utc
-        ),
-        "end_datetime": datetime.datetime(
-            2024, 7, 17, 7, 32, 55, tzinfo=datetime.timezone.utc
-        ),
-        "sensor": "S1A",
-        "polarization": "VV",
-        "product_version": "1.1",
-    }
-    assert result == expected
-
-    filename = (
-        "OPERA_L2_CSLC-S1_T056-123456-IW1_20230101T000000Z_20230102T235959Z_S1B_HH_v1.0"
-    )
-    expected = {
-        "project": "OPERA",
-        "level": "L2",
-        "product_type": "CSLC-S1",
-        "burst_id": "t056_123456_iw1",
-        "start_datetime": datetime.datetime(
-            2023, 1, 1, 0, 0, tzinfo=datetime.timezone.utc
-        ),
-        "end_datetime": datetime.datetime(
-            2023, 1, 2, 23, 59, 59, tzinfo=datetime.timezone.utc
-        ),
-        "sensor": "S1B",
-        "polarization": "HH",
-        "product_version": "1.0",
-    }
-    result = parse_filename(filename)
-    assert result == expected
