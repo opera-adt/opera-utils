@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from opera_utils._gslc import (
+from opera_utils._cslc import (
     get_cslc_orbit,
     get_lonlat_grid,
     get_orbit_arrays,
