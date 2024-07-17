@@ -202,7 +202,7 @@ def test_make_nodata_mask(tmp_path):
     make_nodata_mask([TEST_FILE], out_file=out_file, buffer_pixels=100)
     from osgeo import gdal
 
-    ds = gdal.Open(out_file)
+    ds = gdal.Open(str(out_file))
     bnd = ds.GetRasterBand(1)
     assert bnd.DataType == gdal.GDT_Byte
     data = bnd.ReadAsArray()
