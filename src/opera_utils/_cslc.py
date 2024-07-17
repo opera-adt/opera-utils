@@ -448,13 +448,7 @@ def make_nodata_mask(
         dst_ds = gdal.Open(out_file, gdal.GA_Update)
 
         # Now burn in the union of all polygons
-        gdal.Rasterize(
-            dst_ds,
-            src_ds,
-            burnValues=[1],
-            outputType=gdal.GDT_Byte,
-            creationOptions=["COMPRESS=LZW"],
-        )
+        gdal.Rasterize(dst_ds, src_ds, burnValues=[1])
 
 
 def _get_raster_gt(filename: Filename) -> list[float]:
