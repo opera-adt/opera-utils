@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import datetime
+import re
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Callable
 
 import h5py
@@ -10,6 +12,8 @@ from pyproj import CRS, Transformer
 from ._types import Filename
 
 __all__ = [
+    "CslcParseError",
+    "parse_filename",
     "get_zero_doppler_time",
     "get_radar_wavelength",
     "get_orbit_arrays",
@@ -19,9 +23,44 @@ __all__ = [
 ]
 
 
-def get_zero_doppler_time(
-    filename: Filename, type_: str = "start"
-) -> datetime.datetime:
+CSLC_S1_FILE_REGEX = (
+    r"(?P<project>OPERA)_"
+    r"(?P<level>L2)_"
+    r"(?P<product_type>CSLC-S1)_"
+    r"(?P<burst_id>T\d{3}-\d+-IW\d)_"
+    r"(?P<start_datetime>\d{8}T\d{6}Z)_"
+    r"(?P<end_datetime>\d{8}T\d{6}Z)_"
+    r"(?P<sensor>S1[AB])_"
+    r"(?P<polarization>VV|HH)_"
+    r"v(?P<product_version>\d+\.\d+)"
+)
+
+
+class CslcParseError(ValueError):
+    """Error raised for non-matching filename."""
+
+    pass
+
+
+def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
+    """Get the complex valued dataset from the CSLC HDF5 file.
+
+    ...
+    """
+    name = Path(h5_filename).name
+    match = re.match(CSLC_S1_FILE_REGEX, name)
+    if match is None:
+        raise CslcParseError(f"Unable to parse {h5_filename}")
+
+    result = match.groupdict()
+    # Normalize to lowercase / underscore
+    result["burst_id"] = result["burst_id"].lower().replace("-", "_")
+    result["start_datetime"] = datetime.fromisoformat(result["start_datetime"])
+    result["end_datetime"] = datetime.fromisoformat(result["end_datetime"])
+    return result
+
+
+def get_zero_doppler_time(filename: Filename, type_: str = "start") -> datetime:
     """Get the full acquisition time from the CSLC product.
 
     Uses `/identification/zero_doppler_{type_}_time` from the CSLC product.
@@ -41,7 +80,7 @@ def get_zero_doppler_time(
     DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
     def get_dt(in_str):
-        return datetime.datetime.strptime(in_str.decode("utf-8"), DATETIME_FORMAT)
+        return datetime.strptime(in_str.decode("utf-8"), DATETIME_FORMAT)
 
     dset = f"/identification/zero_doppler_{type_}_time"
     value = _get_dset_and_attrs(filename, dset, parse_func=get_dt)[0]
@@ -100,7 +139,7 @@ def get_radar_wavelength(filename: Filename):
 
 def get_orbit_arrays(
     h5file: Filename,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime.datetime]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime]:
     """Parse orbit info from OPERA S1 CSLC HDF5 file into python types.
 
     Parameters
@@ -116,7 +155,7 @@ def get_orbit_arrays(
         Array of positions in meters.
     velocities : np.ndarray
         Array of velocities in meters per second.
-    reference_epoch : datetime.datetime
+    reference_epoch : datetime
         Reference epoch of orbit.
 
     """
@@ -125,7 +164,7 @@ def get_orbit_arrays(
         times = orbit_group["time"][:]
         positions = np.stack([orbit_group[f"position_{p}"] for p in ["x", "y", "z"]]).T
         velocities = np.stack([orbit_group[f"velocity_{p}"] for p in ["x", "y", "z"]]).T
-        reference_epoch = datetime.datetime.fromisoformat(
+        reference_epoch = datetime.fromisoformat(
             orbit_group["reference_epoch"][()].decode()
         )
 
@@ -156,7 +195,7 @@ def get_cslc_orbit(h5file: Filename):
     for t, x, v in zip(times, positions, velocities):
         orbit_svs.append(
             StateVector(
-                DateTime(reference_epoch + datetime.timedelta(seconds=t)),
+                DateTime(reference_epoch + timedelta(seconds=t)),
                 x,
                 v,
             )
