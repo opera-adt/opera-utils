@@ -18,7 +18,7 @@ from opera_utils._cslc import (
 TEST_FILE = (
     Path(__file__).parent
     / "data"
-    / "OPERA_L2_CSLC-S1_T042-088905-IW1_20231009T140757Z_20231010T204936Z_S1A_VV_v1.0.h5"
+    / "OPERA_L2_CSLC-S1_T087-185683-IW2_20221228T161651Z_20240504T181714Z_S1A_VV_v1.1.h5"
 )
 
 
