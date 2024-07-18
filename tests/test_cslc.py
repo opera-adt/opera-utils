@@ -22,6 +22,14 @@ TEST_FILE = (
 )
 
 
+pytestmark = pytest.mark.filterwarnings(
+    # h5py: `product` is deprecated as of NumPy 1.25.0, and will be removed in NumPy 2.0.
+    # Please use `prod` instead.:DeprecationWarning:h5py/_hl/dataset.py
+    "ignore:.*product.*:DeprecationWarning",
+    "ignore:.*invalid value encountered.*:RuntimeWarning",
+)
+
+
 def test_file_regex():
     filename = (
         "OPERA_L2_CSLC-S1_T113-241377-IW2_20240716T105712Z_20240717T073255Z_S1A_VV_v1.1"
@@ -64,14 +72,6 @@ def test_file_regex():
     }
     result = parse_filename(filename)
     assert result == expected
-
-
-pytestmark = pytest.mark.filterwarnings(
-    # h5py: `product` is deprecated as of NumPy 1.25.0, and will be removed in NumPy 2.0.
-    # Please use `prod` instead.:DeprecationWarning:h5py/_hl/dataset.py
-    "ignore:.*product.*:DeprecationWarning",
-    "ignore:invalid value encountered in intersection:RuntimeWarning",
-)
 
 
 def test_get_radar_wavelength():
