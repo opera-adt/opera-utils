@@ -133,7 +133,10 @@ def search_cslcs(
         processingLevel=L2Product.CSLC.value,
         maxResults=max_results,
     )
+    logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
+    results = filter_results_by_date_and_version(results)
     logger.info(f"Found {len(results)} results")
+
     if not check_missing_data:
         return results
     missing_data_options = get_missing_data_options(
@@ -227,8 +230,14 @@ def _download_for_burst_ids(
     )
     if product == L2Product.CSLC:
         logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
+        print(f"Found {len(results)} total results before deduping pgeVersion")
         results = filter_results_by_date_and_version(results)
-    logger.info(f"Found {len(results)} results")
+
+    msg = f"Found {len(results)} results"
+    print(msg)
+    if len(results) == 0:
+        raise ValueError(msg)
+    logger.info(msg)
     session = _get_auth_session()
     urls = _get_urls(results)
     asf.download_urls(
