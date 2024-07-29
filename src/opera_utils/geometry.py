@@ -8,10 +8,21 @@ from typing import Mapping, Sequence
 from opera_utils import get_burst_ids_for_frame, stitching
 from opera_utils._types import PathOrStr
 from opera_utils._utils import format_nc_filename, scratch_directory
-from opera_utils.constants import EXTRA_COMPRESSED_TIFF_OPTIONS
 from opera_utils.download import download_cslc_static_layers
 
 logger = logging.getLogger(__name__)
+
+EXTRA_COMPRESSED_TIFF_OPTIONS = (
+    "COMPRESS=DEFLATE",
+    "ZLEVEL=4",
+    "TILED=YES",
+    "BLOCKXSIZE=128",
+    "BLOCKYSIZE=128",
+    # Note: we're dropping mantissa bits before we do not
+    # need prevision for LOS rasters (or incidence)
+    "NBITS=16",
+    "PREDICTOR=2",
+)
 
 
 class Layer(Enum):
