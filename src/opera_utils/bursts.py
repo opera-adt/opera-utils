@@ -12,11 +12,17 @@ from .constants import OPERA_BURST_RE
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "normalize_burst_id",
     "get_burst_id",
     "group_by_burst",
     "sort_by_burst_id",
     "filter_by_burst_id",
 ]
+
+
+def normalize_burst_id(burst_id_str: str) -> str:
+    """Normalize the OPERA S1 burst id to lowercase/underscores."""
+    return burst_id_str.lower().replace("-", "_")
 
 
 def get_burst_id(
@@ -44,9 +50,7 @@ def get_burst_id(
     """
     if not (m := re.search(burst_id_fmt, str(filename))):
         raise ValueError(f"Could not parse burst id from {filename}")
-    burst_str = m.group()
-    # Normalize
-    return burst_str.lower().replace("-", "_")
+    return normalize_burst_id(m.group())
 
 
 @overload

@@ -16,7 +16,8 @@ from pyproj import CRS, Transformer
 from shapely import geometry, ops, wkt
 
 from ._types import Filename
-from .constants import OPERA_IDENTIFICATION
+from .bursts import normalize_burst_id
+from .constants import CSLC_S1_FILE_REGEX, OPERA_IDENTIFICATION
 
 __all__ = [
     "CslcParseError",
@@ -32,19 +33,6 @@ __all__ = [
     "make_nodata_mask",
 ]
 logger = logging.getLogger(__name__)
-
-
-CSLC_S1_FILE_REGEX = (
-    r"(?P<project>OPERA)_"
-    r"(?P<level>L2)_"
-    r"(?P<product_type>CSLC-S1)_"
-    r"(?P<burst_id>T\d{3}-\d+-IW\d)_"
-    r"(?P<start_datetime>\d{8}T\d{6}Z)_"
-    r"(?P<end_datetime>\d{8}T\d{6}Z)_"
-    r"(?P<sensor>S1[AB])_"
-    r"(?P<polarization>VV|HH)_"
-    r"v(?P<product_version>\d+\.\d+)"
-)
 
 
 class CslcParseError(ValueError):
@@ -88,7 +76,7 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
 
     result = match.groupdict()
     # Normalize to lowercase / underscore
-    result["burst_id"] = result["burst_id"].lower().replace("-", "_")
+    result["burst_id"] = normalize_burst_id(result["burst_id"])
     fmt = "%Y%m%dT%H%M%SZ"
     result["start_datetime"] = datetime.strptime(result["start_datetime"], fmt).replace(
         tzinfo=timezone.utc
