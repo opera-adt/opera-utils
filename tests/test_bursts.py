@@ -15,7 +15,7 @@ from opera_utils._helpers import flatten
 
 
 def test_normalize():
-    expected = "t087_185684_iw3"
+    expected = "t087_165495_iw3"
     assert expected == normalize_burst_id("T087-165495-IW3")
     assert expected == normalize_burst_id("T087_165495_IW3")
     assert expected == normalize_burst_id("t087_165495_IW3")
