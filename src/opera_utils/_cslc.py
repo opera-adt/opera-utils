@@ -17,7 +17,7 @@ from shapely import geometry, ops, wkt
 
 from ._types import Filename
 from .bursts import normalize_burst_id
-from .constants import CSLC_S1_FILE_REGEX, OPERA_IDENTIFICATION
+from .constants import COMPASS_FILE_REGEX, CSLC_S1_FILE_REGEX, OPERA_IDENTIFICATION
 
 __all__ = [
     "CslcParseError",
@@ -63,6 +63,10 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
         - polarization: str
         - product_version: str
 
+    Or, if the filename is a COMPASS-generated file,
+        - burst_id: str (lowercase with underscores)
+        - start_datetime: datetime (but no hour/minute/second info)
+
     Raises
     ------
     CslcParseError
@@ -70,10 +74,25 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
 
     """
     name = Path(h5_filename).name
-    match = re.match(CSLC_S1_FILE_REGEX, name)
-    if match is None:
+    match: re.Match | None = None
+
+    if match := re.match(CSLC_S1_FILE_REGEX, name):
+        return _parse_cslc_product(match)
+    elif match := re.match(COMPASS_FILE_REGEX, name):
+        return _parse_compass(match)
+    else:
         raise CslcParseError(f"Unable to parse {h5_filename}")
 
+
+def _parse_compass(match: re.Match):
+    result = match.groupdict()
+    result["start_datetime"] = datetime.strptime(
+        result["start_datetime"], "%Y%m%d"
+    ).replace(tzinfo=timezone.utc)
+    return result
+
+
+def _parse_cslc_product(match: re.Match):
     result = match.groupdict()
     # Normalize to lowercase / underscore
     result["burst_id"] = normalize_burst_id(result["burst_id"])
@@ -106,8 +125,17 @@ def get_dataset_name(h5_filename: Filename) -> str:
         If the filename cannot be parsed.
 
     """
-    pol = parse_filename(h5_filename)["polarization"]
-    return f"/data/{pol}"
+    name = Path(h5_filename).name
+    parsed = parse_filename(name)
+    if "polarization" in parsed:
+        return f"/data/{parsed['polarization']}"
+    else:
+        # For compass, no polarization is given, so we have to check the file
+        with h5py.File(h5_filename) as hf:
+            if "VV" in hf["/data"]:
+                return "/data/VV"
+            else:
+                return "/data/HH"
 
 
 def get_zero_doppler_time(filename: Filename, type_: str = "start") -> datetime:

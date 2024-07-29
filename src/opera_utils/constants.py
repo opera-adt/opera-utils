@@ -27,3 +27,6 @@ CSLC_S1_FILE_REGEX = (
     r"(?P<polarization>VV|HH)_"
     r"v(?P<product_version>\d+\.\d+)"
 )
+# https://github.com/opera-adt/COMPASS/blob/16a3c1da2a5db69b9e2007d798a1110d3a6c5f9f/src/compass/utils/runconfig.py#L316-L318
+# {burst_id_str}_{date_str}
+COMPASS_FILE_REGEX = r"(?P<burst_id>t\d{3}_\d+_iw\d)_(?P<start_datetime>\d{8}).h5"
