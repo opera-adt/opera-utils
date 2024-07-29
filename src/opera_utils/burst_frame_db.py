@@ -7,6 +7,7 @@ from typing import Optional, Sequence
 
 from . import datasets
 from ._types import Bbox, PathOrStr
+from .bursts import normalize_burst_id
 
 
 def read_zipped_json(filename: PathOrStr):
@@ -189,7 +190,7 @@ def get_burst_to_frame_mapping(
     if json_file is None:
         json_file = datasets.fetch_burst_to_frame_mapping_file()
     js = read_zipped_json(json_file)
-    return js["data"][burst_id.lower().replace("-", "_")]
+    return js["data"][normalize_burst_id(burst_id)]
 
 
 def get_frame_ids_for_burst(

@@ -19,9 +19,15 @@ from opera_utils._helpers import reproject_bounds
 from opera_utils._types import Bbox, PathOrStr
 from opera_utils._utils import _get_path_from_gdal_str, numpy_to_gdal_type
 
-from .constants import DEFAULT_TIFF_OPTIONS
-
 logger = logging.getLogger(__name__)
+
+DEFAULT_TIFF_OPTIONS = (
+    "COMPRESS=DEFLATE",
+    "ZLEVEL=4",
+    "TILED=YES",
+    "BLOCKXSIZE=128",
+    "BLOCKYSIZE=128",
+)
 
 
 def merge_images(

@@ -2,12 +2,6 @@ from __future__ import annotations
 
 import re
 
-__all__ = [
-    "OPERA_DATASET_NAME",
-    "OPERA_IDENTIFICATION",
-    "OPERA_BURST_RE",
-]
-
 # Specific to OPERA CSLC products:
 OPERA_DATASET_NAME = "/data/VV"
 OPERA_IDENTIFICATION = "/identification"
@@ -22,18 +16,14 @@ OPERA_BURST_RE = re.compile(
     r"[tT](?P<track>\d{3})[-_](?P<burst_id>\d{6})[-_](?P<subswath>iw[1-3])",
     re.IGNORECASE,
 )
-
-DEFAULT_TIFF_OPTIONS = (
-    "COMPRESS=DEFLATE",
-    "ZLEVEL=4",
-    "TILED=YES",
-    "BLOCKXSIZE=128",
-    "BLOCKYSIZE=128",
-)
-EXTRA_COMPRESSED_TIFF_OPTIONS = (
-    *DEFAULT_TIFF_OPTIONS,
-    # Note: we're dropping mantissa bits before we do not
-    # need prevision for LOS rasters (or incidence)
-    "NBITS=16",
-    "PREDICTOR=2",
+CSLC_S1_FILE_REGEX = (
+    r"(?P<project>OPERA)_"
+    r"(?P<level>L2)_"
+    r"(?P<product_type>CSLC-S1)_"
+    r"(?P<burst_id>T\d{3}-\d+-IW\d)_"
+    r"(?P<start_datetime>\d{8}T\d{6}Z)_"
+    r"(?P<end_datetime>\d{8}T\d{6}Z)_"
+    r"(?P<sensor>S1[AB])_"
+    r"(?P<polarization>VV|HH)_"
+    r"v(?P<product_version>\d+\.\d+)"
 )
