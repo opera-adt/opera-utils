@@ -197,7 +197,7 @@ def _get_dset_and_attrs(
         return value, attrs
 
 
-def get_radar_wavelength(filename: Filename):
+def get_radar_wavelength(filename: Filename) -> float:
     """Get the radar wavelength from the CSLC product.
 
     Parameters
@@ -282,7 +282,9 @@ def get_cslc_orbit(h5file: Filename):
     return Orbit(orbit_svs)
 
 
-def get_xy_coords(h5file: Filename, subsample: int = 100) -> tuple:
+def get_xy_coords(
+    h5file: Filename, subsample: int = 100
+) -> tuple[np.ndarray, np.ndarray, int]:
     """Get x and y grid from OPERA S1 CSLC HDF5 file.
 
     Parameters
