@@ -72,7 +72,13 @@ class _HDF5GroupExplorer:
         return list(self._attr_cache.keys())
 
 
-def create_explorer_widget(hf: h5py.File, load_less_than: float = 1e3):
+def create_explorer_widget(
+    hf: h5py.File,
+    load_less_than: float = 1e3,
+    subsample: tuple[int, int] = (10, 10),
+    cmap: str = "gray",
+    interpolation: str = "nearest",
+):
     """Make a widget in Jupyter to explore a h5py file.
 
     Requires `ipywidgets` and `matplotlib` to be installed.
@@ -88,10 +94,17 @@ def create_explorer_widget(hf: h5py.File, load_less_than: float = 1e3):
     import ipywidgets as widgets
     import matplotlib.pyplot as plt
 
+    sub_row, sub_col = subsample
+
     def _make_thumbnail(image):
         # Create a thumbnail of the dataset
         fig, ax = plt.subplots(figsize=(5, 5))
-        ax.imshow(image, cmap="gray", vmax=np.nanpercentile(image, 99))
+        ax.imshow(
+            image,
+            cmap=cmap,
+            interpolation=interpolation,
+            vmax=np.nanpercentile(image, 99),
+        )
         ax.axis("off")
         buf = BytesIO()
         plt.savefig(buf, format="png", dpi=150)
@@ -120,10 +133,12 @@ def create_explorer_widget(hf: h5py.File, load_less_than: float = 1e3):
                 content += f"<br>Value: {item[()]}"
             html_widget = widgets.HTML(content)
 
-            if not item.ndim == 2 or not item.dtype == np.complex64:
+            if not item.ndim == 2:
                 return html_widget
-            # If the dataset is a 2D complex array, make a thumbnail
-            image_widget = _make_thumbnail(np.abs(item[::5, ::10]))
+            # If the dataset is a 2D array, make a thumbnail
+            # Handle the real or complex the same
+            data = np.abs(item[::sub_row, ::sub_col])
+            image_widget = _make_thumbnail(data)
             return widgets.VBox([image_widget, html_widget])
 
         else:
