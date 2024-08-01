@@ -312,9 +312,11 @@ def get_xy_coords(
         # https://github.com/corteva/rioxarray/blob/5783693895b4b055909c5758a72a5d40a365ef11/rioxarray/rioxarray.py#L34 # noqa
         for attr_name in "spatial_ref", "crs_wkt":
             if attr_name in projection_dset.attrs:
-                crs_string = projection_dset.attrs[attr_name].decode("utf-8")
+                crs_string = projection_dset.attrs[attr_name]
         if not crs_string:
             raise ValueError(f"Failed to parse CRS for {h5file}")
+        if isinstance(crs_string, bytes):
+            crs_string = crs_string.decode("utf-8")
         crs = CRS.from_user_input(crs_string)
 
     return x[::subsample], y[::subsample], crs.to_epsg()
