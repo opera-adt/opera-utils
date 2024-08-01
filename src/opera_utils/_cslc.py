@@ -300,16 +300,26 @@ def get_xy_coords(
         Array of x coordinates in meters.
     y : np.ndarray
         Array of y coordinates in meters.
-    projection : int
+    epsg_code : int
         EPSG code of projection.
 
     """
     with h5py.File(h5file) as hf:
         x = hf["/data/x_coordinates"][:]
         y = hf["/data/y_coordinates"][:]
-        projection = hf["/data/projection"][()]
+        projection_dset = hf["/data/projection"]
+        crs_string = ""
+        # https://github.com/corteva/rioxarray/blob/5783693895b4b055909c5758a72a5d40a365ef11/rioxarray/rioxarray.py#L34 # noqa
+        for attr_name in "spatial_ref", "crs_wkt":
+            if attr_name in projection_dset.attrs:
+                crs_string = projection_dset.attrs[attr_name]
+        if not crs_string:
+            raise ValueError(f"Failed to parse CRS for {h5file}")
+        if isinstance(crs_string, bytes):
+            crs_string = crs_string.decode("utf-8")
+        crs = CRS.from_user_input(crs_string)
 
-    return x[::subsample], y[::subsample], projection
+    return x[::subsample], y[::subsample], crs.to_epsg()
 
 
 def get_lonlat_grid(
@@ -330,15 +340,13 @@ def get_lonlat_grid(
         2D Array of latitude coordinates in degrees.
     lon : np.ndarray
         2D Array of longitude coordinates in degrees.
-    projection : int
-        EPSG code of projection.
 
     """
-    x, y, projection = get_xy_coords(h5file, subsample)
+    x, y, epsg = get_xy_coords(h5file, subsample)
     X, Y = np.meshgrid(x, y)
     xx = X.flatten()
     yy = Y.flatten()
-    crs = CRS.from_epsg(projection)
+    crs = CRS.from_epsg(epsg)
     transformer = Transformer.from_crs(crs, CRS.from_epsg(4326), always_xy=True)
     lon, lat = transformer.transform(xx=xx, yy=yy, radians=False)
     lon = lon.reshape(X.shape)
