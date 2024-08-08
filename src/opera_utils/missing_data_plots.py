@@ -19,7 +19,7 @@ from opera_utils._types import PathOrStr
 
 
 def plot_burst_id_date_incidence(
-    slc_files: Optional[Iterable[PathOrStr]] = None,
+    slc_files: Optional[Iterable[str]] = None,
     burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
     ax=None,
     output_file: Optional[PathOrStr] = None,
