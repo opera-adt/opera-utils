@@ -83,41 +83,7 @@ def missing_data_options(
     option_1_bursts_1234_burst_ids_27_dates_10.txt
     """
     from opera_utils import filter_by_burst_id, filter_by_date, get_missing_data_options
-
-    def print_plain(options):
-        header = f"|{'Option':<6}| {'# Dates':<10}| {'# Burst IDs':<14}|"
-        header += f" {'Selected Bursts':<15}| {'Excluded Bursts':<15}| "
-        print(header)
-        print("-" * len(header))
-
-        for idx, option in enumerate(options, start=1):
-            excluded = option.num_candidate_bursts - option.total_num_bursts
-            row = f"|{idx:<6}| {option.num_dates:<10}| {option.num_burst_ids:<14}|"
-            row += f" {option.total_num_bursts:<15}| {excluded:<15}|"
-            print(row)
-        print()
-
-    def print_with_rich(options):
-        from rich.console import Console
-        from rich.table import Table
-
-        console = Console()
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Option", style="dim", width=6)
-        table.add_column("# Dates", style="dim", width=10)
-        table.add_column("# Burst IDs", style="dim", width=14)
-        table.add_column("Selected Bursts", style="dim", width=15)
-        table.add_column("Excluded Bursts", style="dim", width=15)
-
-        for idx, option in enumerate(options, start=1):
-            table.add_row(
-                str(idx),
-                str(option.num_dates),
-                str(option.num_burst_ids),
-                str(option.total_num_bursts),
-                str(option.num_candidate_bursts - option.total_num_bursts),
-            )
-        console.print(table)
+    from opera_utils.missing_data import print_plain, print_with_rich
 
     file_list = [f.strip() for f in namelist.read().splitlines()]
     options = get_missing_data_options(file_list)[:max_options]

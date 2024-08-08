@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import groupby
-from typing import Iterable, Mapping, Optional, Sequence
+from typing import Any, Iterable, Mapping, Optional, Sequence
 
 import numpy as np
 
-from ._dates import get_dates
+from ._dates import filter_by_date, get_dates
 from ._helpers import flatten, powerset, sorted_deduped_values
-from ._types import Filename
-from .bursts import group_by_burst
+from .bursts import filter_by_burst_id, group_by_burst
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True)
+@dataclass
 class BurstSubsetOption:
     """Dataclass for a possible subset of SLC data."""
 
@@ -36,6 +35,8 @@ class BurstSubsetOption:
     # subset_selected: list[bool]
     num_candidate_bursts: int
     """The number of (burst_id, datetime) pairs that were passed as options."""
+    inputs: list[Any] = field(default_factory=list)
+    """The corresponding subset of inputs used to create this option."""
 
     @property
     def num_dates(self) -> int:
@@ -47,7 +48,7 @@ class BurstSubsetOption:
 
 
 def get_missing_data_options(
-    slc_files: Optional[Iterable[Filename]] = None,
+    slc_files: Optional[Iterable[str]] = None,
     burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
 ) -> list[BurstSubsetOption]:
     """Get a list of possible data subsets for a set of burst SLCs.
@@ -63,8 +64,8 @@ def get_missing_data_options(
 
     Parameters
     ----------
-    slc_files : Optional[Iterable[Filename]]
-        list of OPERA CSLC filenames.
+    slc_files : Optional[Iterable[str]]
+        list of OPERA CSLC filenames/urls.
     burst_id_date_tuples : Optional[Iterable[tuple[str, datetime]]]
         Alternative input: list of all existing (burst_id, datetime) tuples.
 
@@ -92,11 +93,20 @@ def get_missing_data_options(
     # In this matrix,
     # - Each row corresponds to one of the possible burst IDs
     # - Each column corresponds to one of the possible dates
-    return generate_burst_subset_options(B, all_burst_ids, all_dates)
+    options = generate_burst_subset_options(B, all_burst_ids, all_dates)
+    # If they gave strings/files/urls, pick those out
+    if slc_files is not None:
+        for option in options:
+            cur_burst_ids = option.burst_ids
+            # The selected files are those which match the selected date + burst IDs
+            valid_date_files = filter_by_date(slc_files, option.dates)
+            option.inputs = filter_by_burst_id(valid_date_files, cur_burst_ids)
+
+    return options
 
 
 def get_burst_id_to_dates(
-    slc_files: Optional[Iterable[Filename]] = None,
+    slc_files: Optional[Iterable[str]] = None,
     burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
 ) -> dict[str, list[datetime]]:
     """Get a mapping of burst ID to list of dates.
@@ -108,7 +118,7 @@ def get_burst_id_to_dates(
 
     Parameters
     ----------
-    slc_files : Optional[Iterable[Filename]]
+    slc_files : Optional[Iterable[str]]
         List of OPERA CSLC filenames.
     burst_id_date_tuples : Optional[Iterable[tuple[str, datetime]]]
         Alternative input: list of all existing (burst_id, datetime) tuples.
@@ -181,7 +191,7 @@ def _burst_id_mapping_from_tuples(
 
 
 def _burst_id_mapping_from_files(
-    slc_files: Iterable[Filename],
+    slc_files: Iterable[str],
 ) -> dict[str, list[datetime]]:
     """Create a {burst_id -> [datetime,...]} mapping from filenames.
 
@@ -302,3 +312,42 @@ def generate_burst_subset_options(
     return sorted(
         options, key=lambda x: (x.total_num_bursts, x.num_burst_ids), reverse=True
     )
+
+
+def print_plain(options: Iterable[BurstSubsetOption]) -> None:
+    """Print a summary of the burst options using plain text."""
+    header = f"|{'Option':<6}| {'# Dates':<10}| {'# Burst IDs':<14}|"
+    header += f" {'Selected Bursts':<15}| {'Excluded Bursts':<15}| "
+    print(header)
+    print("-" * len(header))
+
+    for idx, option in enumerate(options, start=1):
+        excluded = option.num_candidate_bursts - option.total_num_bursts
+        row = f"|{idx:<6}| {option.num_dates:<10}| {option.num_burst_ids:<14}|"
+        row += f" {option.total_num_bursts:<15}| {excluded:<15}|"
+        print(row)
+    print()
+
+
+def print_with_rich(options: Iterable[BurstSubsetOption]) -> None:
+    """Print a summary of the burst options using `rich.Table`."""
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Option", style="dim", width=6)
+    table.add_column("# Dates", style="dim", width=10)
+    table.add_column("# Burst IDs", style="dim", width=14)
+    table.add_column("Selected Bursts", style="dim", width=15)
+    table.add_column("Excluded Bursts", style="dim", width=15)
+
+    for idx, option in enumerate(options, start=1):
+        table.add_row(
+            str(idx),
+            str(option.num_dates),
+            str(option.num_burst_ids),
+            str(option.total_num_bursts),
+            str(option.num_candidate_bursts - option.total_num_bursts),
+        )
+    console.print(table)

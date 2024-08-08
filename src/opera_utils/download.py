@@ -140,7 +140,7 @@ def search_cslcs(
     if not check_missing_data:
         return results
     missing_data_options = get_missing_data_options(
-        slc_files=[r.properties["fileName"] for r in results]
+        slc_files=[r.properties["url"] for r in results]
     )
     return results, missing_data_options
 
