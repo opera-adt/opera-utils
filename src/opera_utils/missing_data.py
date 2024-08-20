@@ -181,7 +181,7 @@ def _burst_id_mapping_from_tuples(
 ) -> dict[str, list[datetime]]:
     """Create a {burst_id -> [datetime,...]} (burst_id, datetime) tuples."""
     # Don't exhaust the iterator for multiple groupings
-    burst_id_date_tuples = list(burst_id_date_tuples)
+    burst_id_date_tuples = sorted(burst_id_date_tuples)
 
     # Group the possible SLC files by their datetime and by their Burst ID
     return {
