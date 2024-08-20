@@ -130,6 +130,7 @@ def search_cslcs(
         intersectsWith=aoi,
         relativeOrbit=track,
         operaBurstID=list(burst_ids) if burst_ids is not None else None,
+        dataset=asf.DATASET.OPERA_S1,
         processingLevel=L2Product.CSLC.value,
         maxResults=max_results,
     )
@@ -227,6 +228,7 @@ def _download_for_burst_ids(
         processingLevel=product.value,
         start=start,
         end=end,
+        dataset=asf.DATASET.OPERA_S1,
     )
     if product == L2Product.CSLC:
         logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
@@ -273,7 +275,8 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
     # It is important to sort by startTime before using groupby,
     # as groupby only works correctly if the input data is sorted by the key
     grouped_by_start_time = groupby(
-        sorted_results, key=lambda r: r.properties["startTime"]
+        sorted_results,
+        key=lambda r: (r.properties["startTime"], r.properties["operaBurstID"]),
     )
 
     # Extract the result with the highest pgeVersion for each group
