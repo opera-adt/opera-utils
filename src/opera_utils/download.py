@@ -268,7 +268,12 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
     # First, sort the results primarily by 'startTime' and secondarily by 'pgeVersion' in descending order
     sorted_results = sorted(
         results,
-        key=lambda r: (r.properties["startTime"], parse(r.properties["pgeVersion"])),
+        key=lambda r: (
+            r.properties["startTime"],
+            r.properties["operaBurstID"],
+            r.properties["processingDate"],
+            parse(r.properties["pgeVersion"]),
+        ),
         reverse=True,
     )
 
@@ -281,11 +286,11 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
 
     # Extract the result with the highest pgeVersion for each group
     filtered_results = [
-        max(group, key=lambda r: parse(r.properties["pgeVersion"]))
+        max(group, key=lambda r: r.properties["processingDate"])
         for _, group in grouped_by_start_time
     ]
 
-    return filtered_results
+    return ASFSearchResults(filtered_results)
 
 
 def _get_urls(
