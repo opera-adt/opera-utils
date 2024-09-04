@@ -396,13 +396,16 @@ def get_union_polygon(
     return ops.unary_union(polygons)
 
 
-def make_nodata_mask(
+def create_nodata_mask(
     opera_file_list: Sequence[Filename],
     out_file: Filename,
     buffer_pixels: int = 0,
     overwrite: bool = False,
 ):
-    """Make a boolean raster mask from the union of nodata polygons using GDAL.
+    """Create a boolean raster mask from the union of nodata polygons using GDAL.
+
+    The output datatype is UInt8, where 1 means valid data in the polygon and
+    0 is invalid (outside the polygon).
 
     Parameters
     ----------
@@ -480,6 +483,9 @@ def make_nodata_mask(
 
         # Now burn in the union of all polygons
         gdal.Rasterize(dst_ds, src_ds, burnValues=[1])
+
+
+make_nodata_mask = create_nodata_mask
 
 
 def _get_raster_gt(filename: Filename) -> list[float]:
