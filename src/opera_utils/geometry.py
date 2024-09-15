@@ -5,6 +5,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Mapping, Sequence
 
+import numpy as np
+import rasterio as rio
+from osgeo import gdal
+
 from opera_utils import get_burst_ids_for_frame, stitching
 from opera_utils._types import PathOrStr
 from opera_utils._utils import format_nc_filename, scratch_directory
@@ -99,20 +103,98 @@ def create_geometry_files(
     output_path.mkdir(exist_ok=True, parents=True)
     if download_dir is None:
         download_dir = output_path / "hdf5"
-    output_files: list[Path] = []
 
     with scratch_directory(download_dir, delete=not save_hdf5_files) as sd:
         local_hdf5_files = download_cslc_static_layers(
             burst_ids=burst_ids, output_dir=sd, max_jobs=max_download_jobs
         )
-        output_files = stitch_geometry_layers(
+        stitch_geometry_layers(
             local_hdf5_files=local_hdf5_files,
             layers=layers,
             strides=strides,
             output_dir=output_path,
         )
 
+    _make_los_up(output_path)
+    output_files = _make_3band_los(output_path)
     return output_files
+
+
+def _make_los_up(output_path: Path):
+    """Create los_up.tif from east/north."""
+    los_east_path = output_path / "los_east.tif"
+    los_north_path = output_path / "los_north.tif"
+    los_up_path = output_path / "los_up.tif"
+
+    with rio.open(los_east_path) as src_east, rio.open(los_north_path) as src_north:
+        profile = src_east.profile
+        los_east = src_east.read(1)
+        los_north = src_north.read(1)
+
+        los_up = np.sqrt(1 - los_east**2 - los_north**2)
+
+        profile.update(
+            dtype=rio.float32,
+            count=1,
+            compress="deflate",
+            zlevel=4,
+            tiled=True,
+            blockxsize=128,
+            blockysize=128,
+            predictor=2,
+        )
+
+        with rio.open(los_up_path, "w", **profile) as dst:
+            dst.write(los_up.astype(rio.float32), 1)
+
+
+def _make_3band_los(output_path: Path):
+    """Combine the 3 TIFFs into one, 3-band TIFF."""
+    los_east_path = output_path / "los_east.tif"
+    los_north_path = output_path / "los_north.tif"
+    los_up_path = output_path / "los_up.tif"
+    combined_los_path = output_path / "los_combined.tif"
+
+    with (
+        rio.open(los_east_path) as src_east,
+        rio.open(los_north_path) as src_north,
+        rio.open(los_up_path) as src_up,
+    ):
+        profile = src_east.profile
+        profile.update(
+            count=3,
+            compress="deflate",
+            zlevel=4,
+            tiled=True,
+            blockxsize=128,
+            blockysize=128,
+            predictor=2,
+            interleave="band",
+        )
+        desc_base = "{} component of line of sight unit vector (ground to satellite)"
+        with rio.open(combined_los_path, "w", **profile) as dst:
+            dst.write(src_east.read(1), 1)
+            dst.set_band_description(1, desc_base.format("East"))
+
+            dst.write(src_north.read(1), 2)
+            dst.set_band_description(2, desc_base.format("North"))
+
+            dst.write(src_up.read(1), 3)
+            dst.set_band_description(3, desc_base.format("Up"))
+
+    # Delete old single-band TIFFs
+    Path(los_east_path).unlink()
+    Path(los_north_path).unlink()
+    Path(los_up_path).unlink()
+
+    # Create VRT files for each band
+    for band, name in enumerate(["los_east", "los_north", "los_up"], start=1):
+        vrt_path = output_path / f"{name}.vrt"
+        gdal.BuildVRT(str(vrt_path), [str(combined_los_path)], bandList=[band])
+
+    return [combined_los_path] + [
+        output_path / f"{name}.vrt" for name in ["los_east", "los_north", "los_up"]
+    ]
 
 
 def stitch_geometry_layers(
