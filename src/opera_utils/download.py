@@ -241,7 +241,7 @@ def _download_for_burst_ids(
         raise ValueError(msg)
     logger.info(msg)
     session = _get_auth_session()
-    urls = _get_urls(results)
+    urls = get_urls(results)
     asf.download_urls(
         urls=urls, path=str(output_dir), session=session, processes=max_jobs
     )
@@ -293,23 +293,30 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
     return ASFSearchResults(filtered_results)
 
 
-def _get_urls(
+def get_urls(
     results: asf.ASFSearchResults,
     type_: Literal["https", "s3"] = "https",
+    file_ext: str = ".h5",
 ) -> list[str]:
+    """Parse the `ASFSearchResults` object for HTTPS or S3 urls."""
     if type_ == "https":
         return [r.properties["url"] for r in results]
     elif type_ == "s3":
-        # TODO: go through .umm, find s3 url
-        raise NotImplementedError()
+        out: list[str] = []
+        for r in results:
+            if "s3Urls" not in r.properties:
+                raise ValueError(f"No S3 URL for {r}")
+
+            for url in r.properties["s3Urls"]:
+                if url.endswith(file_ext):
+                    out.append(url)
+                    break
+            else:
+                raise ValueError(f"Failed to find HDF5 S3 url for {r}")
+        return out
+
     else:
         raise ValueError(f"type_ must be 'https' or 's3'. Got {type_}")
-    # r.umm
-    # 'RelatedUrls': [...
-    #     {'URL': 's3://asf-cumulus-prod-opera-products/OPERA_L2_CSLC
-    #    'Type': 'GET DATA VIA DIRECT ACCESS',
-    #    'Description': 'This link provides direct download access vi
-    #    'Format': 'HDF5'},
 
 
 def _get_auth_session() -> asf.ASFSession:
