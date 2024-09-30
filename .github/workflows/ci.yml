@@ -20,6 +20,8 @@ jobs:
             spec: >-
               rasterio
               gdal
+              libgdal-netcdf
+              libgdal-hdf5
               asf_search
           - label: Minimum
             spec: >-
