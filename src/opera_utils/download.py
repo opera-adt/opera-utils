@@ -241,7 +241,7 @@ def _download_for_burst_ids(
         raise ValueError(msg)
     logger.info(msg)
     session = _get_auth_session()
-    urls = _get_urls(results)
+    urls = get_urls(results)
     asf.download_urls(
         urls=urls, path=str(output_dir), session=session, processes=max_jobs
     )
@@ -293,11 +293,12 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
     return ASFSearchResults(filtered_results)
 
 
-def _get_urls(
+def get_urls(
     results: asf.ASFSearchResults,
     type_: Literal["https", "s3"] = "https",
     file_ext: str = ".h5",
 ) -> list[str]:
+    """Parse the `ASFSearchResults` object for HTTPS or S3 urls."""
     if type_ == "https":
         return [r.properties["url"] for r in results]
     elif type_ == "s3":
