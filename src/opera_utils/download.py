@@ -22,9 +22,11 @@ from ._types import PathOrStr
 from .missing_data import BurstSubsetOption, get_missing_data_options
 
 __all__ = [
-    "download_cslc_static_layers",
     "download_cslcs",
     "search_cslcs",
+    "download_cslc_static_layers",
+    "search_cslc_static_layers",
+    "get_urls",
 ]
 
 logger = logging.getLogger("opera_utils")
@@ -47,7 +49,6 @@ def download_cslc_static_layers(
     burst_ids: Sequence[str],
     output_dir: PathOrStr,
     max_jobs: int = 3,
-    verbose: bool = False,
 ) -> list[Path]:
     """Download the static layers for a sequence of burst IDs.
 
@@ -59,8 +60,6 @@ def download_cslc_static_layers(
         Location to save output rasters to
     max_jobs : int, optional
         Number of parallel downloads to run, by default 3
-    verbose : bool, optional
-        Whether to print verbose output, by default False
 
     Returns
     -------
@@ -72,7 +71,6 @@ def download_cslc_static_layers(
         output_dir=output_dir,
         max_jobs=max_jobs,
         product=L2Product.CSLC_STATIC,
-        verbose=verbose,
     )
 
 
@@ -84,7 +82,7 @@ def search_cslcs(
     track: int | None = None,
     burst_ids: Sequence[str] | None = None,
     max_results: int | None = None,
-    verbose: bool = False,
+    product: L2Product = L2Product.CSLC,
     check_missing_data: bool = False,
 ) -> ASFSearchResults | tuple[ASFSearchResults, list[BurstSubsetOption]]:
     """Search for OPERA CSLC products on ASF.
@@ -105,8 +103,9 @@ def search_cslcs(
         Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
     max_results : int, optional
         Maximum number of results to return
-    verbose : bool, optional
-        Whether to print verbose output, by default False
+    product: L2Product
+        Type of OPERA Level 2 product to search for.
+        Default is L2Product.CSLC
     check_missing_data : bool, optional
         Whether to remove missing data options from the search results, by default False
 
@@ -114,6 +113,8 @@ def search_cslcs(
     -------
     asf_search.ASFSearchResults.ASFSearchResults
         Search results from ASF.
+    If `check_missing_data` is True, also returns list[BurstSubsetOption],
+        indicating possible spatially-consistent subsets of CSLC bursts.
     """
     logger.info("Searching for OPERA CSLC products")
     # If they passed a bounding box, need a WKT polygon
@@ -131,7 +132,7 @@ def search_cslcs(
         relativeOrbit=track,
         operaBurstID=list(burst_ids) if burst_ids is not None else None,
         dataset=asf.DATASET.OPERA_S1,
-        processingLevel=L2Product.CSLC.value,
+        processingLevel=product.value,
         maxResults=max_results,
     )
     logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
@@ -152,7 +153,6 @@ def download_cslcs(
     start: DatetimeInput = None,
     end: DatetimeInput = None,
     max_jobs: int = 3,
-    verbose: bool = False,
 ) -> list[Path]:
     """Download the static layers for a sequence of burst IDs.
 
@@ -168,8 +168,6 @@ def download_cslcs(
         end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
     max_jobs : int, optional
         Number of parallel downloads to run, by default 3
-    verbose : bool, optional
-        Whether to print verbose output, by default False
 
     Returns
     -------
@@ -183,7 +181,40 @@ def download_cslcs(
         start=start,
         end=end,
         product=L2Product.CSLC,
-        verbose=verbose,
+    )
+
+
+def search_cslc_static_layers(
+    bounds: Sequence[float] | None = None,
+    aoi_polygon: str | None = None,
+    track: int | None = None,
+    burst_ids: Sequence[str] | None = None,
+) -> ASFSearchResults:
+    """Search for OPERA CSLC Static Layers products on ASF.
+
+    Parameters
+    ----------
+    bounds : Sequence[float], optional
+        Bounding box coordinates (min lon, min lat, max lon, max lat)
+    aoi_polygon : str, optional
+        GeoJSON polygon string, alternative to `bounds`.
+    track : int, optional
+        Relative orbit number / track / path
+    burst_ids : Sequence[str], optional
+        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
+
+    Returns
+    -------
+    asf_search.ASFSearchResults.ASFSearchResults
+        Search results from ASF.
+    """
+    return search_cslcs(
+        bounds=bounds,
+        aoi_polygon=aoi_polygon,
+        track=track,
+        burst_ids=burst_ids,
+        product=L2Product.CSLC_STATIC,
+        check_missing_data=False,
     )
 
 
@@ -194,7 +225,6 @@ def _download_for_burst_ids(
     max_jobs: int = 3,
     start: DatetimeInput = None,
     end: DatetimeInput = None,
-    verbose: bool = False,
 ) -> list[Path]:
     """Download files for one product type fo static layers for a sequence of burst IDs.
 
@@ -212,8 +242,6 @@ def _download_for_burst_ids(
         Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
     end: datetime.datetime | str, optional
         end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
-    verbose : bool, optional
-        Whether to print verbose output, by default False
 
     Returns
     -------
