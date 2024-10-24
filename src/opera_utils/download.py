@@ -19,6 +19,7 @@ except ImportError:
     warnings.warn("Can't import `asf_search`. Unable to search/download data. ")
 
 from ._types import PathOrStr
+from .bursts import normalize_burst_id
 from .missing_data import BurstSubsetOption, get_missing_data_options
 
 __all__ = [
@@ -252,7 +253,7 @@ def _download_for_burst_ids(
         f"Searching {len(burst_ids)} bursts, {product=} (Dates: {start} to {end})"
     )
     results = asf.search(
-        operaBurstID=list(burst_ids),
+        operaBurstID=list(map(normalize_burst_id, burst_ids)),
         processingLevel=product.value,
         start=start,
         end=end,
