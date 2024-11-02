@@ -16,7 +16,8 @@ from pyproj import CRS, Transformer
 from shapely import geometry, ops, wkt
 
 from ._types import Filename
-from .constants import OPERA_IDENTIFICATION
+from .bursts import normalize_burst_id
+from .constants import COMPASS_FILE_REGEX, CSLC_S1_FILE_REGEX, OPERA_IDENTIFICATION
 
 __all__ = [
     "CslcParseError",
@@ -32,19 +33,6 @@ __all__ = [
     "make_nodata_mask",
 ]
 logger = logging.getLogger(__name__)
-
-
-CSLC_S1_FILE_REGEX = (
-    r"(?P<project>OPERA)_"
-    r"(?P<level>L2)_"
-    r"(?P<product_type>CSLC-S1)_"
-    r"(?P<burst_id>T\d{3}-\d+-IW\d)_"
-    r"(?P<start_datetime>\d{8}T\d{6}Z)_"
-    r"(?P<end_datetime>\d{8}T\d{6}Z)_"
-    r"(?P<sensor>S1[AB])_"
-    r"(?P<polarization>VV|HH)_"
-    r"v(?P<product_version>\d+\.\d+)"
-)
 
 
 class CslcParseError(ValueError):
@@ -75,6 +63,10 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
         - polarization: str
         - product_version: str
 
+    Or, if the filename is a COMPASS-generated file,
+        - burst_id: str (lowercase with underscores)
+        - start_datetime: datetime (but no hour/minute/second info)
+
     Raises
     ------
     CslcParseError
@@ -82,13 +74,28 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
 
     """
     name = Path(h5_filename).name
-    match = re.match(CSLC_S1_FILE_REGEX, name)
-    if match is None:
+    match: re.Match | None = None
+
+    if match := re.match(CSLC_S1_FILE_REGEX, name):
+        return _parse_cslc_product(match)
+    elif match := re.match(COMPASS_FILE_REGEX, name):
+        return _parse_compass(match)
+    else:
         raise CslcParseError(f"Unable to parse {h5_filename}")
 
+
+def _parse_compass(match: re.Match):
+    result = match.groupdict()
+    result["start_datetime"] = datetime.strptime(
+        result["start_datetime"], "%Y%m%d"
+    ).replace(tzinfo=timezone.utc)
+    return result
+
+
+def _parse_cslc_product(match: re.Match):
     result = match.groupdict()
     # Normalize to lowercase / underscore
-    result["burst_id"] = result["burst_id"].lower().replace("-", "_")
+    result["burst_id"] = normalize_burst_id(result["burst_id"])
     fmt = "%Y%m%dT%H%M%SZ"
     result["start_datetime"] = datetime.strptime(result["start_datetime"], fmt).replace(
         tzinfo=timezone.utc
@@ -118,8 +125,17 @@ def get_dataset_name(h5_filename: Filename) -> str:
         If the filename cannot be parsed.
 
     """
-    pol = parse_filename(h5_filename)["polarization"]
-    return f"/data/{pol}"
+    name = Path(h5_filename).name
+    parsed = parse_filename(name)
+    if "polarization" in parsed:
+        return f"/data/{parsed['polarization']}"
+    else:
+        # For compass, no polarization is given, so we have to check the file
+        with h5py.File(h5_filename) as hf:
+            if "VV" in hf["/data"]:
+                return "/data/VV"
+            else:
+                return "/data/HH"
 
 
 def get_zero_doppler_time(filename: Filename, type_: str = "start") -> datetime:
@@ -181,7 +197,7 @@ def _get_dset_and_attrs(
         return value, attrs
 
 
-def get_radar_wavelength(filename: Filename):
+def get_radar_wavelength(filename: Filename) -> float:
     """Get the radar wavelength from the CSLC product.
 
     Parameters
@@ -266,7 +282,9 @@ def get_cslc_orbit(h5file: Filename):
     return Orbit(orbit_svs)
 
 
-def get_xy_coords(h5file: Filename, subsample: int = 100) -> tuple:
+def get_xy_coords(
+    h5file: Filename, subsample: int = 100
+) -> tuple[np.ndarray, np.ndarray, int]:
     """Get x and y grid from OPERA S1 CSLC HDF5 file.
 
     Parameters
@@ -282,16 +300,26 @@ def get_xy_coords(h5file: Filename, subsample: int = 100) -> tuple:
         Array of x coordinates in meters.
     y : np.ndarray
         Array of y coordinates in meters.
-    projection : int
+    epsg_code : int
         EPSG code of projection.
 
     """
     with h5py.File(h5file) as hf:
         x = hf["/data/x_coordinates"][:]
         y = hf["/data/y_coordinates"][:]
-        projection = hf["/data/projection"][()]
+        projection_dset = hf["/data/projection"]
+        crs_string = ""
+        # https://github.com/corteva/rioxarray/blob/5783693895b4b055909c5758a72a5d40a365ef11/rioxarray/rioxarray.py#L34 # noqa
+        for attr_name in "spatial_ref", "crs_wkt":
+            if attr_name in projection_dset.attrs:
+                crs_string = projection_dset.attrs[attr_name]
+        if not crs_string:
+            raise ValueError(f"Failed to parse CRS for {h5file}")
+        if isinstance(crs_string, bytes):
+            crs_string = crs_string.decode("utf-8")
+        crs = CRS.from_user_input(crs_string)
 
-    return x[::subsample], y[::subsample], projection
+    return x[::subsample], y[::subsample], crs.to_epsg()
 
 
 def get_lonlat_grid(
@@ -312,15 +340,13 @@ def get_lonlat_grid(
         2D Array of latitude coordinates in degrees.
     lon : np.ndarray
         2D Array of longitude coordinates in degrees.
-    projection : int
-        EPSG code of projection.
 
     """
-    x, y, projection = get_xy_coords(h5file, subsample)
+    x, y, epsg = get_xy_coords(h5file, subsample)
     X, Y = np.meshgrid(x, y)
     xx = X.flatten()
     yy = Y.flatten()
-    crs = CRS.from_epsg(projection)
+    crs = CRS.from_epsg(epsg)
     transformer = Transformer.from_crs(crs, CRS.from_epsg(4326), always_xy=True)
     lon, lat = transformer.transform(xx=xx, yy=yy, radians=False)
     lon = lon.reshape(X.shape)
@@ -370,13 +396,16 @@ def get_union_polygon(
     return ops.unary_union(polygons)
 
 
-def make_nodata_mask(
+def create_nodata_mask(
     opera_file_list: Sequence[Filename],
     out_file: Filename,
     buffer_pixels: int = 0,
     overwrite: bool = False,
 ):
-    """Make a boolean raster mask from the union of nodata polygons using GDAL.
+    """Create a boolean raster mask from the union of nodata polygons using GDAL.
+
+    The output datatype is UInt8, where 1 means valid data in the polygon and
+    0 is invalid (outside the polygon).
 
     Parameters
     ----------
@@ -413,13 +442,13 @@ def make_nodata_mask(
         test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"
         # convert pixels to degrees lat/lon
         gt = _get_raster_gt(test_f)
-        # TODO: more robust way to get the pixel size... this is a hack
-        # maybe just use pyproj to warp lat/lon to meters and back?
-        dx_meters = gt[1]
-        dx_degrees = dx_meters / 111000
-        buffer_degrees = buffer_pixels * dx_degrees
-    except RuntimeError:
-        raise ValueError(f"Unable to open {test_f}")
+    except RuntimeError as e:
+        raise ValueError(f"Unable to get geotransform from {test_f}") from e
+    # TODO: more robust way to get the pixel size... this is a hack
+    # maybe just use pyproj to warp lat/lon to meters and back?
+    dx_meters = gt[1]
+    dx_degrees = dx_meters / 111000
+    buffer_degrees = buffer_pixels * dx_degrees
 
     # Get the union of all the polygons and convert to a temp geojson
     union_poly = get_union_polygon(opera_file_list, buffer_degrees=buffer_degrees)
@@ -454,6 +483,9 @@ def make_nodata_mask(
 
         # Now burn in the union of all polygons
         gdal.Rasterize(dst_ds, src_ds, burnValues=[1])
+
+
+make_nodata_mask = create_nodata_mask
 
 
 def _get_raster_gt(filename: Filename) -> list[float]:

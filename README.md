@@ -37,6 +37,44 @@ While not required for all, some utilities use the GDAL package, which can be in
 mamba env update --file environment-geo.yml
 ```
 
+## Example Usage
+
+### Parsing Sentinel-1 Burst IDs
+
+```python
+import opera_utils
+print(opera_utils.get_burst_id("OPERA_L2_CSLC-S1_T087-185683-IW2_20230322T161649Z_20240504T185235Z_S1A_VV_v1.1.h5"))
+'t087_185683_iw2'
+```
+
+### Get DISP-S1 Frame metadata
+
+```python
+In [4]: opera_utils.get_frame_to_burst_mapping(11114)
+Out[4]:
+{'epsg': 32610,
+ 'is_land': True,
+ 'is_north_america': True,
+ 'xmin': 546450,
+ 'ymin': 4204110,
+ 'xmax': 833790,
+ 'ymax': 4409070,
+ 'burst_ids': ['t042_088905_iw1',
+  ...
+ ]
+  ```
+
+To just get the burst IDs for a Frame:
+```python
+In [3]: opera_utils.get_burst_ids_for_frame(11114)
+Out[3]:
+['t042_088905_iw1',
+ 't042_088905_iw2',
+ ...
+ 't042_088913_iw2',
+ 't042_088913_iw3']
+ ```
+
 ## Setup for Developers
 
 To contribute to the development of `opera-utils`, you can fork the repository and install the package in development mode.

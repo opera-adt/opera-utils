@@ -67,12 +67,11 @@ def test_get_burst_id_to_dates(filenames, burst_id_date_tuples):
     out2 = missing_data.get_burst_id_to_dates(slc_files=filenames)
     assert out2 == expected
 
-    # check order of inputs does matter
+    # check order of inputs does not matter
     out3 = missing_data.get_burst_id_to_dates(
         burst_id_date_tuples=burst_id_date_tuples[::-1]
     )
-    with pytest.raises(AssertionError):
-        assert out3 == expected
+    assert out3 == expected
 
 
 def test_get_burst_id_date_incidence(B, filenames):

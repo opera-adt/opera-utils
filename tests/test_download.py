@@ -6,6 +6,9 @@ import pytest
 from opera_utils.download import L2Product, filter_results_by_date_and_version
 
 
+@pytest.mark.filterwarnings(
+    "ignore:Parsing dates involving a day of month without a year specified.*:DeprecationWarning"
+)
 @pytest.mark.vcr()
 def test_download_filter():
     burst_ids = ["t087_185683_iw2", "t087_185682_iw2"]

@@ -20,6 +20,8 @@ jobs:
             spec: >-
               rasterio
               gdal
+              libgdal-netcdf
+              libgdal-hdf5
               asf_search
           - label: Minimum
             spec: >-
@@ -38,7 +40,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup environment
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
           environment-name: opera_utils-env

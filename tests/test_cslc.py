@@ -74,6 +74,18 @@ def test_file_regex():
     assert result == expected
 
 
+def test_compass_regex():
+    filename = "t042_123456_iw2_20240102.h5"
+    result = parse_filename(filename)
+    expected = {
+        "burst_id": "t042_123456_iw2",
+        "start_datetime": datetime.datetime(
+            2024, 1, 2, 0, 0, 0, tzinfo=datetime.timezone.utc
+        ),
+    }
+    assert result == expected
+
+
 def test_get_radar_wavelength():
     wvl = get_radar_wavelength(TEST_FILE)
     assert wvl == 0.05546576
