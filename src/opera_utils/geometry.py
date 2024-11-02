@@ -280,27 +280,6 @@ def get_incidence_angles(static_h5file: PathOrStr, subsample_factor: int = 10):
         inc_angle_rad = np.arccos(np.sqrt(1 - los_east**2 - los_north**2))
         return np.degrees(inc_angle_rad)
 
-    # los_east_raster = format_nc_filename(
-    #     static_h5file, ds_name=f"data/{Layer.LOS_EAST.value}"
-    # )
-    # los_north_raster = format_nc_filename(
-    #     static_h5file, ds_name=f"data/{Layer.LOS_NORTH.value}"
-    # )
-    # from osgeo_utils import gdal_calc
-
-    # return gdal_calc.Calc(
-    #     NoDataValue=0,
-    #     format="MEM",
-    #     outfile="",
-    #     # type=output_type,
-    #     # quiet=True,
-    #     # overwrite=True,
-    #     # creation_options=io.DEFAULT_TIFF_OPTIONS,
-    #     E=los_east_raster,
-    #     N=los_north_raster,
-    #     calc="degrees(arccos(sqrt(1 - E**2 - N**2)))",
-    # ).ReadAsArray()
-
 
 def get_slant_range(
     cslc_h5file: PathOrStr, static_h5file: PathOrStr, subsample: int = 100
@@ -327,7 +306,7 @@ def get_slant_range(
     the incidence angles from the static HDF5 file, and then computes the
     slant range using geometric relationships.
     """
-    from opera_utils._gslc import get_orbit_arrays
+    from opera_utils._cslc import get_orbit_arrays
 
     _t, x, _v, _t0 = get_orbit_arrays(cslc_h5file)
     R = np.linalg.norm(x, axis=1).mean()
