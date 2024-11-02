@@ -30,7 +30,8 @@ __all__ = [
     "get_cslc_orbit",
     "get_cslc_polygon",
     "get_union_polygon",
-    "make_nodata_mask",
+    "create_nodata_mask",
+    "make_nodata_mask",  # TODO: deprecate
 ]
 logger = logging.getLogger(__name__)
 
@@ -399,7 +400,7 @@ def get_union_polygon(
 def create_nodata_mask(
     opera_file_list: Sequence[Filename],
     out_file: Filename,
-    buffer_pixels: int = 0,
+    buffer_pixels: int = 400,
     overwrite: bool = False,
 ):
     """Create a boolean raster mask from the union of nodata polygons using GDAL.
