@@ -22,7 +22,7 @@ CSLC_S1_FILE_REGEX = (
     r"(?P<product_type>CSLC-S1)_"
     r"(?P<burst_id>T\d{3}-\d+-IW\d)_"
     r"(?P<start_datetime>\d{8}T\d{6}Z)_"
-    r"(?P<end_datetime>\d{8}T\d{6}Z)_"
+    r"(?P<generation_datetime>\d{8}T\d{6}Z)_"
     r"(?P<sensor>S1[AB])_"
     r"(?P<polarization>VV|HH)_"
     r"v(?P<product_version>\d+\.\d+)"
