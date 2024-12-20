@@ -43,7 +43,7 @@ def test_file_regex():
         "start_datetime": datetime.datetime(
             2024, 7, 16, 10, 57, 12, tzinfo=datetime.timezone.utc
         ),
-        "end_datetime": datetime.datetime(
+        "generation_datetime": datetime.datetime(
             2024, 7, 17, 7, 32, 55, tzinfo=datetime.timezone.utc
         ),
         "sensor": "S1A",
