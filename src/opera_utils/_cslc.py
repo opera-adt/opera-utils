@@ -59,7 +59,7 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
         - product_type: str
         - burst_id: str (normalized to lowercase with underscores)
         - start_datetime: datetime
-        - end_datetime: datetime
+        - generation_datetime: datetime
         - sensor: str
         - polarization: str
         - product_version: str
@@ -101,9 +101,9 @@ def _parse_cslc_product(match: re.Match):
     result["start_datetime"] = datetime.strptime(result["start_datetime"], fmt).replace(
         tzinfo=timezone.utc
     )
-    result["end_datetime"] = datetime.strptime(result["end_datetime"], fmt).replace(
-        tzinfo=timezone.utc
-    )
+    result["generation_datetime"] = datetime.strptime(
+        result["generation_datetime"], fmt
+    ).replace(tzinfo=timezone.utc)
     return result
 
 
@@ -469,14 +469,7 @@ def create_nodata_mask(
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_vector_file = Path(tmpdir) / "temp.geojson"
         with open(temp_vector_file, "w") as f:
-            f.write(
-                json.dumps(
-                    {
-                        "geometry": geometry.mapping(union_poly),
-                        "properties": {"id": 1},
-                    }
-                )
-            )
+            f.write(json.dumps(geometry.mapping(union_poly)))
 
         # Open the input vector file
         src_ds = gdal.OpenEx(fspath(temp_vector_file), gdal.OF_VECTOR)
