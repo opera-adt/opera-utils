@@ -469,14 +469,7 @@ def create_nodata_mask(
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_vector_file = Path(tmpdir) / "temp.geojson"
         with open(temp_vector_file, "w") as f:
-            f.write(
-                json.dumps(
-                    {
-                        "geometry": geometry.mapping(union_poly),
-                        "properties": {"id": 1},
-                    }
-                )
-            )
+            f.write(json.dumps(geometry.mapping(union_poly)))
 
         # Open the input vector file
         src_ds = gdal.OpenEx(fspath(temp_vector_file), gdal.OF_VECTOR)
