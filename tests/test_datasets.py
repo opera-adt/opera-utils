@@ -3,6 +3,16 @@ import pytest
 from opera_utils import datasets
 
 
+# XXX remove this ones release for https://github.com/kevin1024/vcrpy/issues/888 is out
+@pytest.fixture(autouse=True)
+def patch_VCRHTTPResponse_version_string():
+    from vcr.stubs import VCRHTTPResponse
+
+    if not hasattr(VCRHTTPResponse, "version_string"):
+        VCRHTTPResponse.version_string = None
+    yield
+
+
 @pytest.fixture(scope="module")
 def vcr_config():
     return {
