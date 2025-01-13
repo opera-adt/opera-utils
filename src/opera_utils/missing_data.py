@@ -81,7 +81,7 @@ def get_missing_data_options(
     )
     dupes = _duplicated_bursts(burst_id_to_dates)
     if dupes:
-        s = "\n".join(f'{b}:{d.strftime("%Y%m%d")}' for (b, d) in dupes)
+        s = "\n".join(f"{b}:{d.strftime('%Y%m%d')}" for (b, d) in dupes)
         msg = f"Duplicated (burst_id, datetime) pairs passed:\n{s}."
         # TODO: is there a better way to echo this back to them?
         raise ValueError(msg)
