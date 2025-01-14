@@ -9,18 +9,15 @@ __all__ = [
     "fetch_frame_to_burst_mapping_file",
 ]
 
-# See: https://github.com/opera-adt/burst_db/tree/main/src/burst_db/data
-# BASE_URL = "https://github.com/opera-adt/burst_db/raw/v{version}/src/burst_db/data"
-# BASE_URL = "https://github.com/opera-adt/burst_db/raw/v0.3.0/src/burst_db/data"
 BASE_URL = "https://github.com/opera-adt/burst_db/releases/download/v{version}/"
 
 # $ ls *json.zip | xargs -n1 shasum -a 256
-# df795cdad6e3f85c29aafd2ca4bbc60a7f011319eb428f0c036d49361a3cb205  burst-id-geometries-simple-0.5.0.geojson.zip
-# 120560ea7af47c492477e2803c4a42ff3c7cb0dfe0d867d7a81ff0ef138ea05b  frame-geometries-simple-0.5.0.geojson.zip
-# 2909b1065f41f753c203be8a567c2e6770a047f1c863f04db8efd2d13e353854  opera-s1-disp-0.5.0-burst-to-frame.json.zip
-# 14d62b32a76a24937c8c73dc88ce60a0ea02c4458d102c9ba1b1191b147e045f  opera-s1-disp-0.5.0-frame-to-burst.json.zip
+# 0b3119030c7fde89be4afaa713455ea021ea1f1bd7563b02aabeecafd9b4c0f0  burst-id-geometries-simple-0.7.0.geojson.zip
+# e6d578cc1be77d0b8c1f400d52f425bd4dc29d01b3a0057cf5f85ec5e5519d76  frame-geometries-simple-0.7.0.geojson.zip
+# 0611d8807c4a6a9b0dfe5f0906e47f455b924d19a8a42fcfcab7f0f09f717a75  opera-s1-disp-0.7.0-burst-to-frame.json.zip
+# 22ac2854fd17ed56e90eb71ab27d03f7157e013b6bd982ca512a5212cc136f62  opera-s1-disp-0.7.0-frame-to-burst.json.zip
 
-BURST_DB_VERSION = "0.5.0"
+BURST_DB_VERSION = "0.7.0"
 
 POOCH = pooch.create(
     # Folder where the data will be stored. For a sensible default, use the
@@ -43,10 +40,10 @@ POOCH = pooch.create(
     # are their respective SHA256 hashes. Files will be downloaded
     # automatically when needed.
     registry={
-        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "df795cdad6e3f85c29aafd2ca4bbc60a7f011319eb428f0c036d49361a3cb205",
-        f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "120560ea7af47c492477e2803c4a42ff3c7cb0dfe0d867d7a81ff0ef138ea05b",
-        f"opera-s1-disp-{BURST_DB_VERSION}-burst-to-frame.json.zip": "2909b1065f41f753c203be8a567c2e6770a047f1c863f04db8efd2d13e353854",
-        f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip": "14d62b32a76a24937c8c73dc88ce60a0ea02c4458d102c9ba1b1191b147e045f",
+        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "0b3119030c7fde89be4afaa713455ea021ea1f1bd7563b02aabeecafd9b4c0f0",
+        f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "e6d578cc1be77d0b8c1f400d52f425bd4dc29d01b3a0057cf5f85ec5e5519d76",
+        f"opera-s1-disp-{BURST_DB_VERSION}-burst-to-frame.json.zip": "0611d8807c4a6a9b0dfe5f0906e47f455b924d19a8a42fcfcab7f0f09f717a75",
+        f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip": "22ac2854fd17ed56e90eb71ab27d03f7157e013b6bd982ca512a5212cc136f62",
     },
 )
 
