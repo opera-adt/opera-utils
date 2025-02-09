@@ -11,7 +11,7 @@ import rasterio as rio
 from osgeo import gdal
 
 from opera_utils import get_burst_ids_for_frame, stitching
-from opera_utils._types import PathOrStr
+from opera_utils._types import Bbox, PathOrStr
 from opera_utils._utils import format_nc_filename, scratch_directory
 from opera_utils.download import download_cslc_static_layers
 
@@ -207,6 +207,8 @@ def stitch_geometry_layers(
     layers: Sequence[Layer | str] = DEFAULT_LAYERS,
     strides: Mapping[str, int] = DEFAULT_STRIDES,
     output_dir: PathOrStr = Path("."),
+    out_bounds: Bbox | None = None,
+    out_bounds_epsg: int | None = None,
 ) -> list[Path]:
     """Stitch geometry layers from downloaded HDF5 files.
 
@@ -220,6 +222,13 @@ def stitch_geometry_layers(
         Stride values for merging images.
     output_dir : PathOrStr
         Directory to store output GeoTIFFs.
+    out_bounds: Optional[tuple[float]]
+        if provided, forces the output image bounds to
+            (left, bottom, right, top)
+        Otherwise, computes from the outside of all input images.
+    out_bounds_epsg: Optional[int]
+        EPSG code for the `out_bounds`.
+        If not provided, assumed to match the projections of `file_list`.
 
     Returns
     -------
@@ -247,6 +256,8 @@ def stitch_geometry_layers(
             resample_alg="nearest",
             in_nodata=nodata,
             out_nodata=nodata,
+            out_bounds=out_bounds,
+            out_bounds_epsg=out_bounds_epsg,
         )
     return output_files
 
