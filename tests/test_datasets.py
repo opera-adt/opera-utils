@@ -27,7 +27,7 @@ def test_registry():
     p = datasets.POOCH
     assert len(p.registry_files) == 4
     assert (
-        p.base_url == "https://github.com/opera-adt/burst_db/releases/download/v0.7.0/"
+        p.base_url == "https://github.com/opera-adt/burst_db/releases/download/v0.8.0/"
     )
     for f in p.registry_files:
         assert p.is_available(f)
