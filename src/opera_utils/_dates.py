@@ -198,7 +198,7 @@ def group_by_date(
 
 def sort_files_by_date(
     files: Iterable[Filename], file_date_fmt: str = "%Y%m%d"
-) -> tuple[list[Filename], list[list[datetime.date]]]:
+) -> tuple[list[Filename], list[list[datetime.date | datetime.datetime]]]:
     """Sort a list of files by date.
 
     If some files have multiple dates, the files with the most dates are sorted
@@ -219,7 +219,7 @@ def sort_files_by_date(
     -------
     file_list : list[Filename]
         list of files sorted by date.
-    dates : list[list[datetime.date,...]]
+    dates : list[list[datetime.date | datetime.datetime]]
         Sorted list, where each entry has all the dates from the corresponding file.
     """
     file_date_tuples = [(f, get_dates(f, fmt=file_date_fmt)) for f in files]
