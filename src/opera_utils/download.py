@@ -27,6 +27,8 @@ __all__ = [
     "search_cslcs",
     "download_cslc_static_layers",
     "search_cslc_static_layers",
+    "download_rtcs",
+    "download_rtc_static_layers",
     "get_urls",
 ]
 
@@ -72,6 +74,35 @@ def download_cslc_static_layers(
         output_dir=output_dir,
         max_jobs=max_jobs,
         product=L2Product.CSLC_STATIC,
+    )
+
+
+def download_rtc_static_layers(
+    burst_ids: Sequence[str],
+    output_dir: PathOrStr,
+    max_jobs: int = 3,
+) -> list[Path]:
+    """Download the RTC-S1 static layers for a sequence of burst IDs.
+
+    Parameters
+    ----------
+    burst_ids : Sequence[str]
+        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
+    output_dir : Path | str
+        Location to save output rasters to
+    max_jobs : int, optional
+        Number of parallel downloads to run, by default 3
+
+    Returns
+    -------
+    list[Path]
+        Locations to saved raster files.
+    """
+    return _download_for_burst_ids(
+        burst_ids=burst_ids,
+        output_dir=output_dir,
+        max_jobs=max_jobs,
+        product=L2Product.RTC_STATIC,
     )
 
 
@@ -155,7 +186,7 @@ def download_cslcs(
     end: DatetimeInput = None,
     max_jobs: int = 3,
 ) -> list[Path]:
-    """Download the static layers for a sequence of burst IDs.
+    """Download the matching CSLC-S1 files for a sequence of burst IDs.
 
     Parameters
     ----------
@@ -182,6 +213,43 @@ def download_cslcs(
         start=start,
         end=end,
         product=L2Product.CSLC,
+    )
+
+
+def download_rtcs(
+    burst_ids: Sequence[str],
+    output_dir: PathOrStr,
+    start: DatetimeInput = None,
+    end: DatetimeInput = None,
+    max_jobs: int = 3,
+) -> list[Path]:
+    """Download the matching RTC-S1 files for a sequence of burst IDs.
+
+    Parameters
+    ----------
+    burst_ids : Sequence[str]
+        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
+    output_dir : Path | str
+        Location to save output rasters to
+    start: datetime.datetime | str, optional
+        Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    end: datetime.datetime | str, optional
+        end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    max_jobs : int, optional
+        Number of parallel downloads to run, by default 3
+
+    Returns
+    -------
+    list[Path]
+        Locations to saved raster files.
+    """
+    return _download_for_burst_ids(
+        burst_ids=burst_ids,
+        output_dir=output_dir,
+        max_jobs=max_jobs,
+        start=start,
+        end=end,
+        product=L2Product.RTC,
     )
 
 
