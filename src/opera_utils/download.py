@@ -98,15 +98,37 @@ def download_rtc_static_layers(
     list[Path]
         Locations to saved raster files.
     """
-    return _download_for_burst_ids(
-        burst_ids=burst_ids,
-        output_dir=output_dir,
-        max_jobs=max_jobs,
-        product=L2Product.RTC_STATIC,
+    # Note: RTC Static must be slightly different since there's more than one 'url'
+    # the "url" and "fileName" ASF search result only give the LIA geotiff
+    # There are also these:
+    # ['.iso.xml',
+    # '_local_incidence_angle.tif',
+    # '_mask.tif',
+    # '_number_of_looks.tif',
+    # '_rtc_anf_gamma0_to_beta0.tif',
+    # '_rtc_anf_gamma0_to_sigma0.tif']
+    # return _download_for_burst_ids(
+
+    results = asf.search(
+        operaBurstID=list(map(normalize_burst_id, burst_ids)),
+        processingLevel=L2Product.RTC_STATIC.value,
+        dataset=asf.DATASET.OPERA_S1,
     )
 
+    msg = f"Found {len(results)} results"
+    if len(results) == 0:
+        raise ValueError(msg)
+    logger.info(msg)
 
-def search_cslcs(
+    session = _get_auth_session()
+    urls = get_urls(results)
+    asf.download_urls(
+        urls=urls, path=str(output_dir), session=session, processes=max_jobs
+    )
+    return [Path(output_dir) / r.properties["fileName"] for r in results]
+
+
+def search_l2(
     start: DatetimeInput | None = None,
     end: DatetimeInput | None = None,
     bounds: Sequence[float] | None = None,
@@ -157,12 +179,15 @@ def search_cslcs(
     else:
         aoi = aoi_polygon
 
+    opera_burst_ids = (
+        list(map(normalize_burst_id, burst_ids)) if burst_ids is not None else None
+    )
     results = asf.search(
         start=start,
         end=end,
         intersectsWith=aoi,
         relativeOrbit=track,
-        operaBurstID=list(burst_ids) if burst_ids is not None else None,
+        operaBurstID=opera_burst_ids,
         dataset=asf.DATASET.OPERA_S1,
         processingLevel=product.value,
         maxResults=max_results,
@@ -177,6 +202,9 @@ def search_cslcs(
         slc_files=[r.properties["url"] for r in results]
     )
     return results, missing_data_options
+
+
+search_cslcs = search_l2
 
 
 def download_cslcs(
@@ -329,11 +357,9 @@ def _download_for_burst_ids(
     )
     if product == L2Product.CSLC:
         logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
-        print(f"Found {len(results)} total results before deduping pgeVersion")
         results = filter_results_by_date_and_version(results)
 
     msg = f"Found {len(results)} results"
-    print(msg)
     if len(results) == 0:
         raise ValueError(msg)
     logger.info(msg)
