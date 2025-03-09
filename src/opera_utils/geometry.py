@@ -174,7 +174,7 @@ def _make_3band_los(output_path: Path):
             blockxsize=128,
             blockysize=128,
             predictor=2,
-            interleave="band",
+            interleave="pixel",
         )
         desc_base = "{} component of line of sight unit vector (ground to satellite)"
         with rio.open(combined_los_path, "w", **profile) as dst:
