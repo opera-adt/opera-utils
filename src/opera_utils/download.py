@@ -27,6 +27,8 @@ __all__ = [
     "search_cslcs",
     "download_cslc_static_layers",
     "search_cslc_static_layers",
+    "download_rtcs",
+    "download_rtc_static_layers",
     "get_urls",
 ]
 
@@ -75,7 +77,58 @@ def download_cslc_static_layers(
     )
 
 
-def search_cslcs(
+def download_rtc_static_layers(
+    burst_ids: Sequence[str],
+    output_dir: PathOrStr,
+    max_jobs: int = 3,
+) -> list[Path]:
+    """Download the RTC-S1 static layers for a sequence of burst IDs.
+
+    Parameters
+    ----------
+    burst_ids : Sequence[str]
+        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
+    output_dir : Path | str
+        Location to save output rasters to
+    max_jobs : int, optional
+        Number of parallel downloads to run, by default 3
+
+    Returns
+    -------
+    list[Path]
+        Locations to saved raster files.
+    """
+    # Note: RTC Static must be slightly different since there's more than one 'url'
+    # the "url" and "fileName" ASF search result only give the LIA geotiff
+    # There are also these:
+    # ['.iso.xml',
+    # '_local_incidence_angle.tif',
+    # '_mask.tif',
+    # '_number_of_looks.tif',
+    # '_rtc_anf_gamma0_to_beta0.tif',
+    # '_rtc_anf_gamma0_to_sigma0.tif']
+    # return _download_for_burst_ids(
+
+    results = asf.search(
+        operaBurstID=list(map(normalize_burst_id, burst_ids)),
+        processingLevel=L2Product.RTC_STATIC.value,
+        dataset=asf.DATASET.OPERA_S1,
+    )
+
+    msg = f"Found {len(results)} results"
+    if len(results) == 0:
+        raise ValueError(msg)
+    logger.info(msg)
+
+    session = _get_auth_session()
+    urls = get_urls(results)
+    asf.download_urls(
+        urls=urls, path=str(output_dir), session=session, processes=max_jobs
+    )
+    return [Path(output_dir) / r.properties["fileName"] for r in results]
+
+
+def search_l2(
     start: DatetimeInput | None = None,
     end: DatetimeInput | None = None,
     bounds: Sequence[float] | None = None,
@@ -126,12 +179,15 @@ def search_cslcs(
     else:
         aoi = aoi_polygon
 
+    opera_burst_ids = (
+        list(map(normalize_burst_id, burst_ids)) if burst_ids is not None else None
+    )
     results = asf.search(
         start=start,
         end=end,
         intersectsWith=aoi,
         relativeOrbit=track,
-        operaBurstID=list(burst_ids) if burst_ids is not None else None,
+        operaBurstID=opera_burst_ids,
         dataset=asf.DATASET.OPERA_S1,
         processingLevel=product.value,
         maxResults=max_results,
@@ -148,6 +204,9 @@ def search_cslcs(
     return results, missing_data_options
 
 
+search_cslcs = search_l2
+
+
 def download_cslcs(
     burst_ids: Sequence[str],
     output_dir: PathOrStr,
@@ -155,7 +214,7 @@ def download_cslcs(
     end: DatetimeInput = None,
     max_jobs: int = 3,
 ) -> list[Path]:
-    """Download the static layers for a sequence of burst IDs.
+    """Download the matching CSLC-S1 files for a sequence of burst IDs.
 
     Parameters
     ----------
@@ -182,6 +241,43 @@ def download_cslcs(
         start=start,
         end=end,
         product=L2Product.CSLC,
+    )
+
+
+def download_rtcs(
+    burst_ids: Sequence[str],
+    output_dir: PathOrStr,
+    start: DatetimeInput = None,
+    end: DatetimeInput = None,
+    max_jobs: int = 3,
+) -> list[Path]:
+    """Download the matching RTC-S1 files for a sequence of burst IDs.
+
+    Parameters
+    ----------
+    burst_ids : Sequence[str]
+        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
+    output_dir : Path | str
+        Location to save output rasters to
+    start: datetime.datetime | str, optional
+        Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    end: datetime.datetime | str, optional
+        end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+    max_jobs : int, optional
+        Number of parallel downloads to run, by default 3
+
+    Returns
+    -------
+    list[Path]
+        Locations to saved raster files.
+    """
+    return _download_for_burst_ids(
+        burst_ids=burst_ids,
+        output_dir=output_dir,
+        max_jobs=max_jobs,
+        start=start,
+        end=end,
+        product=L2Product.RTC,
     )
 
 
@@ -261,11 +357,9 @@ def _download_for_burst_ids(
     )
     if product == L2Product.CSLC:
         logger.debug(f"Found {len(results)} total results before deduping pgeVersion")
-        print(f"Found {len(results)} total results before deduping pgeVersion")
         results = filter_results_by_date_and_version(results)
 
     msg = f"Found {len(results)} results"
-    print(msg)
     if len(results) == 0:
         raise ValueError(msg)
     logger.info(msg)
