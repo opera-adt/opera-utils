@@ -87,6 +87,8 @@ def merge_images(
     create_only : bool
         If True, creates an empty output file, does not write data. Default is False.
     """
+    if strides is None:
+        strides = {"x": 1, "y": 1}
     if Path(outfile).exists():
         if not overwrite:
             logger.info(f"{outfile} already exists, skipping")
@@ -95,8 +97,7 @@ def merge_images(
             logger.info(f"Overwrite=True: removing {outfile}")
             Path(outfile).unlink()
 
-    is_downsampled = strides is not None and strides["x"] > 1 and strides["y"] > 1
-    if len(file_list) == 1:
+    if len(file_list) == 1 and out_bounds is None:
         logger.info("Only one image, no stitching needed")
         logger.info(f"Copying {file_list[0]} to {outfile} and zeroing nodata values.")
         _copy_set_nodata(
@@ -113,58 +114,55 @@ def merge_images(
     # If not, warp them to the most common projection using VRT files in a tempdir
     temp_dir = tempfile.TemporaryDirectory()
 
-    if is_downsampled:
+    tmp_path = Path(temp_dir.name)
+    if strides is not None and (strides["x"] > 1 or strides["y"] > 1):
         file_list = get_downsampled_vrts(
             file_list,
             strides=strides,
-            dirname=Path(temp_dir.name),
+            dirname=tmp_path,
         )
 
     warped_file_list = warp_to_projection(
         file_list,
-        # temp_dir,
-        dirname=Path(temp_dir.name),
+        dirname=tmp_path,
         projection=projection,
         resample_alg=resample_alg,
     )
     # Compute output array shape. We guarantee it will cover the output
     # bounds completely
-    bounds, combined_nodata = get_combined_bounds_nodata(  # type: ignore
+    bounds, combined_nodata = get_combined_bounds_nodata(
         *warped_file_list,
         target_aligned_pixels=target_aligned_pixels,
         out_bounds=out_bounds,
         out_bounds_epsg=out_bounds_epsg,
-        strides=strides,
     )
     (xmin, ymin, xmax, ymax) = bounds
+    proj_win = (xmin, ymax, xmax, ymin)  # ul_lr = ulx, uly, lrx, lry
 
     # Write out the files for gdal_merge using the --optfile flag
-    optfile = Path(temp_dir.name) / "file_list.txt"
+    optfile = tmp_path / "file_list.txt"
     optfile.write_text("\n".join(map(str, warped_file_list)))
+    suffix = Path(outfile).suffix
+    merge_output = (tmp_path / "merged").with_suffix(suffix)
     args = [
         "gdal_merge.py",
+        "-quiet",
         "-o",
-        outfile,
+        merge_output,
         "--optfile",
         optfile,
         "-of",
         driver,
-        "-ul_lr",
-        xmin,
-        ymax,
-        xmax,
-        ymin,
     ]
+
     if out_nodata is not None:
         args.extend(["-a_nodata", str(out_nodata)])
     if in_nodata is not None or combined_nodata is not None:
         ndv = str(in_nodata) if in_nodata is not None else str(combined_nodata)
-        args.extend(["-n", ndv])  # type: ignore
+        args.extend(["-n", ndv])
     if out_dtype is not None:
         out_gdal_dtype = gdal.GetDataTypeName(numpy_to_gdal_type(out_dtype))
         args.extend(["-ot", out_gdal_dtype])
-    if target_aligned_pixels:
-        args.append("-tap")
     if create_only:
         args.append("-create")
     if options is not None:
@@ -172,8 +170,21 @@ def merge_images(
             args.extend(["-co", option])
 
     arg_list = [str(a) for a in args]
-    logger.info(f"Running {' '.join(arg_list)}")
+    logger.debug(f"Running {' '.join(arg_list)}")
     subprocess.check_call(arg_list)
+
+    # Now clip to the provided bounding box
+    gdal.Translate(
+        destName=fspath(outfile),
+        srcDS=fspath(merge_output),
+        projWin=proj_win,
+        # TODO: https://github.com/OSGeo/gdal/issues/10536
+        # Figure out if we really want to resample here, or just
+        # do a nearest neighbor (which is default)
+        resampleAlg="bilinear",
+        format=driver,
+        creationOptions=options,
+    )
 
     temp_dir.cleanup()
 
