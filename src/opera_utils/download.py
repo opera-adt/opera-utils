@@ -118,7 +118,6 @@ def download_rtc_static_layers(
     out_paths: list[Path] = []
     for result in results:
         candidate_urls = result.properties["additionalUrls"]
-        print(candidate_urls)
         for u in candidate_urls:
             if any(u.endswith(f"_{layer.value}.tif") for layer in selected_layers):
                 urls.append(u)
