@@ -8,6 +8,7 @@ from typing import Mapping, Sequence
 import h5py
 import numpy as np
 import rasterio as rio
+from numpy.typing import ArrayLike
 from osgeo import gdal
 
 from opera_utils import get_burst_ids_for_frame, stitching
@@ -262,7 +263,9 @@ def stitch_geometry_layers(
     return output_files
 
 
-def get_incidence_angles(static_h5file: PathOrStr, subsample_factor: int = 10):
+def get_incidence_angles(
+    static_h5file: PathOrStr, subsample_factor: int = 10
+) -> np.ndarray:
     """Calculate incidence angles from Line Of Sight (LOS) east and north components.
 
     This function reads the LOS east and north components from the HDF5 file,
@@ -293,42 +296,54 @@ def get_incidence_angles(static_h5file: PathOrStr, subsample_factor: int = 10):
 
 
 def get_slant_range(
-    cslc_h5file: PathOrStr, static_h5file: PathOrStr, subsample: int = 100
+    static_h5file: PathOrStr,
+    incidence_angles: ArrayLike | None = None,
+    subsample: int = 100,
 ):
     """Calculate the approximate slant range for CSLC products.
 
+    This function reads the orbit data and line of sight unit vectors from the
+    CSLC static layers file,  calculates the incidence angles,
+    then computes the slant range using spherical trig relationships.
+
     Parameters
     ----------
-    cslc_h5file : PathOrStr
-        Path to the HDF5 file containing the CSLC data.
     static_h5file : PathOrStr
         Path to the HDF5 file containing the static data.
+    incidence_angles : ArrayLike, optional.
+        Array or float data of incidence angles (in degrees) at which the
+        slant ranges should be computed.
+        If None, computes for the whole `static_h5file` file at a subsampled rate.
     subsample : int, optional
         Factor by which to subsample the incidence data, by default 100.
+        Ignored if `incidence_angles` is passed in.
 
     Returns
     -------
     np.ndarray
         Array of slant range values.
 
-    Notes
-    -----
-    This function reads the orbit data from the CSLC HDF5 file, calculates
-    the incidence angles from the static HDF5 file, and then computes the
-    slant range using geometric relationships.
     """
     from opera_utils._cslc import get_orbit_arrays
 
-    _t, x, _v, _t0 = get_orbit_arrays(cslc_h5file)
+    _t, x, _v, _t0 = get_orbit_arrays(static_h5file)
+    # Get orbit radius in ECEF coordinate system
     R = np.linalg.norm(x, axis=1).mean()
-    # sat_altitude = R - radius_of_earth
 
     # See here for other implementation
     # https://github.com/insarlab/MintPy/blob/2012127edbe81b6b0817cc6a27283eb33dfca466/src/mintpy/utils/utils0.py#L175
 
-    incidence = get_incidence_angles(static_h5file, subsample_factor=subsample)
-    incidence_rad = np.radians(incidence)
+    if incidence_angles is not None:
+        incidence_angles = np.asarray(incidence_angles)
+    else:
+        incidence_angles = get_incidence_angles(
+            static_h5file, subsample_factor=subsample
+        )
+
+    incidence_rad = np.radians(incidence_angles)
     earth_radius = 6371.0088e3
+    # If desired:
+    # satellite_altitude = R - radius_of_earth
 
     # calculate 2R based on the law of sines
     two_times_circ = R / np.sin(np.pi - incidence_rad)
