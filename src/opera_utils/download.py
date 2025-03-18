@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 import netrc
+import urllib.parse
 import warnings
 from enum import Enum
 from itertools import groupby
@@ -30,6 +31,8 @@ __all__ = [
     "download_rtcs",
     "download_rtc_static_layers",
     "get_urls",
+    "L2Product",
+    "RTCStaticLayers",
 ]
 
 logger = logging.getLogger("opera_utils")
@@ -44,8 +47,87 @@ class L2Product(str, Enum):
     RTC_STATIC = "RTC-STATIC"
 
 
+class RTCStaticLayers(str, Enum):
+    """Available rasters from the RTC-STATIC collection."""
+
+    INCIDENCE_ANGLE = "incidence_angle"
+    LOCAL_INCIDENCE_ANGLE = "local_incidence_angle"
+    MASK = "mask"
+    NUMBER_OF_LOOKS = "number_of_looks"
+    RTC_ANF_GAMMA0_TO_BETA0 = "rtc_anf_gamma0_to_beta0"
+    RTC_ANF_GAMMA0_TO_SIGMA0 = "rtc_anf_gamma0_to_sigma0"
+
+
 # Type for ASF Search start/end times
 DatetimeInput = Union[datetime.datetime, str, None]
+
+
+def download_rtc_static_layers(
+    burst_ids: Sequence[str],
+    output_dir: PathOrStr,
+    layers: Sequence[RTCStaticLayers] = (RTCStaticLayers.LOCAL_INCIDENCE_ANGLE,),
+    max_jobs: int = 3,
+) -> list[Path]:
+    """Download the RTC-S1 static layers for a sequence of burst IDs.
+
+    Parameters
+    ----------
+    burst_ids : Sequence[str]
+        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
+    output_dir : Path | str
+        Location to save output rasters to
+    layers : Sequence[RTCStaticLayers]
+        Sequence of static layers rasters to download.
+        Choices are contained in `RTCStaticLayers`.
+        Default is "local_incidence_angle"
+    max_jobs : int, optional
+        Number of parallel downloads to run, by default 3
+
+    Returns
+    -------
+    list[Path]
+        Locations to saved raster files.
+    """
+    selected_layers = [RTCStaticLayers(layer) for layer in layers]
+
+    results = asf.search(
+        operaBurstID=list(map(normalize_burst_id, burst_ids)),
+        processingLevel=L2Product.RTC_STATIC.value,
+        dataset=asf.DATASET.OPERA_S1,
+    )
+
+    msg = f"Found {len(results)} results"
+    if len(results) == 0:
+        raise ValueError(msg)
+    logger.info(msg)
+
+    session = _get_auth_session()
+    # Note: RTC Static must be slightly different since there's more than one 'url'
+    # the "url" and "fileName" ASF search result only give the incidence geotiff
+    # There are also these:
+    # '.iso.xml'
+    # '_local_incidence_angle.tif'
+    # '_mask.tif'
+    # '_number_of_looks.tif'
+    # '_rtc_anf_gamma0_to_beta0.tif'
+    # '_rtc_anf_gamma0_to_sigma0.tif'
+    #
+    # Filter to only the ones we requested
+    urls: list[str] = []
+    out_paths: list[Path] = []
+    for result in results:
+        candidate_urls = result.properties["additionalUrls"]
+        print(candidate_urls)
+        for u in candidate_urls:
+            if any(u.endswith(f"_{layer.value}.tif") for layer in selected_layers):
+                urls.append(u)
+                out_path = Path(output_dir) / Path(urllib.parse.urlparse(u).path).name
+                out_paths.append(out_path)
+
+    asf.download_urls(
+        urls=urls, path=str(output_dir), session=session, processes=max_jobs
+    )
+    return out_paths
 
 
 def download_cslc_static_layers(
@@ -75,57 +157,6 @@ def download_cslc_static_layers(
         max_jobs=max_jobs,
         product=L2Product.CSLC_STATIC,
     )
-
-
-def download_rtc_static_layers(
-    burst_ids: Sequence[str],
-    output_dir: PathOrStr,
-    max_jobs: int = 3,
-) -> list[Path]:
-    """Download the RTC-S1 static layers for a sequence of burst IDs.
-
-    Parameters
-    ----------
-    burst_ids : Sequence[str]
-        Sequence of OPERA Burst IDs (e.g. 'T123_012345_IW1')
-    output_dir : Path | str
-        Location to save output rasters to
-    max_jobs : int, optional
-        Number of parallel downloads to run, by default 3
-
-    Returns
-    -------
-    list[Path]
-        Locations to saved raster files.
-    """
-    # Note: RTC Static must be slightly different since there's more than one 'url'
-    # the "url" and "fileName" ASF search result only give the LIA geotiff
-    # There are also these:
-    # ['.iso.xml',
-    # '_local_incidence_angle.tif',
-    # '_mask.tif',
-    # '_number_of_looks.tif',
-    # '_rtc_anf_gamma0_to_beta0.tif',
-    # '_rtc_anf_gamma0_to_sigma0.tif']
-    # return _download_for_burst_ids(
-
-    results = asf.search(
-        operaBurstID=list(map(normalize_burst_id, burst_ids)),
-        processingLevel=L2Product.RTC_STATIC.value,
-        dataset=asf.DATASET.OPERA_S1,
-    )
-
-    msg = f"Found {len(results)} results"
-    if len(results) == 0:
-        raise ValueError(msg)
-    logger.info(msg)
-
-    session = _get_auth_session()
-    urls = get_urls(results)
-    asf.download_urls(
-        urls=urls, path=str(output_dir), session=session, processes=max_jobs
-    )
-    return [Path(output_dir) / r.properties["fileName"] for r in results]
 
 
 def search_l2(
