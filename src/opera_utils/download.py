@@ -90,8 +90,9 @@ def download_rtc_static_layers(
     """
     selected_layers = [RTCStaticLayers(layer) for layer in layers]
 
+    normalized_burst_ids = list(map(normalize_burst_id, burst_ids))
     results = asf.search(
-        operaBurstID=list(map(normalize_burst_id, burst_ids)),
+        operaBurstID=normalized_burst_ids,
         processingLevel=L2Product.RTC_STATIC.value,
         dataset=asf.DATASET.OPERA_S1,
     )
@@ -124,6 +125,12 @@ def download_rtc_static_layers(
                 out_path = Path(output_dir) / Path(urllib.parse.urlparse(u).path).name
                 out_paths.append(out_path)
 
+    if not out_paths:
+        raise ValueError(
+            f"No urls found for {normalized_burst_ids} and {selected_layers}"
+        )
+
+    Path(output_dir).mkdir(exist_ok=True, parents=True)
     asf.download_urls(
         urls=urls, path=str(output_dir), session=session, processes=max_jobs
     )
@@ -396,6 +403,7 @@ def _download_for_burst_ids(
     logger.info(msg)
     session = _get_auth_session()
     urls = get_urls(results)
+    Path(output_dir).mkdir(exist_ok=True, parents=True)
     asf.download_urls(
         urls=urls, path=str(output_dir), session=session, processes=max_jobs
     )
