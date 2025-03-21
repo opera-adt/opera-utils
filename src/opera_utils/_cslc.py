@@ -162,7 +162,7 @@ def get_dataset_name(h5_filename: Filename) -> str:
 
 def get_zero_doppler_time(
     filename: Filename,
-    dataset: str | None,
+    dataset: str | None = None,
     type_: str = "start",
     datetime_format: str = "%Y-%m-%d %H:%M:%S.%f",
 ) -> datetime:
@@ -454,7 +454,7 @@ def get_union_polygon(
 def create_nodata_mask(
     opera_file_list: Sequence[Filename],
     out_file: Filename,
-    dset_name: str | None,
+    dset_name: str | None = None,
     buffer_pixels: int = 400,
     overwrite: bool = False,
 ):

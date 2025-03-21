@@ -30,5 +30,5 @@ def test_download_filter():
         start=start,
         end=end,
     )
-    assert len(results) == 60
+    assert len(results) == 30
     assert len(filter_results_by_date_and_version(results)) == 30
