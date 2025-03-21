@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import re
 
+SPEED_OF_LIGHT = 299_792_458
+
 # Specific to OPERA CSLC products:
 OPERA_DATASET_NAME = "/data/VV"
 OPERA_IDENTIFICATION = "/identification"
+NISAR_BOUNDING_POLYGON = "/science/LSAR/identification/boundingPolygon"
 
 # It should match either or these within a filename:
 # t087_185684_iw2 (which comes from COMPASS)
@@ -24,6 +27,19 @@ CSLC_S1_FILE_REGEX = (
     r"(?P<start_datetime>\d{8}T\d{6}Z)_"
     r"(?P<generation_datetime>\d{8}T\d{6}Z)_"
     r"(?P<sensor>S1[ABCDE])_"
+    r"(?P<polarization>VV|HH)_"
+    r"v(?P<product_version>\d+\.\d+)"
+)
+
+NISAR_FILE_REGEX = (
+    r"(?P<project>NISAR)_"
+    r"(?P<level>L2)_"
+    r"(?P<product_type>GSLC)_"
+    r"(?P<sensor>NI)_"
+    r"(?P<frame_id>F\d{3})_"
+    r"(?P<start_datetime>\d{8}T\d{6}Z)_"
+    r"(?P<generation_datetime>\d{8}T\d{6}Z)_"
+    r"(?P<sensor_repeat>NI)_"
     r"(?P<polarization>VV|HH)_"
     r"v(?P<product_version>\d+\.\d+)"
 )

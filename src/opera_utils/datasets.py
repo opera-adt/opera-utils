@@ -39,10 +39,18 @@ POOCH = pooch.create(
     # 93c458a6324970366d65e3639554d05e9ed46947dee2d32e2728e098336b8c9a  opera-s1-disp-0.9.0-burst-to-frame.json.zip
     # 0a0662d47f10e49dc20f1809407916b87565d1ed33c988ba86a3d6547bb4a28f  opera-s1-disp-0.9.0-frame-to-burst.json.zip
     registry={
-        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "4d9a046029e0dbe03a0746f5e7df645d4746e134676751085f55a341eb23f466",
-        f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": "115182c420a0446f3f015c16e623fe9535337679796e44a65cf6154392f66eb2",
-        f"opera-s1-disp-{BURST_DB_VERSION}-burst-to-frame.json.zip": "93c458a6324970366d65e3639554d05e9ed46947dee2d32e2728e098336b8c9a",
-        f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip": "0a0662d47f10e49dc20f1809407916b87565d1ed33c988ba86a3d6547bb4a28f",
+        f"burst-id-geometries-simple-{BURST_DB_VERSION}.geojson.zip": (
+            "4d9a046029e0dbe03a0746f5e7df645d4746e134676751085f55a341eb23f466"
+        ),
+        f"frame-geometries-simple-{BURST_DB_VERSION}.geojson.zip": (
+            "115182c420a0446f3f015c16e623fe9535337679796e44a65cf6154392f66eb2"
+        ),
+        f"opera-s1-disp-{BURST_DB_VERSION}-burst-to-frame.json.zip": (
+            "93c458a6324970366d65e3639554d05e9ed46947dee2d32e2728e098336b8c9a"
+        ),
+        f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip": (
+            "0a0662d47f10e49dc20f1809407916b87565d1ed33c988ba86a3d6547bb4a28f"
+        ),
     },
 )
 
