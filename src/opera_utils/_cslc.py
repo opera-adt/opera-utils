@@ -17,7 +17,13 @@ from shapely import geometry, ops, wkt
 
 from ._types import Filename
 from .bursts import normalize_burst_id
-from .constants import COMPASS_FILE_REGEX, CSLC_S1_FILE_REGEX, OPERA_IDENTIFICATION
+from .constants import (
+    COMPASS_FILE_REGEX,
+    CSLC_S1_FILE_REGEX,
+    NISAR_BOUNDING_POLYGON,
+    NISAR_FILE_REGEX,
+    OPERA_IDENTIFICATION,
+)
 
 __all__ = [
     "CslcParseError",
@@ -79,6 +85,8 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
 
     if match := re.match(CSLC_S1_FILE_REGEX, name):
         return _parse_cslc_product(match)
+    elif match := re.match(NISAR_FILE_REGEX, name):
+        return _parse_gslc_product(match)
     elif match := re.match(COMPASS_FILE_REGEX, name):
         return _parse_compass(match)
     else:
@@ -89,6 +97,19 @@ def _parse_compass(match: re.Match):
     result = match.groupdict()
     result["start_datetime"] = datetime.strptime(
         result["start_datetime"], "%Y%m%d"
+    ).replace(tzinfo=timezone.utc)
+    return result
+
+
+def _parse_gslc_product(match: re.Match):
+    result = match.groupdict()
+    result["frame_id"] = result["frame_id"]
+    fmt = "%Y%m%dT%H%M%SZ"
+    result["start_datetime"] = datetime.strptime(result["start_datetime"], fmt).replace(
+        tzinfo=timezone.utc
+    )
+    result["generation_datetime"] = datetime.strptime(
+        result["generation_datetime"], fmt
     ).replace(tzinfo=timezone.utc)
     return result
 
@@ -139,7 +160,12 @@ def get_dataset_name(h5_filename: Filename) -> str:
                 return "/data/HH"
 
 
-def get_zero_doppler_time(filename: Filename, type_: str = "start") -> datetime:
+def get_zero_doppler_time(
+    filename: Filename,
+    dataset: str | None,
+    type_: str = "start",
+    datetime_format: str = "%Y-%m-%d %H:%M:%S.%f",
+) -> datetime:
     """Get the full acquisition time from the CSLC product.
 
     Uses `/identification/zero_doppler_{type_}_time` from the CSLC product.
@@ -148,20 +174,25 @@ def get_zero_doppler_time(filename: Filename, type_: str = "start") -> datetime:
     ----------
     filename : Filename
         Path to the CSLC product.
+    dataset : str, optional
+        The subdataset to read zero doppler time from
     type_ : str, optional
         Either "start" or "stop", by default "start".
+    datetime_format : str, optional
+        The format of the datetime
 
     Returns
     -------
     str
         Full acquisition time.
     """
-    DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
     def get_dt(in_str):
-        return datetime.strptime(in_str.decode("utf-8"), DATETIME_FORMAT)
+        return datetime.strptime(in_str.decode("utf-8")[:26], datetime_format)
 
     dset = f"/identification/zero_doppler_{type_}_time"
+    if dataset:
+        dset = dataset
     value = _get_dset_and_attrs(filename, dset, parse_func=get_dt)[0]
     return value
 
@@ -218,6 +249,7 @@ def get_radar_wavelength(filename: Filename) -> float:
 
 def get_orbit_arrays(
     h5file: Filename,
+    is_nisar: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime]:
     """Parse orbit info from OPERA S1 CSLC HDF5 file into python types.
 
@@ -225,6 +257,8 @@ def get_orbit_arrays(
     ----------
     h5file : Filename
         Path to OPERA S1 CSLC HDF5 file.
+    is_nisar : bool, optional
+        if the data is nisar GSLCs
 
     Returns
     -------
@@ -238,19 +272,34 @@ def get_orbit_arrays(
         Reference epoch of orbit.
 
     """
-    with h5py.File(h5file) as hf:
-        orbit_group = hf["/metadata/orbit"]
-        times = orbit_group["time"][:]
-        positions = np.stack([orbit_group[f"position_{p}"] for p in ["x", "y", "z"]]).T
-        velocities = np.stack([orbit_group[f"velocity_{p}"] for p in ["x", "y", "z"]]).T
-        reference_epoch = datetime.fromisoformat(
-            orbit_group["reference_epoch"][()].decode()
-        )
+    if is_nisar:
+        with h5py.File(h5file) as hf:
+            orbit_group = hf["/science/LSAR/GSLC//metadata/orbit"]
+            times = orbit_group["time"][:]
+            positions = orbit_group["position"][()]
+            velocities = orbit_group["velocity"][()]
+            units = orbit_group["time"].attrs["units"].decode("utf-8")
+            reference_epoch_str = units.split("since")[-1].strip()
+            reference_epoch = datetime.fromisoformat(reference_epoch_str)
+
+    else:
+        with h5py.File(h5file) as hf:
+            orbit_group = hf["/metadata/orbit"]
+            times = orbit_group["time"][:]
+            positions = np.stack(
+                [orbit_group[f"position_{p}"] for p in ["x", "y", "z"]]
+            ).T
+            velocities = np.stack(
+                [orbit_group[f"velocity_{p}"] for p in ["x", "y", "z"]]
+            ).T
+            reference_epoch = datetime.fromisoformat(
+                orbit_group["reference_epoch"][()].decode()
+            )
 
     return times, positions, velocities, reference_epoch
 
 
-def get_cslc_orbit(h5file: Filename):
+def get_cslc_orbit(h5file: Filename, is_nisar: bool = False):
     """Parse orbit info from OPERA S1 CSLC HDF5 file into an isce3.core.Orbit.
 
     `isce3` must be installed to use this function.
@@ -259,6 +308,8 @@ def get_cslc_orbit(h5file: Filename):
     ----------
     h5file : Filename
         Path to OPERA S1 CSLC HDF5 file.
+    is_nisar : bool, optional
+        if the data is nisar GSLCs
 
     Returns
     -------
@@ -268,7 +319,7 @@ def get_cslc_orbit(h5file: Filename):
     """
     from isce3.core import DateTime, Orbit, StateVector
 
-    times, positions, velocities, reference_epoch = get_orbit_arrays(h5file)
+    times, positions, velocities, reference_epoch = get_orbit_arrays(h5file, is_nisar)
     orbit_svs = []
 
     for t, x, v in zip(times, positions, velocities):
@@ -367,7 +418,10 @@ def get_cslc_polygon(
     buffer_degrees : float, optional
         Buffer the polygons by this many degrees, by default 0.0
     """
-    dset_name = f"{OPERA_IDENTIFICATION}/bounding_polygon"
+    if "NISAR" in str(opera_file):
+        dset_name = NISAR_BOUNDING_POLYGON
+    else:
+        dset_name = f"{OPERA_IDENTIFICATION}/bounding_polygon"
     with h5py.File(opera_file) as hf:
         if dset_name not in hf:
             logger.debug(f"Could not find {dset_name} in {opera_file}")
@@ -400,6 +454,7 @@ def get_union_polygon(
 def create_nodata_mask(
     opera_file_list: Sequence[Filename],
     out_file: Filename,
+    dset_name: str | None,
     buffer_pixels: int = 400,
     overwrite: bool = False,
 ):
@@ -414,6 +469,8 @@ def create_nodata_mask(
         list of COMPASS SLC filenames.
     out_file : Filename
         Output filename.
+    dset_name : str, optional
+        The name of the dataset in opera files
     buffer_pixels : int, optional
         Number of pixels to buffer the union polygon by, by default 0.
         Note that buffering will *decrease* the numba of pixels marked as nodata.
@@ -424,7 +481,6 @@ def create_nodata_mask(
     from osgeo import gdal
 
     gdal.UseExceptions()
-
     if Path(out_file).exists():
         if not overwrite:
             logger.debug(f"Skipping {out_file} since it already exists.")
@@ -434,10 +490,13 @@ def create_nodata_mask(
             Path(out_file).unlink()
 
     # Check these are the right format to get nodata polygons
-    try:
-        dataset_name = get_dataset_name(opera_file_list[-1])
-    except CslcParseError:
-        raise ValueError(f"{opera_file_list[-1]} is not a CSLC file")
+    if dset_name:
+        dataset_name = dset_name
+    else:
+        try:
+            dataset_name = get_dataset_name(opera_file_list[-1])
+        except CslcParseError:
+            raise ValueError(f"{opera_file_list[-1]} is not a CSLC file")
 
     try:
         test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"
@@ -465,7 +524,6 @@ def create_nodata_mask(
     )
     logger.info(cmd)
     subprocess.check_call(cmd, shell=True)
-
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_vector_file = Path(tmpdir) / "temp.geojson"
         with open(temp_vector_file, "w") as f:
