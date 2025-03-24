@@ -275,7 +275,7 @@ def get_orbit_arrays(
         - Time array (np.ndarray)
         - Reference datetime (datetime)
     """
-    # arse the filename to figure out if this is S1 vs NISAR
+    # Parse the filename to figure out if this is S1 vs NISAR
     parsed = parse_filename(h5file)
     sensor = str(parsed.get("sensor", ""))
     if sensor.lower().startswith("nisar"):
