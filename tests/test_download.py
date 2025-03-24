@@ -17,7 +17,8 @@ def patch_VCRHTTPResponse_version_string():
 
 
 @pytest.mark.filterwarnings(
-    "ignore:Parsing dates involving a day of month without a year specified.*:DeprecationWarning"
+    "ignore:Parsing dates involving a day of month without a year"
+    " specified.*:DeprecationWarning"
 )
 @pytest.mark.vcr()
 def test_download_filter():
