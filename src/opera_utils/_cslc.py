@@ -188,8 +188,14 @@ def get_zero_doppler_time(
     """
 
     def get_dt(in_str):
+        # Sentinel-1: datetime_format = "%Y-%m-%d %H:%M:%S.%f"
+        # NISAR: datetime_format = "%Y-%m-%dT%H:%M:%S.%f" + some extra digits
+        # The index 0:26 gets rid of those extra digits
         return datetime.strptime(in_str.decode("utf-8")[:26], datetime_format)
 
+    # This has to be the default but since we have to change in disp-s1
+    # product.py and maybe other use cases, I am leaving it as is
+    # because it depends on the type_
     dset = f"/identification/zero_doppler_{type_}_time"
     if dataset:
         dset = dataset
@@ -249,7 +255,37 @@ def get_radar_wavelength(filename: Filename) -> float:
 
 def get_orbit_arrays(
     h5file: Filename,
-    is_nisar: bool = False,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime]:
+    """Retrieve orbit arrays and timestamps from an HDF5 file.
+
+    This function parses the filename to determine the sensor type
+    (e.g., "S1" or "NISAR") and calls either `get_nisar_orbit` or
+    `get_s1_orbit` accordingly.
+
+    Parameters
+    ----------
+    h5file : Filename
+        Path to the HDF5 file containing orbit data.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray, datetime]
+        - Position array (np.ndarray)
+        - Velocity array (np.ndarray)
+        - Time array (np.ndarray)
+        - Reference datetime (datetime)
+    """
+    # arse the filename to figure out if this is S1 vs NISAR
+    parsed = parse_filename(h5file)
+    sensor = str(parsed.get("sensor", ""))
+    if sensor.lower().startswith("nisar"):
+        return get_nisar_orbit(h5file)
+    else:
+        return get_s1_orbit(h5file)
+
+
+def get_s1_orbit(
+    h5file: Filename,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime]:
     """Parse orbit info from OPERA S1 CSLC HDF5 file into python types.
 
@@ -257,8 +293,6 @@ def get_orbit_arrays(
     ----------
     h5file : Filename
         Path to OPERA S1 CSLC HDF5 file.
-    is_nisar : bool, optional
-        if the data is nisar GSLCs
 
     Returns
     -------
@@ -272,34 +306,51 @@ def get_orbit_arrays(
         Reference epoch of orbit.
 
     """
-    if is_nisar:
-        with h5py.File(h5file) as hf:
-            orbit_group = hf["/science/LSAR/GSLC//metadata/orbit"]
-            times = orbit_group["time"][:]
-            positions = orbit_group["position"][()]
-            velocities = orbit_group["velocity"][()]
-            units = orbit_group["time"].attrs["units"].decode("utf-8")
-            reference_epoch_str = units.split("since")[-1].strip()
-            reference_epoch = datetime.fromisoformat(reference_epoch_str)
-
-    else:
-        with h5py.File(h5file) as hf:
-            orbit_group = hf["/metadata/orbit"]
-            times = orbit_group["time"][:]
-            positions = np.stack(
-                [orbit_group[f"position_{p}"] for p in ["x", "y", "z"]]
-            ).T
-            velocities = np.stack(
-                [orbit_group[f"velocity_{p}"] for p in ["x", "y", "z"]]
-            ).T
-            reference_epoch = datetime.fromisoformat(
-                orbit_group["reference_epoch"][()].decode()
-            )
-
+    with h5py.File(h5file) as hf:
+        orbit_group = hf["/metadata/orbit"]
+        times = orbit_group["time"][:]
+        positions = np.stack([orbit_group[f"position_{p}"] for p in ["x", "y", "z"]]).T
+        velocities = np.stack([orbit_group[f"velocity_{p}"] for p in ["x", "y", "z"]]).T
+        reference_epoch = datetime.fromisoformat(
+            orbit_group["reference_epoch"][()].decode()
+        )
     return times, positions, velocities, reference_epoch
 
 
-def get_cslc_orbit(h5file: Filename, is_nisar: bool = False):
+def get_nisar_orbit(
+    h5file: Filename,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, datetime]:
+    """Parse orbit info from NISAR HDF5 file into python types.
+
+    Parameters
+    ----------
+    h5file : Filename
+        Path to NISAR GSLC HDF5 file.
+
+    Returns
+    -------
+    times : np.ndarray
+        Array of times in seconds since reference epoch.
+    positions : np.ndarray
+        Array of positions in meters.
+    velocities : np.ndarray
+        Array of velocities in meters per second.
+    reference_epoch : datetime
+        Reference epoch of orbit.
+
+    """
+    with h5py.File(h5file) as hf:
+        orbit_group = hf["/science/LSAR/GSLC//metadata/orbit"]
+        times = orbit_group["time"][:]
+        positions = orbit_group["position"][()]
+        velocities = orbit_group["velocity"][()]
+        units = orbit_group["time"].attrs["units"].decode("utf-8")
+        reference_epoch_str = units.split("since")[-1].strip()
+        reference_epoch = datetime.fromisoformat(reference_epoch_str)
+    return times, positions, velocities, reference_epoch
+
+
+def get_cslc_orbit(h5file: Filename):
     """Parse orbit info from OPERA S1 CSLC HDF5 file into an isce3.core.Orbit.
 
     `isce3` must be installed to use this function.
@@ -308,8 +359,6 @@ def get_cslc_orbit(h5file: Filename, is_nisar: bool = False):
     ----------
     h5file : Filename
         Path to OPERA S1 CSLC HDF5 file.
-    is_nisar : bool, optional
-        if the data is nisar GSLCs
 
     Returns
     -------
@@ -319,7 +368,7 @@ def get_cslc_orbit(h5file: Filename, is_nisar: bool = False):
     """
     from isce3.core import DateTime, Orbit, StateVector
 
-    times, positions, velocities, reference_epoch = get_orbit_arrays(h5file, is_nisar)
+    times, positions, velocities, reference_epoch = get_orbit_arrays(h5file)
     orbit_svs = []
 
     for t, x, v in zip(times, positions, velocities):
