@@ -1,8 +1,0 @@
-asf_search
-pre-commit
-pytest
-pytest-cov
-pytest-randomly
-pytest-recording
-pytest-xdist
-ruff
