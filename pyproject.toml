@@ -53,7 +53,7 @@ Changelog = "https://github.com/opera-adt/opera-utils/releases"
 [project.scripts]
 opera-utils = "opera_utils.cli:cli_app"
 
-# extra requirements: `pip install .[docs]` or `pip install .[docs]`
+# extra requirements: `pip install .[docs]` or `pip install .[test]`
 [project.optional-dependencies]
 test = [
   "asf_search",

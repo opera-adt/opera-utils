@@ -14,8 +14,6 @@ repos:
         args: [--allow-multiple-documents]
       - id: debug-statements
       - id: end-of-file-fixer
-      - id: file-contents-sorter
-        files: (requirements.txt)$
       - id: mixed-line-ending
       - id: trailing-whitespace
 
