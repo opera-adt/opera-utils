@@ -51,7 +51,7 @@ jobs:
               - conda-forge
       - name: Install
         run: |
-          pip install --no-deps .[test]
+          pip install .[test]
       - name: Test
         run: |
           pytest -n0
