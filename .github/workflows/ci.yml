@@ -51,10 +51,7 @@ jobs:
               - conda-forge
       - name: Install
         run: |
-          pip install --no-deps .
-      - name: Install test dependencies
-        run: |
-          micromamba install -f tests/requirements.txt -c conda-forge
+          pip install .[test]
       - name: Test
         run: |
           pytest -n0

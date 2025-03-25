@@ -19,17 +19,29 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python",
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
 license = { file = "LICENSE.txt" }
 
+dependencies = [
+  "click>=7.0",
+  "h5py>=1.10",
+  "numpy>=1.24",
+  "pooch>=1.7",
+  "pyproj>=3.3",
+  "shapely>=1.8",
+  "typing_extensions>=4",
+]
+
+
 # The version will be written into a version.py upon install, auto-generated
 # see section: setuptools_scm
 # https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html#dynamic-metadata
 # dependencies will be read from text files
-dynamic = ["version", "dependencies", "optional-dependencies"]
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/opera-adt/opera-utils"
@@ -41,14 +53,29 @@ Changelog = "https://github.com/opera-adt/opera-utils/releases"
 [project.scripts]
 opera-utils = "opera_utils.cli:cli_app"
 
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
-
-# extra requirements: `pip install .[docs]` or `pip install .[docs]`
-[tool.setuptools.dynamic.optional-dependencies.docs]
-file = ["docs/requirements.txt"]
-[tool.setuptools.dynamic.optional-dependencies.test]
-file = ["tests/requirements.txt"]
+# extra requirements: `pip install .[docs]` or `pip install .[test]`
+[project.optional-dependencies]
+test = [
+  "asf_search",
+  "pre-commit",
+  "pytest",
+  "pytest-cov",
+  "pytest-randomly",
+  "pytest-recording",
+  "pytest-xdist",
+  "ruff",
+]
+docs = [
+  "mkdocs",
+  "mkdocs-gen-files",
+  "mkdocs-jupyter",
+  "mkdocs-literate-nav",
+  "mkdocs-material",
+  "mkdocs-section-index",
+  "mkdocstrings[python]",
+  "pybtex",               # for mdx_bib
+  "pymdown-extensions",
+]
 
 [tool.setuptools_scm]
 # https://github.com/pypa/setuptools_scm#configuration-parameters
