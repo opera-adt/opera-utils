@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 import requests
 
+from opera_utils.disp._product import DispProduct
+
 logger = logging.getLogger("opera_utils")
 
 
@@ -22,23 +24,23 @@ class Granule:
 
     Attributes
     ----------
-    frame_id : int
-        The frame number of the granule.
+    product : DispProduct
+        The product information.
     url : str
         URL (https or s3) containing granule download location.
+    frame_id : int
+        The frame number of the granule.
     orbit_pass : OrbitPass
         The orbit direction ("ASCENDING" or "DESCENDING").
-    start : datetime
+    reference_datetime : datetime
         The beginning date/time of the granule.
-    end : datetime
+    secondary_datetime : datetime
         The ending date/time of the granule.
     """
 
-    frame_id: int
+    product: DispProduct
     url: str
     orbit_pass: OrbitPass
-    start: datetime
-    end: datetime
 
     @classmethod
     def from_umm(
@@ -66,24 +68,31 @@ class Granule:
         ValueError
             If required temporal extent data is missing.
         """
+        from ._product import DispProduct
+
         url = get_download_url(umm_data, protocol=url_type)
+        product = DispProduct.from_filename(url)
         additional_attributes = umm_data.get("AdditionalAttributes", [])
-        frame_id_str = _get_attr(additional_attributes, "FRAME_NUMBER")
         orbit_pass = OrbitPass(
             _get_attr(additional_attributes, "ASCENDING_DESCENDING").upper()
         )
-        temporal_extent = umm_data.get("TemporalExtent", {}).get("RangeDateTime", {})
-        begin_str = temporal_extent.get("BeginningDateTime")
-        end_str = temporal_extent.get("EndingDateTime")
-        if begin_str is None or end_str is None:
-            raise ValueError("Missing temporal extent data")
         return cls(
-            frame_id=int(frame_id_str),
+            product=product,
             url=url,
             orbit_pass=orbit_pass,
-            start=datetime.fromisoformat(begin_str),
-            end=datetime.fromisoformat(end_str),
         )
+
+    @property
+    def frame_id(self) -> int:
+        return self.product.frame_id
+
+    @property
+    def reference_datetime(self) -> datetime:
+        return self.product.reference_datetime
+
+    @property
+    def secondary_datetime(self) -> datetime:
+        return self.product.secondary_datetime
 
 
 def get_download_url(
@@ -198,4 +207,5 @@ def get_products(
 if __name__ == "__main__":
     import tyro
 
-    tyro.cli(get_products)
+    for granule in sorted(tyro.cli(get_products), key=lambda g: (g.frame_id,)):
+        print(granule.url)
