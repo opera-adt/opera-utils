@@ -46,3 +46,16 @@ NISAR_FILE_REGEX = (
 # https://github.com/opera-adt/COMPASS/blob/16a3c1da2a5db69b9e2007d798a1110d3a6c5f9f/src/compass/utils/runconfig.py#L316-L318
 # {burst_id_str}_{date_str}
 COMPASS_FILE_REGEX = r"(?P<burst_id>t\d{3}_\d+_iw\d)_(?P<start_datetime>\d{8}).h5"
+
+# OPERA_L3_DISP-S1_IW_F11116_VV_20160705T140755Z_20160729T140756Z_v1.0_20241219T231545Z.nc
+DISP_FILE_REGEX = re.compile(
+    "OPERA_L3_DISP-"
+    r"(?P<sensor>(S1|NI))_"
+    r"(?P<acquisition_mode>IW)_"  # TODO: What's NISAR's?
+    r"F(?P<frame_id>\d{5})_"
+    r"(?P<polarization>(VV|HH))_"
+    r"(?P<reference_datetime>\d{8}T\d{6}Z)_"
+    r"(?P<secondary_datetime>\d{8}T\d{6}Z)_"
+    r"v(?P<version>[\d.]+)_"
+    r"(?P<generation_datetime>\d{8}T\d{6}Z)",
+)
