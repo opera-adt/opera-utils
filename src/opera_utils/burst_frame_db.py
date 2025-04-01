@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 import zipfile
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
 
 from . import datasets
 from ._types import Bbox, PathOrStr
 from .bursts import normalize_burst_id
+
+if TYPE_CHECKING:
+    import geopandas
 
 
 def read_zipped_json(filename: PathOrStr):
@@ -58,7 +61,7 @@ def get_frame_to_burst_mapping(
 def get_frame_geojson(
     frame_ids: Optional[Sequence[int | str]] = None,
     as_geodataframe: bool = False,
-) -> dict:
+) -> dict | geopandas.GeoDataFrame:
     """Get the GeoJSON for the frame geometries."""
     data = _get_geojson(
         datasets.fetch_frame_geometries_simple(),
@@ -82,7 +85,7 @@ def get_frame_geojson(
 def get_burst_id_geojson(
     burst_ids: Optional[Sequence[str]] = None,
     as_geodataframe: bool = False,
-) -> dict:
+) -> dict | geopandas.GeoDataFrame:
     """Get the GeoJSON for the burst_id geometries."""
     data = _get_geojson(
         datasets.fetch_burst_id_geometries_simple(),
@@ -96,8 +99,6 @@ def get_burst_id_geojson(
     if isinstance(burst_ids, str):
         burst_ids = [burst_ids]
     if as_geodataframe:
-        import geopandas
-
         assert isinstance(data, geopandas.GeoDataFrame)
         return data[data.burst_id_jpl.isin(tuple(burst_ids))]
     # Manually filter for the case of no geopandas
@@ -112,22 +113,33 @@ def get_burst_id_geojson(
 
 
 def _get_geojson(
-    f,
+    f: PathOrStr,
     as_geodataframe: bool = False,
     fids: Sequence[str | int] | None = None,
     index_name: Optional[str] = None,
-) -> dict:
+) -> dict | geopandas.GeoDataFrame:
     # https://gdal.org/user/ogr_sql_dialect.html#where
     # https://pyogrio.readthedocs.io/en/latest/introduction.html#filter-records-by-attribute-value
     if as_geodataframe:
-        from pyogrio import read_dataframe
-
-        gdf = read_dataframe(f, layer=None, fid_as_index=True, fids=fids)
-        if index_name:
-            gdf.index.name = index_name
-        return gdf
+        return _get_frame_geodataframe(fids)
 
     return read_zipped_json(f)
+
+
+def _get_frame_geodataframe(
+    frame_ids: Optional[Sequence[int | str]] = None,
+    json_file: Optional[PathOrStr] = None,
+    index_name: Optional[str] = None,
+) -> geopandas.GeoDataFrame:
+    from pyogrio import read_dataframe
+
+    if json_file is None:
+        json_file = datasets.fetch_frame_geometries_simple()
+
+    gdf = read_dataframe(json_file, layer=None, fid_as_index=True, fids=frame_ids)
+    if index_name:
+        gdf.index.name = index_name
+    return gdf
 
 
 def get_frame_bbox(
@@ -229,3 +241,21 @@ def get_frame_ids_for_burst(
     """
     burst_data = get_burst_to_frame_mapping(burst_id, json_file)
     return burst_data["frame_ids"]
+
+
+def get_intersecting_frames(bounds: Bbox, ids_only: bool = False) -> list[int]:
+    """Get the frame IDs that intersect with the given bounds."""
+    from shapely.geometry import box
+
+    try:
+        # gdf[gdf.geometry.intersects(Point(-123, 32))]
+        # gdf = opera_utils.get_frame_geojson(as_geodataframe=True)
+        gdf = _get_frame_geodataframe(index_name="frame_id")
+    except ImportError as e:
+        # TODO: decide if this is worth supporting without geopandas
+        raise ImportError("geopandas is required for this function") from e
+
+    frames = gdf[gdf.geometry.intersects(box(*bounds))]
+    if ids_only:
+        return frames.index.tolist()
+    return frames.to_json()
