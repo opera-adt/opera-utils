@@ -55,6 +55,8 @@ opera-utils = "opera_utils.cli:cli_app"
 
 # extra requirements: `pip install .[docs]` or `pip install .[test]`
 [project.optional-dependencies]
+geopandas = ["geopandas-base", "pyogrio"]
+
 test = [
   "asf_search",
   "pre-commit",
@@ -64,6 +66,8 @@ test = [
   "pytest-recording",
   "pytest-xdist",
   "ruff",
+  "geopandas-base",
+  "pyogrio",
 ]
 docs = [
   "mkdocs",
