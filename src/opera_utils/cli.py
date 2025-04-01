@@ -13,7 +13,7 @@ from ._types import Bbox
 from .burst_frame_db import get_frame_bbox
 
 
-@click.group()
+@click.group(name="opera-utils")
 @click.version_option()
 @click.option("--debug", is_flag=True, default=False)
 @click.pass_context
