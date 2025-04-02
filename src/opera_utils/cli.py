@@ -82,11 +82,11 @@ def intersects(
 ):
     """Get the frames that intersect with the given bounding box."""
     geom = Bbox(point[0], point[1], point[0], point[1]) if point else Bbox(*bbox)
-    frames = burst_frame_db.get_intersecting_frames(geom, ids_only=ids_only)
+    frames = burst_frame_db.get_intersecting_frames(geom)
     if ids_only:
-        click.echo("\n".join(map(str, frames)))
+        click.echo("\n".join([f["id"] for f in frames["features"]]))
     else:
-        click.echo(frames)
+        click.echo(json.dumps(frames))
 
 
 @disp_s1.command()
