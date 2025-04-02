@@ -262,7 +262,7 @@ def test_get_frame_to_burst_mapping(mock_dataset_files):
     ):
         result = burst_frame_db.get_frame_to_burst_mapping(1)
 
-        assert result["frame_id"] == 1
+        assert result["epsg"] == 32631
         assert "t001_000001_iw1" in result["burst_ids"]
         assert "t001_000001_iw2" in result["burst_ids"]
         assert "t001_000001_iw3" in result["burst_ids"]
@@ -274,10 +274,9 @@ def test_get_burst_to_frame_mapping(mock_dataset_files):
         "opera_utils.datasets.fetch_burst_to_frame_mapping_file",
         return_value=mock_dataset_files["burst_map"],
     ):
-        result = burst_frame_db.get_burst_to_frame_mapping("t001_000001_iw1")
+        result = burst_frame_db.get_burst_to_frame_mapping("t001_000008_iw3")
 
-        assert result["burst_id"] == "t001_000001_iw1"
-        assert 1 in result["frame_ids"]
+        assert result["frame_ids"] == [1]
 
 
 def test_get_frame_bbox(mock_dataset_files):
@@ -305,8 +304,8 @@ def test_get_burst_ids_for_frame(mock_dataset_files):
 
         assert "t001_000001_iw1" in burst_ids
         assert "t001_000001_iw2" in burst_ids
-        assert "t001_000001_iw3" in burst_ids
-        assert len(burst_ids) == 3
+        assert "t001_000008_iw3" in burst_ids
+        assert len(burst_ids) == 27
 
 
 def test_get_frame_ids_for_burst(mock_dataset_files):
@@ -315,7 +314,7 @@ def test_get_frame_ids_for_burst(mock_dataset_files):
         "opera_utils.datasets.fetch_burst_to_frame_mapping_file",
         return_value=mock_dataset_files["burst_map"],
     ):
-        frame_ids = burst_frame_db.get_frame_ids_for_burst("t001_000001_iw1")
+        frame_ids = burst_frame_db.get_frame_ids_for_burst("t001_000009_iw1")
 
         assert 1 in frame_ids
         assert 2 in frame_ids
@@ -352,10 +351,10 @@ def test_get_burst_geojson_dict(mock_dataset_files):
 
         # Test filtering
         result = burst_frame_db.get_burst_id_geojson(
-            ["t087_179760_iw2"], as_geodataframe=False
+            ["t001_000001_iw1"], as_geodataframe=False
         )
         assert len(result["features"]) == 1
-        assert result["features"][0]["properties"]["burst_id_jpl"] == "t087_179760_iw2"
+        assert result["features"][0]["properties"]["burst_id_jpl"] == "t001_000001_iw1"
 
 
 # Tests that require geopandas
