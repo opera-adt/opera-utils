@@ -7,10 +7,13 @@ import logging
 
 import click
 
+from opera_utils import burst_frame_db
+
+from ._types import Bbox
 from .burst_frame_db import get_frame_bbox
 
 
-@click.group()
+@click.group(name="opera-utils")
 @click.version_option()
 @click.option("--debug", is_flag=True, default=False)
 @click.pass_context
@@ -18,10 +21,25 @@ def cli_app(ctx, debug):
     """opera-utils command-line interface."""
     level = logging.DEBUG if debug else logging.INFO
     handler = logging.StreamHandler()
-    logging.basicConfig(level=level, handlers=[handler])
+    logger = logging.getLogger("opera_utils")
+    logger.setLevel(level)
+    logger.addHandler(handler)
 
 
-@cli_app.command()
+@cli_app.group()
+@click.pass_context
+def disp_s1(ctx):
+    """Tools for working with DISP-S1 data."""
+    pass
+
+
+@cli_app.group()
+@click.pass_context
+def disp_nisar(ctx):
+    """Tools for working with DISP-NISAR data."""
+
+
+@disp_s1.command()
 @click.argument("frame_id")
 @click.option(
     "--latlon",
@@ -36,7 +54,7 @@ def cli_app(ctx, debug):
     help="Output only (left, bottom, right, top) and omit EPSG",
 )
 def frame_bbox(frame_id, latlon: bool, bounds_only: bool):
-    """Look up the EPSG/bounding box for FRAME_ID.
+    """Look up the DISP-S1 EPSG/bounding box for FRAME_ID.
 
     Outputs as JSON string to stdout like
     {"epsg": 32618, "bbox": [157140.0, 4145220.0, 440520.0, 4375770.0]}
@@ -55,7 +73,23 @@ def frame_bbox(frame_id, latlon: bool, bounds_only: bool):
         click.echo(json.dumps(obj))
 
 
-@cli_app.command()
+@disp_s1.command()
+@click.option("--bbox", type=float, nargs=4)
+@click.option("--point", type=float, nargs=2)
+@click.option("--ids-only", is_flag=True, default=False)
+def intersects(
+    bbox: tuple[float, float, float, float], point: tuple[float, float], ids_only: bool
+):
+    """Get the frames that intersect with the given bounding box."""
+    geom = Bbox(point[0], point[1], point[0], point[1]) if point else Bbox(*bbox)
+    frames = burst_frame_db.get_intersecting_frames(geom, ids_only=ids_only)
+    if ids_only:
+        click.echo("\n".join(map(str, frames)))
+    else:
+        click.echo(frames)
+
+
+@disp_s1.command()
 @click.argument("namelist", type=click.File("r"))
 @click.option(
     "--write-options/--no-write-options",
@@ -75,7 +109,7 @@ def frame_bbox(frame_id, latlon: bool, bounds_only: bool):
 def missing_data_options(
     namelist, write_options: bool, output_prefix: str, max_options: int
 ):
-    """Get a list of options for how to handle missing data.
+    """Get a list of options for how to handle missing S1 data.
 
     Prints a table of options to stdout, and writes the subset
     of files to disk for each option with names like
