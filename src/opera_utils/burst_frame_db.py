@@ -251,22 +251,6 @@ def get_burst_geodataframe(
     return gdf
 
 
-def _get_frame_geodataframe(
-    frame_ids: Optional[Sequence[int | str]] = None,
-    json_file: Optional[PathOrStr] = None,
-    index_name: Optional[str] = None,
-) -> geopandas.GeoDataFrame:
-    from pyogrio import read_dataframe
-
-    if json_file is None:
-        json_file = datasets.fetch_frame_geometries_simple()
-
-    gdf = read_dataframe(json_file, layer=None, fid_as_index=True, fids=frame_ids)
-    if index_name:
-        gdf.index.name = index_name
-    return gdf
-
-
 def get_frame_bbox(
     frame_id: int, json_file: Optional[PathOrStr] = None
 ) -> tuple[int, Bbox]:
@@ -378,9 +362,8 @@ def get_intersecting_frames(bounds: Bbox) -> dict:
 
     Returns
     -------
-    list[int] or str
-        If ids_only is True, returns a list of frame IDs.
-        If ids_only is False, returns GeoJSON string.
+    dict
+        Returns a GeoJSON dict object.
 
     """
     try:
