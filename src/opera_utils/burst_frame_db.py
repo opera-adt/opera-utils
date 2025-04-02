@@ -72,7 +72,6 @@ def get_frame_to_burst_mapping(
     return js["data"][str(frame_id)]
 
 
-# Using overload for type stability
 @overload
 def get_frame_geojson(
     frame_ids: Optional[Sequence[int | str]] = None,
