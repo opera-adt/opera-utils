@@ -141,8 +141,8 @@ def test_intersects_bad_bbox_count(runner):
     assert "Error: Option '--bbox' requires 4 arguments" in result.output
 
 
-def test_intersects_point_functional_geojson(runner):
-    """Verify functional output for a specific point intersection (GeoJSON)."""
+def test_intersects_point_geojson(runner):
+    """Verify output for a specific point intersection (GeoJSON)."""
     point = ["-114", "31"]  # Longitude, Latitude as strings for CLI
     expected_ids = {
         "24724",
@@ -190,8 +190,8 @@ def test_intersects_point_functional_geojson(runner):
     ), f"Expected IDs {expected_ids}, but found {actual_ids}"
 
 
-def test_intersects_point_functional_ids_only(runner):
-    """Verify functional output for a specific point intersection (--ids-only)."""
+def test_intersects_point_ids_only(runner):
+    """Verify output for a specific point intersection (--ids-only)."""
     point = ["-114", "31"]  # Longitude, Latitude as strings for CLI
     expected_ids = {
         "24724",

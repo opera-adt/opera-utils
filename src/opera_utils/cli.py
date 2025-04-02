@@ -86,7 +86,7 @@ def intersects(
     if ids_only:
         click.echo("\n".join([f["id"] for f in frames["features"]]))
     else:
-        click.echo(frames)
+        click.echo(json.dumps(frames))
 
 
 @disp_s1.command()
