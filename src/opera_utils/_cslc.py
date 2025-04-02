@@ -277,8 +277,8 @@ def get_orbit_arrays(
     """
     # Parse the filename to figure out if this is S1 vs NISAR
     parsed = parse_filename(h5file)
-    sensor = str(parsed.get("sensor", ""))
-    if sensor.lower().startswith("nisar"):
+    project = str(parsed.get("project", ""))
+    if project.lower().startswith("nisar"):
         return get_nisar_orbit(h5file)
     else:
         return get_s1_orbit(h5file)

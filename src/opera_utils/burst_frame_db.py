@@ -13,6 +13,7 @@ from .bursts import normalize_burst_id
 if TYPE_CHECKING:
     import geopandas
 
+
 GeojsonOrGdf = Union[dict, "geopandas.GeoDataFrame"]
 
 # Check if geopandas is available
@@ -165,7 +166,6 @@ def get_burst_id_geojson(
 
     if isinstance(burst_ids, str):
         burst_ids = [burst_ids]
-
     # Manually filter for the case of no geopandas
     return {
         **data,
@@ -248,6 +248,22 @@ def get_burst_geodataframe(
             burst_ids = [burst_ids]
         return gdf[gdf.burst_id_jpl.isin(tuple(burst_ids))]
 
+    return gdf
+
+
+def _get_frame_geodataframe(
+    frame_ids: Optional[Sequence[int | str]] = None,
+    json_file: Optional[PathOrStr] = None,
+    index_name: Optional[str] = None,
+) -> geopandas.GeoDataFrame:
+    from pyogrio import read_dataframe
+
+    if json_file is None:
+        json_file = datasets.fetch_frame_geometries_simple()
+
+    gdf = read_dataframe(json_file, layer=None, fid_as_index=True, fids=frame_ids)
+    if index_name:
+        gdf.index.name = index_name
     return gdf
 
 
