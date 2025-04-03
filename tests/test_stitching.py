@@ -1,4 +1,5 @@
 import datetime
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,14 @@ from opera_utils import stitching
 from opera_utils._types import Bbox
 
 gdal.UseExceptions()
+
+
+@pytest.fixture(autouse=True)
+def suppress_geopandas_deprecation():
+    """Pytest fixture to suppress geopandas deprecation warnings in tests."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=DeprecationWarning)
+        yield
 
 
 @pytest.fixture(scope="session")
