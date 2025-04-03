@@ -50,15 +50,17 @@ class DispProduct:
         ValueError
             If the filename format is invalid.
         """
+
+        def _to_datetime(dt: str) -> datetime:
+            return datetime.fromisoformat(dt.replace("Z", "+00:00"))
+
         if not (match := DISP_FILE_REGEX.match(Path(name).name)):
             raise ValueError(f"Invalid filename format: {name}")
 
         data: dict[str, Any] = match.groupdict()
-        data["reference_datetime"] = datetime.fromisoformat(data["reference_datetime"])
-        data["secondary_datetime"] = datetime.fromisoformat(data["secondary_datetime"])
-        data["generation_datetime"] = datetime.fromisoformat(
-            data["generation_datetime"]
-        )
+        data["reference_datetime"] = _to_datetime(data["reference_datetime"])
+        data["secondary_datetime"] = _to_datetime(data["secondary_datetime"])
+        data["generation_datetime"] = _to_datetime(data["generation_datetime"])
         data["frame_id"] = int(data["frame_id"])
 
         return cls(filename=name, **data)
