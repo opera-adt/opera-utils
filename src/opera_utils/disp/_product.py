@@ -90,7 +90,7 @@ class DispProduct:
         return self._coordinates[1]
 
     def get_rasterio_profile(self, chunks: tuple[int, int] = (256, 256)) -> dict:
-        from rasterio.transform import Affine
+        from rasterio import transform
 
         profile = {
             "driver": "GTiff",
@@ -107,7 +107,7 @@ class DispProduct:
         left, bottom, right, top = self._frame_bbox_result[1]
         profile["width"] = self.shape[1]
         profile["height"] = self.shape[0]
-        profile["transform"] = Affine.from_bounds(
+        profile["transform"] = transform.from_bounds(
             left, bottom, right, top, self.shape[1], self.shape[0]
         )
         profile["crs"] = f"EPSG:{self.epsg}"
@@ -121,6 +121,8 @@ class DispProductStack:
     products: list[DispProduct]
 
     def __post_init__(self) -> None:
+        if len(self.products) == 0:
+            raise ValueError("At least one product is required")
         if len(set(p.frame_id for p in self.products)) != 1:
             raise ValueError("All products must have the same frame_id")
         # Check for duplicates
