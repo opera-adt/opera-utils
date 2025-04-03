@@ -17,6 +17,7 @@ Usage:
 import threading
 from datetime import datetime
 from pathlib import Path
+from typing import Sequence
 
 import numpy as np
 import tyro
@@ -24,11 +25,29 @@ from dolphin import io
 from dolphin.utils import flatten, format_dates
 from tqdm.auto import trange
 
-from ._product import DispProduct
+from ._product import DispProductStack
 
 CORRECTION_DATASETS = [
     "/corrections/solid_earth_tide",
     "/corrections/ionospheric_delay",
+]
+
+SAME_PER_MINISTACK_DATASETS = [
+    "temporal_coherence",
+    "/phase_similarity",
+    "shp_counts",
+]
+QUALITY_DATASETS = [
+    "timeseries_inversion_residuals",
+    "connected_component_labels",
+    "recommended_mask",
+    # "estimated_phase_quality" TODO: skip always?
+]
+UNIQUE_PER_DATE_DATASETS = [
+    "displacement",
+    "timeseries_inversion_residuals",
+    "connected_component_labels",
+    "recommended_mask",
 ]
 
 
@@ -45,20 +64,21 @@ def _make_gtiff_output_paths(output_dir: Path, all_dates: list[datetime], datase
 
 
 def rereference(
-    output_dir: Path,
-    nc_files: list[Path | str],
+    output_dir: Path | str,
+    nc_files: Sequence[Path | str],
     dataset: str = "displacement",
     apply_corrections: bool = True,
     nodata: float = np.nan,
+    batch_depth: int = 15,
     keep_bits: int = 9,
-):
+) -> None:
     """Create a single-reference stack from a list of OPERA displacement files.
 
     Parameters
     ----------
-    output_dir : str
+    output_dir : Path or str
         File path to the output directory.
-    nc_files : list[str]
+    nc_files : list[Path | str]
         One or more netCDF files, each containing a 'displacement' dataset
         for a reference_date -> secondary_date interferogram.
     dataset : str
@@ -77,13 +97,9 @@ def rereference(
         Default is 9.
 
     """
-    ifg_date_pairs = []
-    for f in nc_files:
-        dp = DispProduct.from_filename(f)
-        ifg_date_pairs.append((dp.reference_datetime, dp.secondary_datetime))
-
+    products = DispProductStack.from_file_list(nc_files)
     # Flatten all dates, find unique sorted list of SAR epochs
-    all_dates = sorted(set(flatten(ifg_date_pairs)))
+    all_dates = sorted(set(flatten(products.ifg_date_pairs)))
 
     # open a GDAL dataset for the first file just to get the shape/geoinformation
     # All netCDF files for a frame are on the same grid.
@@ -92,7 +108,7 @@ def rereference(
 
     # Create the main displacement dataset.
     output_paths = _make_gtiff_output_paths(
-        output_dir,
+        Path(output_dir),
         all_dates=all_dates,
         dataset=dataset,  # like_filename=gdal_str,
     )
@@ -110,12 +126,24 @@ def rereference(
     else:
         corrections_readers = []
 
+    # encoding = {
+    #         dataset: {
+    #             "chunks": (-1, 256, 256),
+    #             "compressor": zarr.Blosc(
+    #                 cname="zstd", clevel=3, shuffle=zarr.Blosc.BITSHUFFLE
+    #             ),
+    #         } for dataset in UNIQUE_PER_DATE_DATASETS
+    #     }
+    # out_slim.to_zarr("aligned.zarr", mode="w", encoding=encoding, consolidated=True)
+
     num_dates = len(nc_files)
     # Make a "cumulative offset" which adds up the phase each time theres a reference
     # date changeover.
-    cumulative_offset = np.zeros((nrows, ncols), dtype=np.float32)
-    last_displacement = np.zeros((nrows, ncols), dtype=np.float32)
-    last_reference_date = ifg_date_pairs[0][0]
+    out_shape = (1 + num_dates, nrows, ncols)  # Keep a 0s raster of (ref, ref)
+    batch_shape = (batch_depth, nrows, ncols)
+    cumulative_offset = np.zeros(batch_shape, dtype=np.float32)
+    last_displacement = np.zeros(batch_shape, dtype=np.float32)
+    latest_reference_date = ifg_date_pairs[0][0]
 
     write_threads = []
     for idx in trange(num_dates, desc="Summing dates"):
@@ -129,11 +157,11 @@ def rereference(
             current_displacement -= np.squeeze(r[idx, :, :])
 
         cur_ref, cur_sec = ifg_date_pairs[idx]
-        if cur_ref != last_reference_date:
+        if cur_ref != latest_reference_date:
             # e.g. we had (1,2), (1,3), now we hit (3,4)
             # So to write out (1,4), we need to add the running total
             # to the current displacement
-            last_reference_date = cur_ref
+            latest_reference_date = cur_ref
             cumulative_offset += last_displacement
         last_displacement = current_displacement
 
