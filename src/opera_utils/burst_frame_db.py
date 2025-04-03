@@ -1,16 +1,33 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import zipfile
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Union, overload
 
 from . import datasets
 from ._types import Bbox, PathOrStr
 from .bursts import normalize_burst_id
 
+if TYPE_CHECKING:
+    import geopandas
 
-def read_zipped_json(filename: PathOrStr):
+
+GeojsonOrGdf = Union[dict, "geopandas.GeoDataFrame"]
+
+# Check if geopandas is available
+_has_geopandas = False
+try:
+    import geopandas
+
+    if importlib.util.find_spec("pyogrio"):
+        _has_geopandas = True
+except ImportError:
+    pass
+
+
+def read_zipped_json(filename: PathOrStr) -> dict:
     """Read a zipped JSON file and returns its contents as a dictionary.
 
     Parameters
@@ -55,19 +72,47 @@ def get_frame_to_burst_mapping(
     return js["data"][str(frame_id)]
 
 
+@overload
+def get_frame_geojson(
+    frame_ids: Optional[Sequence[int | str]] = None,
+    as_geodataframe: Literal[True] = True,
+) -> "geopandas.GeoDataFrame": ...
+
+
+@overload
+def get_frame_geojson(
+    frame_ids: Optional[Sequence[int | str]] = None,
+    as_geodataframe: Literal[False] = False,
+) -> dict: ...
+
+
 def get_frame_geojson(
     frame_ids: Optional[Sequence[int | str]] = None,
     as_geodataframe: bool = False,
-) -> dict:
-    """Get the GeoJSON for the frame geometries."""
-    data = _get_geojson(
-        datasets.fetch_frame_geometries_simple(),
-        as_geodataframe=as_geodataframe,
-        fids=frame_ids,
-        index_name="frame_id",
-    )
-    if as_geodataframe or not frame_ids:
-        # `as_geodataframe` means it's already filtered
+    json_file: Optional[PathOrStr] = None,
+) -> GeojsonOrGdf:
+    """Get the GeoJSON or GeoDataFrame for the frame geometries.
+
+    Parameters
+    ----------
+    frame_ids : Sequence[int | str], optional
+        Frame IDs to filter by. If None, returns all frames.
+    as_geodataframe : bool, default=False
+        If True, returns a GeoDataFrame. If False, returns a GeoJSON dict.
+    json_file : PathOrStr, optional
+        The path to the JSON file containing the frame geometries.
+        If None, uses the default file from datasets.
+
+    Returns
+    -------
+    dict or geopandas.GeoDataFrame
+        Frame geometries as GeoJSON or GeoDataFrame.
+    """
+    if as_geodataframe:
+        return get_frame_geodataframe(frame_ids, json_file=json_file)
+
+    data = read_zipped_json(datasets.fetch_frame_geometries_simple())
+    if not frame_ids:
         return data
 
     # Manually filter for the case of no geopandas
@@ -79,27 +124,47 @@ def get_frame_geojson(
     }
 
 
+@overload
+def get_burst_id_geojson(
+    burst_ids: Optional[Sequence[str]] = None,
+    as_geodataframe: Literal[True] = True,
+) -> "geopandas.GeoDataFrame": ...
+
+
+@overload
+def get_burst_id_geojson(
+    burst_ids: Optional[Sequence[str]] = None,
+    as_geodataframe: Literal[False] = False,
+) -> dict: ...
+
+
 def get_burst_id_geojson(
     burst_ids: Optional[Sequence[str]] = None,
     as_geodataframe: bool = False,
-) -> dict:
-    """Get the GeoJSON for the burst_id geometries."""
-    data = _get_geojson(
-        datasets.fetch_burst_id_geometries_simple(),
-        as_geodataframe=as_geodataframe,
-        fids=burst_ids,
-        index_name="burst_id_jpl",
-    )
+) -> GeojsonOrGdf:
+    """Get the GeoJSON or GeoDataFrame for the burst_id geometries.
+
+    Parameters
+    ----------
+    burst_ids : Sequence[str], optional
+        Burst IDs to filter by. If None, returns all bursts.
+    as_geodataframe : bool, default=False
+        If True, returns a GeoDataFrame. If False, returns a GeoJSON dict.
+
+    Returns
+    -------
+    dict or geopandas.GeoDataFrame
+        Burst geometries as GeoJSON or GeoDataFrame.
+    """
+    if as_geodataframe:
+        return get_burst_geodataframe(burst_ids)
+
+    data = read_zipped_json(datasets.fetch_burst_id_geometries_simple())
     if not burst_ids:
         return data
 
     if isinstance(burst_ids, str):
         burst_ids = [burst_ids]
-    if as_geodataframe:
-        import geopandas
-
-        assert isinstance(data, geopandas.GeoDataFrame)
-        return data[data.burst_id_jpl.isin(tuple(burst_ids))]
     # Manually filter for the case of no geopandas
     return {
         **data,
@@ -111,23 +176,78 @@ def get_burst_id_geojson(
     }
 
 
-def _get_geojson(
-    f,
-    as_geodataframe: bool = False,
-    fids: Sequence[str | int] | None = None,
-    index_name: Optional[str] = None,
-) -> dict:
-    # https://gdal.org/user/ogr_sql_dialect.html#where
-    # https://pyogrio.readthedocs.io/en/latest/introduction.html#filter-records-by-attribute-value
-    if as_geodataframe:
+def get_frame_geodataframe(
+    frame_ids: Optional[Sequence[int | str]] = None,
+    json_file: Optional[PathOrStr] = None,
+) -> "geopandas.GeoDataFrame":
+    """Get frame geometries as a GeoDataFrame.
+
+    Parameters
+    ----------
+    frame_ids : Sequence[int | str], optional
+        Frame IDs to filter by. If None, returns all frames.
+    json_file : PathOrStr, optional
+        The path to the JSON file containing the frame geometries.
+        If None, uses the default file from datasets.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        Frame geometries as a GeoDataFrame.
+    """
+    try:
         from pyogrio import read_dataframe
+    except ImportError as e:
+        raise ImportError(
+            "geopandas and pyogrio are required for GeoDataFrame support"
+        ) from e
 
-        gdf = read_dataframe(f, layer=None, fid_as_index=True, fids=fids)
-        if index_name:
-            gdf.index.name = index_name
-        return gdf
+    if json_file is None:
+        json_file = datasets.fetch_frame_geometries_simple()
 
-    return read_zipped_json(f)
+    gdf = read_dataframe(json_file, layer=None, fid_as_index=True, fids=frame_ids)
+    gdf.index.name = "frame_id"
+    return gdf
+
+
+def get_burst_geodataframe(
+    burst_ids: Optional[Sequence[str]] = None,
+    json_file: Optional[PathOrStr] = None,
+) -> "geopandas.GeoDataFrame":
+    """Get burst geometries as a GeoDataFrame.
+
+    Parameters
+    ----------
+    burst_ids : Sequence[str], optional
+        Burst IDs to filter by. If None, returns all bursts.
+    json_file : PathOrStr, optional
+        The path to the JSON file containing the burst geometries.
+        If None, uses the default file from datasets.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        Burst geometries as a GeoDataFrame.
+    """
+    try:
+        from pyogrio import read_dataframe
+    except ImportError as e:
+        raise ImportError(
+            "geopandas and pyogrio are required for GeoDataFrame support"
+        ) from e
+
+    if json_file is None:
+        json_file = datasets.fetch_burst_id_geometries_simple()
+
+    gdf = read_dataframe(json_file, layer=None)
+    gdf.index.name = "burst_id_jpl"
+
+    if burst_ids:
+        if isinstance(burst_ids, str):
+            burst_ids = [burst_ids]
+        return gdf[gdf.burst_id_jpl.isin(tuple(burst_ids))]
+
+    return gdf
 
 
 def get_frame_bbox(
@@ -169,7 +289,7 @@ def get_burst_ids_for_frame(
     Parameters
     ----------
     frame_id : int
-        The ID of the frame to get the bounding box for.
+        The ID of the frame to get the burst IDs for.
     json_file : PathOrStr, optional
         The path to the JSON file containing the frame-to-burst mapping.
         If `None`, fetches the remote zip file from `datasets`
@@ -229,3 +349,29 @@ def get_frame_ids_for_burst(
     """
     burst_data = get_burst_to_frame_mapping(burst_id, json_file)
     return burst_data["frame_ids"]
+
+
+def get_intersecting_frames(bounds: Bbox) -> dict:
+    """Get the frame IDs that intersect with the given bounds.
+
+    Parameters
+    ----------
+    bounds : Bbox
+        Bounding box to check for intersection
+
+    Returns
+    -------
+    dict
+        Returns a GeoJSON dict object.
+
+    """
+    try:
+        import geopandas  # noqa: F401
+        from shapely.geometry import box
+    except ImportError as e:
+        raise ImportError("geopandas and shapely are required for this function") from e
+
+    gdf = get_frame_geodataframe()
+    frames = gdf[gdf.geometry.intersects(box(*bounds))]
+
+    return frames.to_geo_dict()
