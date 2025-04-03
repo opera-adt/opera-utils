@@ -119,7 +119,7 @@ class TestDispProduct:
         assert profile["tiled"] is True
         assert profile["blockysize"] == 256
         assert profile["blockxsize"] == 256
-        assert profile["compress"] == "deflate"
+        assert profile["compress"] == "lzw"
         assert math.isnan(profile["nodata"])
         assert profile["dtype"] == "float32"
         assert profile["count"] == 1

@@ -73,8 +73,6 @@ SAME_PER_MINISTACK_DATASETS = [
     SamePerMinistackDataset.SHP_COUNTS,
 ]
 UNIQUE_PER_DATE_DATASETS = [
-    # DisplacementDataset.DISPLACEMENT,
-    # DisplacementDataset.SHORT_WAVELENGTH,
     QualityDataset.TIMESERIES_INVERSION_RESIDUALS,
     QualityDataset.CONNECTED_COMPONENT_LABELS,
     QualityDataset.RECOMMENDED_MASK,
@@ -118,8 +116,6 @@ def rereference(
     # Flatten all dates, find unique sorted list of SAR epochs
     all_dates = sorted(set(flatten(products.ifg_date_pairs)))
 
-    nrows, ncols = products[0].shape
-
     # Create the main displacement dataset.
     writer = GeotiffWriter.from_dates(
         Path(output_dir),
@@ -140,9 +136,10 @@ def rereference(
 
     # Make a "cumulative offset" which adds up the phase each time theres a reference
     # date changeover.
-    cumulative_offset = np.zeros((nrows, ncols), dtype=np.float32)
-    last_displacement = np.zeros((nrows, ncols), dtype=np.float32)
-    current_displacement = np.zeros((nrows, ncols), dtype=np.float32)
+    shape = products[0].shape
+    cumulative_offset = np.zeros(shape, dtype=np.float32)
+    last_displacement = np.zeros(shape, dtype=np.float32)
+    current_displacement = np.zeros(shape, dtype=np.float32)
     latest_reference_date = products[0].reference_datetime
 
     for idx in trange(len(nc_files), desc="Summing dates", position=tqdm_position):
@@ -164,9 +161,6 @@ def rereference(
 
         current_displacement += cumulative_offset
         writer[idx] = current_displacement + cumulative_offset
-        # current_batch[cur_batch_idx] = current_displacement + cumulative_offset
-
-    print(f"Saved displacement stack to {output_dir}")
 
 
 @dataclass
