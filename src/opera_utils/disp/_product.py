@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import cached_property
 from math import nan
 from pathlib import Path
@@ -52,7 +52,7 @@ class DispProduct:
         """
 
         def _to_datetime(dt: str) -> datetime:
-            return datetime.fromisoformat(dt.replace("Z", "+00:00"))
+            return datetime.strptime(dt, "%Y%M%dT%H%M%SZ").replace(tzinfo=timezone.utc)
 
         if not (match := DISP_FILE_REGEX.match(Path(name).name)):
             raise ValueError(f"Invalid filename format: {name}")
