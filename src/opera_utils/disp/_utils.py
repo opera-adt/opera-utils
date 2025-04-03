@@ -84,3 +84,54 @@ def utm_to_rowcol(
     col = int(round((utm_x - xmin) / pixel_width))
     row = int(round((ymax - utm_y) / abs(pixel_height)))
     return row, col
+
+
+def round_mantissa(z: np.ndarray, keep_bits=10) -> None:
+    """Zero out mantissa bits of elements of array in place.
+
+    Drops a specified number of bits from the floating point mantissa,
+    leaving an array more amenable to compression.
+
+    Parameters
+    ----------
+    z : numpy.ndarray
+        Real or complex array whose mantissas are to be zeroed out
+    keep_bits : int, optional
+        Number of bits to preserve in mantissa. Defaults to 10.
+        Lower numbers will truncate the mantissa more and enable
+        more compression.
+
+    References
+    ----------
+    https://numcodecs.readthedocs.io/en/v0.12.1/_modules/numcodecs/bitround.html
+
+    """
+    max_bits = {
+        "float16": 10,
+        "float32": 23,
+        "float64": 52,
+    }
+    # recurse for complex data
+    if np.iscomplexobj(z):
+        round_mantissa(z.real, keep_bits)
+        round_mantissa(z.imag, keep_bits)
+        return
+
+    if not z.dtype.kind == "f" or z.dtype.itemsize > 8:
+        raise TypeError("Only float arrays (16-64bit) can be bit-rounded")
+
+    bits = max_bits[str(z.dtype)]
+    # cast float to int type of same width (preserve endianness)
+    a_int_dtype = np.dtype(z.dtype.str.replace("f", "i"))
+    all_set = np.array(-1, dtype=a_int_dtype)
+    if keep_bits == bits:
+        return z
+    if keep_bits > bits:
+        raise ValueError("keep_bits too large for given dtype")
+    b = z.view(a_int_dtype)
+    maskbits = bits - keep_bits
+    mask = (all_set >> maskbits) << maskbits
+    half_quantum1 = (1 << (maskbits - 1)) - 1
+    b += ((b >> maskbits) & 1) + half_quantum1
+    b &= mask
+    return b.view(z.dtype)

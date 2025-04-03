@@ -6,7 +6,7 @@ from datetime import datetime
 from functools import cached_property
 from math import nan
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 import numpy as np
 from typing_extensions import Self
@@ -21,6 +21,7 @@ __all__ = ["DispProduct", "DispProductStack"]
 class DispProduct:
     """Class for information from one DISP-S1 production filename."""
 
+    filename: str | Path
     sensor: str
     acquisition_mode: str
     frame_id: int
@@ -52,7 +53,7 @@ class DispProduct:
         if not (match := DISP_FILE_REGEX.match(Path(name).name)):
             raise ValueError(f"Invalid filename format: {name}")
 
-        data = match.groupdict()
+        data: dict[str, Any] = match.groupdict()
         data["reference_datetime"] = datetime.fromisoformat(data["reference_datetime"])
         data["secondary_datetime"] = datetime.fromisoformat(data["secondary_datetime"])
         data["generation_datetime"] = datetime.fromisoformat(
@@ -60,7 +61,7 @@ class DispProduct:
         )
         data["frame_id"] = int(data["frame_id"])
 
-        return cls(**data)  # type: ignore
+        return cls(filename=name, **data)
 
     @cached_property
     def _frame_bbox_result(self) -> tuple[int, Bbox]:
@@ -73,7 +74,7 @@ class DispProduct:
     @property
     def shape(self) -> tuple[int, int]:
         left, bottom, right, top = self._frame_bbox_result[1]
-        return (int(round(top - bottom)), int(round(right - left)))
+        return (int(round((top - bottom) / 30)), int(round((right - left) / 30)))
 
     @cached_property
     def _coordinates(self) -> tuple[np.ndarray, np.ndarray]:
@@ -98,7 +99,7 @@ class DispProduct:
             "tiled": True,
             "blockysize": chunks[0],
             "blockxsize": chunks[1],
-            "compress": "deflate",
+            "compress": "lzw",
             "nodata": nan,
             "dtype": "float32",
             "count": 1,
@@ -142,6 +143,10 @@ class DispProductStack:
                 key=lambda p: (p.reference_datetime, p.secondary_datetime),
             )
         )
+
+    @property
+    def filenames(self) -> list[Path | str]:
+        return [p.filename for p in self.products]
 
     @property
     def reference_dates(self) -> list[datetime]:

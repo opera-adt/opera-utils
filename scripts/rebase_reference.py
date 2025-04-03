@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# dependencies = ["numpy", "dolphin", "tqdm", "tyro"]
+# dependencies = ["numpy", "rasterio", "tqdm", "tyro"]
 # ///
 """Convert a series of OPERA DISP-S1 products to a single-reference stack.
 
@@ -14,63 +14,81 @@ Usage:
     python -m opera_utils.disp.rebase_reference single-reference-out/ OPERA_L3_DISP-S1_*.nc
 """
 
-import threading
-from datetime import datetime
+import multiprocessing
+from concurrent.futures import FIRST_EXCEPTION, Future, ProcessPoolExecutor, wait
+from dataclasses import dataclass
+from datetime import date, datetime
+from enum import StrEnum
+from itertools import repeat
 from pathlib import Path
-from typing import Sequence
+from typing import Self, Sequence
 
+import h5py
 import numpy as np
+import rasterio as rio
 import tyro
-from dolphin import io
-from dolphin.utils import flatten, format_dates
+from numpy.typing import DTypeLike
 from tqdm.auto import trange
 
-from ._product import DispProductStack
+from opera_utils.disp._product import DispProductStack
+from opera_utils.disp._utils import _last_per_ministack, flatten, round_mantissa
 
-CORRECTION_DATASETS = [
-    "/corrections/solid_earth_tide",
-    "/corrections/ionospheric_delay",
-]
+
+class DisplacementDataset(StrEnum):
+    """Enumeration of displacement datasets."""
+
+    DISPLACEMENT = "displacement"
+    SHORT_WAVELENGTH = "short_wavelength_displacement"
+
+
+class CorrectionDataset(StrEnum):
+    """Enumeration of correction datasets."""
+
+    SOLID_EARTH_TIDE = "/corrections/solid_earth_tide"
+    IONOSPHERIC_DELAY = "/corrections/ionospheric_delay"
+
+
+class SamePerMinistackDataset(StrEnum):
+    """Enumeration of datasets that are same per ministack."""
+
+    TEMPORAL_COHERENCE = "temporal_coherence"
+    PHASE_SIMILARITY = "phase_similarity"
+    SHP_COUNTS = "shp_counts"
+
+
+class QualityDataset(StrEnum):
+    """Enumeration of quality datasets."""
+
+    TIMESERIES_INVERSION_RESIDUALS = "timeseries_inversion_residuals"
+    CONNECTED_COMPONENT_LABELS = "connected_component_labels"
+    RECOMMENDED_MASK = "recommended_mask"
+    ESTIMATED_PHASE_QUALITY = "estimated_phase_quality"
+    SHP_COUNTS = "shp_counts"
+    WATER_MASK = "water_mask"
+
 
 SAME_PER_MINISTACK_DATASETS = [
-    "temporal_coherence",
-    "/phase_similarity",
-    "shp_counts",
-]
-QUALITY_DATASETS = [
-    "timeseries_inversion_residuals",
-    "connected_component_labels",
-    "recommended_mask",
-    # "estimated_phase_quality" TODO: skip always?
+    SamePerMinistackDataset.TEMPORAL_COHERENCE,
+    SamePerMinistackDataset.PHASE_SIMILARITY,
+    SamePerMinistackDataset.SHP_COUNTS,
 ]
 UNIQUE_PER_DATE_DATASETS = [
-    "displacement",
-    "timeseries_inversion_residuals",
-    "connected_component_labels",
-    "recommended_mask",
+    # DisplacementDataset.DISPLACEMENT,
+    # DisplacementDataset.SHORT_WAVELENGTH,
+    QualityDataset.TIMESERIES_INVERSION_RESIDUALS,
+    QualityDataset.CONNECTED_COMPONENT_LABELS,
+    QualityDataset.RECOMMENDED_MASK,
 ]
-
-
-def _make_gtiff_output_paths(output_dir: Path, all_dates: list[datetime], dataset: str):
-    ref_date = all_dates[0]
-    suffix = ".tif"
-
-    out_paths = [
-        output_dir / f"{dataset}_{format_dates(ref_date, d)}{suffix}"
-        for d in all_dates[1:]
-    ]
-    output_dir.mkdir(exist_ok=True, parents=True)
-    return out_paths
 
 
 def rereference(
     output_dir: Path | str,
     nc_files: Sequence[Path | str],
-    dataset: str = "displacement",
+    dataset: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
     apply_corrections: bool = True,
     nodata: float = np.nan,
-    batch_depth: int = 15,
     keep_bits: int = 9,
+    tqdm_position: int = 0,
 ) -> None:
     """Create a single-reference stack from a list of OPERA displacement files.
 
@@ -81,82 +99,61 @@ def rereference(
     nc_files : list[Path | str]
         One or more netCDF files, each containing a 'displacement' dataset
         for a reference_date -> secondary_date interferogram.
-    dataset : str
+    dataset : DisplacementDataset
         Name of HDF5 dataset within product to convert.
     apply_corrections : bool
         Apply corrections to the data.
         Default is True.
-    block_shape : tuple[int, int]
-        Size of chunks of data to load at once.
-        Default is (256, 256)
     nodata : float
         Value to use in translated rasters as nodata value.
         Default is np.nan
     keep_bits : int
         Number of floating point mantissa bits to retain in the output rasters.
         Default is 9.
+    tqdm_position : int
+        Position of the progress bar. Default is 0.
 
     """
     products = DispProductStack.from_file_list(nc_files)
     # Flatten all dates, find unique sorted list of SAR epochs
     all_dates = sorted(set(flatten(products.ifg_date_pairs)))
 
-    # open a GDAL dataset for the first file just to get the shape/geoinformation
-    # All netCDF files for a frame are on the same grid.
-    gdal_str = io.format_nc_filename(nc_files[0], dataset)
-    ncols, nrows = io.get_raster_xysize(gdal_str)
+    nrows, ncols = products[0].shape
 
     # Create the main displacement dataset.
-    output_paths = _make_gtiff_output_paths(
+    writer = GeotiffWriter.from_dates(
         Path(output_dir),
-        all_dates=all_dates,
-        dataset=dataset,  # like_filename=gdal_str,
+        dataset=dataset,
+        date_list=all_dates,
+        keep_bits=keep_bits,
+        profile=products.get_rasterio_profile(),
     )
 
-    reader = io.HDF5StackReader.from_file_list(
-        nc_files, dset_names=dataset, nodata=nodata
-    )
+    reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=nodata)
     if apply_corrections:
         corrections_readers = [
-            io.HDF5StackReader.from_file_list(
-                nc_files, dset_names=correction_dataset, nodata=nodata
-            )
-            for correction_dataset in CORRECTION_DATASETS
+            HDF5StackReader(nc_files, dset_name=str(correction_dataset), nodata=nodata)
+            for correction_dataset in CorrectionDataset
         ]
     else:
         corrections_readers = []
 
-    # encoding = {
-    #         dataset: {
-    #             "chunks": (-1, 256, 256),
-    #             "compressor": zarr.Blosc(
-    #                 cname="zstd", clevel=3, shuffle=zarr.Blosc.BITSHUFFLE
-    #             ),
-    #         } for dataset in UNIQUE_PER_DATE_DATASETS
-    #     }
-    # out_slim.to_zarr("aligned.zarr", mode="w", encoding=encoding, consolidated=True)
-
-    num_dates = len(nc_files)
     # Make a "cumulative offset" which adds up the phase each time theres a reference
     # date changeover.
-    out_shape = (1 + num_dates, nrows, ncols)  # Keep a 0s raster of (ref, ref)
-    batch_shape = (batch_depth, nrows, ncols)
-    cumulative_offset = np.zeros(batch_shape, dtype=np.float32)
-    last_displacement = np.zeros(batch_shape, dtype=np.float32)
-    latest_reference_date = ifg_date_pairs[0][0]
+    cumulative_offset = np.zeros((nrows, ncols), dtype=np.float32)
+    last_displacement = np.zeros((nrows, ncols), dtype=np.float32)
+    current_displacement = np.zeros((nrows, ncols), dtype=np.float32)
+    latest_reference_date = products[0].reference_datetime
 
-    write_threads = []
-    for idx in trange(num_dates, desc="Summing dates"):
-        # Read all 3D array of shape (M, block_rows, block_cols)
-        current_displacement = np.squeeze(reader[idx, :, :])
-        if isinstance(current_displacement, np.ma.MaskedArray):
-            current_displacement = current_displacement.filled(0)
+    for idx in trange(len(nc_files), desc="Summing dates", position=tqdm_position):
+        current_displacement[:] = reader[idx]
 
         # Apply corrections if needed
         for r in corrections_readers:
-            current_displacement -= np.squeeze(r[idx, :, :])
+            current_displacement -= r[idx]
 
-        cur_ref, cur_sec = ifg_date_pairs[idx]
+        # Check for the shift in reference date
+        cur_ref, _cur_sec = products.ifg_date_pairs[0]
         if cur_ref != latest_reference_date:
             # e.g. we had (1,2), (1,3), now we hit (3,4)
             # So to write out (1,4), we need to add the running total
@@ -165,35 +162,172 @@ def rereference(
             cumulative_offset += last_displacement
         last_displacement = current_displacement
 
-        # Write current output raster
-        def write_arr(arr, output_name, like_filename, nodata):
-            io.round_mantissa(arr, keep_bits=keep_bits)
-            io.write_arr(
-                arr=arr,
-                output_name=output_name,
-                like_filename=like_filename,
-                nodata=nodata,
-            )
-
-        # Use a background thread to write the data to avoid holding up the reading loop
-        t = threading.Thread(
-            target=write_arr,
-            args=(
-                current_displacement + cumulative_offset,
-                output_paths[idx],
-                gdal_str,
-                nodata,
-            ),
-        )
-        t.start()
-        write_threads.append(t)
-
-    # Then wait for just those threads
-    for t in write_threads:
-        t.join()
+        current_displacement += cumulative_offset
+        writer[idx] = current_displacement + cumulative_offset
+        # current_batch[cur_batch_idx] = current_displacement + cumulative_offset
 
     print(f"Saved displacement stack to {output_dir}")
 
 
+@dataclass
+class HDF5StackReader:
+    """Reader for HDF5 datasets from multiple files."""
+
+    file_list: Sequence[Path | str]
+    dset_name: str
+    nodata: float = np.nan
+
+    def __getitem__(self, idx: int | slice) -> np.ndarray:
+        if isinstance(idx, slice):
+            return np.stack([self[i] for i in range(idx.start, idx.stop, idx.step)])
+        with h5py.File(self.file_list[idx], "r") as hf:
+            return hf[str(self.dset_name)][()]
+
+    def read_direct(self, idx: int, dest: np.ndarray) -> None:
+        with h5py.File(self.file_list[idx], "r") as hf:
+            dset = hf[str(self.dset_name)]
+            dset.read_direct(dest)
+
+
+@dataclass
+class GeotiffWriter:
+    """Writer for GeoTIFF files."""
+
+    files: Sequence[Path | str]
+    profile: dict | None = None
+    like_filename: Path | str | None = None
+    nodata: float = np.nan
+    keep_bits: int | None = 9
+    dtype: DTypeLike | None = None
+
+    def __post_init__(self):
+        if self.profile is None:
+            self.profile = {}
+        if self.like_filename is not None:
+            with rio.open(self.like_filename) as src:
+                self.profile.update(src.profile)
+
+        self.profile["count"] = 1
+        self.profile["driver"] = "GTiff"
+        if self.dtype is not None:
+            self.profile["dtype"] = np.dtype(self.dtype)
+        if self.nodata is not None:
+            self.profile["nodata"] = self.nodata
+
+    def __setitem__(self, key, value):
+        # Check if we have a floating point raster
+        if self.keep_bits is not None and np.issubdtype(value.dtype, np.floating):
+            round_mantissa(value, keep_bits=self.keep_bits)
+
+        if isinstance(key, slice):
+            keys = list(range(key.start, key.stop, key.step))
+        elif isinstance(key, int):
+            keys = [key]
+        else:
+            keys = list(key)
+
+        for idx in keys:
+            with rio.open(self.files[idx], "w", **self.profile) as dst:
+                dst.write(value, 1)
+
+    def __len__(self):
+        return len(self.files)
+
+    @classmethod
+    def from_dates(
+        cls,
+        output_dir: Path,
+        dataset: str,
+        date_list: Sequence[datetime] | None = None,
+        date_pairs: Sequence[tuple[datetime, datetime]] | None = None,
+        suffix: str = ".tif",
+        **kwargs,
+    ) -> Self:
+        if date_list:
+            ref_date = date_list[0]
+
+            out_paths = [
+                output_dir / f"{dataset}_{_format_dates(ref_date, d)}{suffix}"
+                for d in date_list[1:]
+            ]
+        elif date_pairs:
+            out_paths = [
+                output_dir / f"{dataset}_{_format_dates(*d)}{suffix}"
+                for d in date_pairs
+            ]
+        else:
+            raise ValueError("Either date_list or date_pairs must be provided")
+        output_dir.mkdir(exist_ok=True, parents=True)
+        return cls(files=out_paths, **kwargs)
+
+
+def _format_dates(*dates: datetime | date, fmt: str = "%Y%m%d", sep: str = "_") -> str:
+    """Format a date pair into a string."""
+    return sep.join((d.strftime(fmt)) for d in dates)
+
+
+def extract_quality_layers(output_dir: Path, products: DispProductStack, dataset: str):
+    """Extract quality layers from the displacement products and write them to GeoTIFF files."""
+    reader = HDF5StackReader(products.filenames, dataset)
+    writer = GeotiffWriter.from_dates(
+        output_dir,
+        dataset=dataset,
+        date_pairs=products.ifg_date_pairs,
+        profile=products.get_rasterio_profile(),
+    )
+    for idx in trange(len(products.filenames)):
+        writer[idx] = reader[idx]
+
+
+def main(nc_files: list[str], output_dir: Path | str, num_workers: int = 5):
+    """Run the rebase reference script and extract all datasets."""
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True, parents=True)
+
+    # Transfer the water mask
+    water_mask_path = output_path / "water_mask.tif"
+    if not water_mask_path.exists():
+        with rio.open(f"NETCDF:{nc_files[0]}:/water_mask") as src:
+            profile = src.profile | {"driver": "GTiff"}
+            with rio.open(water_mask_path, "w", **profile) as dst:
+                dst.write(src.read(1), 1)
+
+    # Transfer the quality layers (no rebasing needed)
+    last_per_ministack_products = DispProductStack.from_file_list(
+        _last_per_ministack(nc_files)
+    )
+    with multiprocessing.Pool(num_workers) as pool:
+        pool.starmap(
+            extract_quality_layers,
+            zip(
+                repeat(output_dir),
+                repeat(last_per_ministack_products),
+                SAME_PER_MINISTACK_DATASETS,
+            ),
+        )
+
+    all_products = DispProductStack.from_file_list(nc_files)
+    futures: list[Future] = []
+    with ProcessPoolExecutor(num_workers) as pool:
+        # Submit time series rebase function
+        futures.append(
+            pool.submit(
+                rereference, output_dir, nc_files, DisplacementDataset.DISPLACEMENT
+            )
+        )
+        # Submit the others to extract
+        for dataset in UNIQUE_PER_DATE_DATASETS:
+            futures.append(
+                pool.submit(
+                    extract_quality_layers,
+                    Path(output_dir),
+                    all_products,
+                    str(dataset),
+                )
+            )
+        # Wait for all futures to complete
+        wait(futures, return_when=FIRST_EXCEPTION)
+
+
 if __name__ == "__main__":
-    tyro.cli(rereference)
+    tyro.cli(main)
