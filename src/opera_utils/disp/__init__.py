@@ -1,2 +1,4 @@
-from ._product import DispProduct as DispProduct
-from ._utils import get_frame_coordinates as get_frame_coordinates
+from ._product import DispProduct, DispProductStack
+from ._utils import get_frame_coordinates
+
+__all__ = ["DispProduct", "DispProductStack", "get_frame_coordinates"]
