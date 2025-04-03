@@ -52,7 +52,7 @@ class DispProduct:
         """
 
         def _to_datetime(dt: str) -> datetime:
-            return datetime.strptime(dt, "%Y%M%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+            return datetime.strptime(dt, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
 
         if not (match := DISP_FILE_REGEX.match(Path(name).name)):
             raise ValueError(f"Invalid filename format: {name}")
