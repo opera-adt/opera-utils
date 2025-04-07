@@ -21,7 +21,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from itertools import repeat
 from pathlib import Path
-from typing import Self, Sequence
+from typing import Literal, Self, Sequence
 
 import h5py
 import numpy as np
@@ -84,6 +84,7 @@ def rereference(
     nc_files: Sequence[Path | str],
     dataset: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
     apply_corrections: bool = True,
+    reference_point: tuple[int, int] | None = None,
     nodata: float = np.nan,
     keep_bits: int = 9,
     tqdm_position: int = 0,
@@ -102,6 +103,10 @@ def rereference(
     apply_corrections : bool
         Apply corrections to the data.
         Default is True.
+    reference_point : tuple[int, int] | None
+        Reference point to use when rebasing /displacement.
+        If None, finds a point with the highest harmonic mean of temporal coherence.
+        Default is None
     nodata : float
         Value to use in translated rasters as nodata value.
         Default is np.nan
@@ -117,7 +122,7 @@ def rereference(
     all_dates = sorted(set(flatten(products.ifg_date_pairs)))
 
     # Create the main displacement dataset.
-    writer = GeotiffWriter.from_dates(
+    writer = GeotiffStackWriter.from_dates(
         Path(output_dir),
         dataset=dataset,
         date_list=all_dates,
@@ -149,7 +154,11 @@ def rereference(
         for r in corrections_readers:
             current_displacement -= r[idx]
 
-        # Check for the shift in reference date
+        # Apply spaitla reference point if needed
+        if reference_point is not None:
+            current_displacement -= current_displacement[reference_point]
+
+        # Check for the shift in temporal reference date
         cur_ref, _cur_sec = products.ifg_date_pairs[0]
         if cur_ref != latest_reference_date:
             # e.g. we had (1,2), (1,3), now we hit (3,4)
@@ -159,7 +168,6 @@ def rereference(
             cumulative_offset += last_displacement
         last_displacement = current_displacement
 
-        current_displacement += cumulative_offset
         writer[idx] = current_displacement + cumulative_offset
 
 
@@ -184,7 +192,7 @@ class HDF5StackReader:
 
 
 @dataclass
-class GeotiffWriter:
+class GeotiffStackWriter:
     """Writer for GeoTIFF files."""
 
     files: Sequence[Path | str]
@@ -260,21 +268,136 @@ def _format_dates(*dates: datetime | date, fmt: str = "%Y%m%d", sep: str = "_") 
     return sep.join((d.strftime(fmt)) for d in dates)
 
 
-def extract_quality_layers(output_dir: Path, products: DispProductStack, dataset: str):
+def extract_quality_layers(
+    output_dir: Path,
+    products: DispProductStack,
+    dataset: str,
+    save_mean: bool = True,
+    mean_type: Literal["harmonic", "arithmetic"] = "harmonic",
+):
     """Extract quality layers from the displacement products and write them to GeoTIFF files."""
     reader = HDF5StackReader(products.filenames, dataset)
-    writer = GeotiffWriter.from_dates(
+    writer = GeotiffStackWriter.from_dates(
         output_dir,
         dataset=dataset,
         date_pairs=products.ifg_date_pairs,
         profile=products.get_rasterio_profile(),
     )
+    if save_mean:
+        # For harmonic mean, we need to accumulate the reciprocals
+        if mean_type == "harmonic":
+            # Start with zeros, will replace with sum of reciprocals
+            reciprocal_sum = np.zeros(reader[0].shape, dtype=np.float32)
+            valid_count = np.zeros(reader[0].shape, dtype=np.int32)
+        else:  # arithmetic mean
+            cumulative = np.zeros(reader[0].shape, dtype=reader[0].dtype)
+
+        writer_average = GeotiffStackWriter(
+            files=[output_dir / f"average_{dataset}.tif"],
+            profile=products.get_rasterio_profile(),
+        )
+
     for idx in trange(len(products.filenames)):
-        writer[idx] = reader[idx]
+        cur_data = reader[idx]
+        writer[idx] = cur_data
+
+        if save_mean:
+            if mean_type == "harmonic":
+                # Handle zeros or negative values to avoid division problems
+                valid_mask = cur_data > 0
+                reciprocal_sum[valid_mask] += 1.0 / cur_data[valid_mask]
+                valid_count[valid_mask] += 1
+            else:  # arithmetic mean
+                cumulative += cur_data
+
+    if save_mean:
+        if mean_type == "harmonic":
+            # Avoid division by zero by masking where valid_count is 0
+            mask = valid_count > 0
+            with np.errstate(divide="ignore", invalid="ignore"):
+                average = valid_count / reciprocal_sum
+        else:  # arithmetic mean
+            mask = cumulative > 0
+            average = cumulative / len(products.filenames)
+
+        # Set invalid areas to NaN and write
+        writer_average[0] = np.where(mask, average, np.nan)
 
 
-def main(nc_files: list[str], output_dir: Path | str, num_workers: int = 5):
-    """Run the rebase reference script and extract all datasets."""
+def find_reference_point(
+    average_quality_raster: Path | str,
+    max_quality_test: float = 0.95,
+    min_quality: float = 0.5,
+    step: float = 0.05,
+) -> tuple[int, int]:
+    """Choose a high quality (row, column) as the reference point.
+
+    This function finds a point with the highest harmonic mean of temporal coherence.
+    It steps back from high to low and picks a pixel meeting a threshold that is
+    toward the center of mass of the good data pixels.
+
+    Parameters
+    ----------
+    average_quality_raster : Path | str
+        Path to the average quality raster.
+    max_quality_test : float, optional
+        Maximum quality threshold to test, by default 0.95
+    min_quality : float, optional
+        Minimum quality threshold, by default 0.5
+    step : float, optional
+        Step size for quality threshold, by default 0.05
+
+    Returns
+    -------
+    tuple[int, int]
+        Reference point (row, column)
+    """
+    from scipy import ndimage
+
+    with rio.open(average_quality_raster) as src:
+        quality = src.read(1)
+
+    # Step back from high to low and pick all points meeting a threshold.
+    # We don't just want the highest quality, isolated pixel:
+    # We want one toward the middle of the good data pixels.
+    for threshold in np.arange(max_quality_test, min_quality - step, -step):
+        candidates = quality > threshold
+        if not np.any(candidates):
+            continue
+        # Find the pixel closest to the center of mass of the good pixels.
+        center_of_mass = ndimage.center_of_mass(candidates)
+        # The center may not be a good pixel! So find the candidate closest:
+        row, col = np.unravel_index(
+            np.argmin(np.abs(candidates - center_of_mass)), candidates.shape
+        )
+        return int(row), int(col)
+    raise ValueError(f"No valid candidates found with quality above {min_quality}")
+
+
+def main(
+    nc_files: list[str],
+    output_dir: Path | str,
+    apply_corrections: bool = True,
+    reference_point: tuple[int, int] | None = None,
+    num_workers: int = 5,
+):
+    """Run the rebase reference script and extract all datasets.
+
+    Parameters
+    ----------
+    nc_files : list[str]
+        List of netCDF files to process.
+    output_dir : Path or str
+        Output directory for the processed files.
+    apply_corrections : bool, optional
+        Whether to apply corrections to the data, by default True
+    reference_point : tuple[int, int] | None, optional
+        Reference point to use when rebasing /displacement.
+        If None, finds a point with the highest harmonic mean of temporal coherence.
+        Default is None.
+    num_workers : int, optional
+        Number of workers to use, by default 5
+    """
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True, parents=True)
 
@@ -297,8 +420,18 @@ def main(nc_files: list[str], output_dir: Path | str, num_workers: int = 5):
                 repeat(output_dir),
                 repeat(last_per_ministack_products),
                 SAME_PER_MINISTACK_DATASETS,
+                repeat(True),
             ),
         )
+
+    # Find the reference point
+    # Load in the coherence dataset
+    # TODO: Any way to extract the name, rather than relying on this matching
+    # the function `extract_quality_layers`?
+    coherence_path = output_path / "average_temporal_coherence.tif"
+
+    # Find the reference point
+    reference_point = find_reference_point(coherence_path)
 
     all_products = DispProductStack.from_file_list(nc_files)
     futures: list[Future] = []
@@ -306,7 +439,12 @@ def main(nc_files: list[str], output_dir: Path | str, num_workers: int = 5):
         # Submit time series rebase function
         futures.append(
             pool.submit(
-                rereference, output_dir, nc_files, DisplacementDataset.DISPLACEMENT
+                rereference,
+                output_dir,
+                nc_files,
+                DisplacementDataset.DISPLACEMENT,
+                apply_corrections=apply_corrections,
+                reference_point=reference_point,
             )
         )
         # Submit the others to extract
