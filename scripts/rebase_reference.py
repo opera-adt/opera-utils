@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# dependencies = ["numpy", "rasterio", "tqdm", "tyro"]
+# dependencies = ["numpy", "rasterio", "scipy", "tqdm", "tyro"]
 # ///
 """Convert a series of OPERA DISP-S1 products to a single-reference stack.
 
@@ -28,6 +28,7 @@ import numpy as np
 import rasterio as rio
 import tyro
 from numpy.typing import DTypeLike
+from scipy import ndimage
 from tqdm.auto import trange
 
 from opera_utils.disp._product import DispProductStack
@@ -352,8 +353,6 @@ def find_reference_point(
     tuple[int, int]
         Reference point (row, column)
     """
-    from scipy import ndimage
-
     with rio.open(average_quality_raster) as src:
         quality = src.read(1)
 
