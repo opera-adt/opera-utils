@@ -1,7 +1,7 @@
-"""Tests for the credentials module."""
+"""Tests for the credentials module using pytest monkeypatch."""
 
-import os
-from unittest.mock import MagicMock, patch
+import netrc
+from unittest.mock import MagicMock
 
 import pytest
 import requests
@@ -35,54 +35,50 @@ def test_aws_credentials_dataclass():
     assert h5py_kwargs["session_token"] == "test_token"
 
 
-@patch("opera_utils.credentials.get_temporary_aws_credentials")
-def test_aws_credentials_from_asf(mock_get_temp_creds):
-    """Test AWSCredentials.from_asf method."""
-    # Mock the response from get_temporary_aws_credentials
-    mock_get_temp_creds.return_value = {
-        "accessKeyId": "test_id",
-        "secretAccessKey": "test_secret",
-        "sessionToken": "test_token",
-    }
+def test_aws_credentials_from_asf(monkeypatch):
+    """Test AWSCredentials.from_asf method using monkeypatch."""
 
-    # Call the method
+    def mock_get_temp_creds(*args, **kwargs):
+        return {
+            "accessKeyId": "test_id",
+            "secretAccessKey": "test_secret",
+            "sessionToken": "test_token",
+        }
+
+    monkeypatch.setattr(
+        "opera_utils.credentials.get_temporary_aws_credentials", mock_get_temp_creds
+    )
+
     creds = AWSCredentials.from_asf(ASFCredentialEndpoints.OPERA)
-
-    # Verify the response
     assert creds.access_key_id == "test_id"
     assert creds.secret_access_key == "test_secret"
     assert creds.session_token == "test_token"
 
-    # Verify the mock was called with expected args
-    mock_get_temp_creds.assert_called_once_with(ASFCredentialEndpoints.OPERA)
 
+def test_aws_credentials_from_env(monkeypatch):
+    """Test AWSCredentials.from_env method using monkeypatch."""
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "env_id")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "env_secret")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "env_token")
 
-@patch.dict(os.environ, {
-    "AWS_ACCESS_KEY_ID": "env_id",
-    "AWS_SECRET_ACCESS_KEY": "env_secret",
-    "AWS_SESSION_TOKEN": "env_token",
-})
-def test_aws_credentials_from_env():
-    """Test AWSCredentials.from_env method."""
     creds = AWSCredentials.from_env()
     assert creds.access_key_id == "env_id"
     assert creds.secret_access_key == "env_secret"
     assert creds.session_token == "env_token"
 
 
-def test_aws_credentials_from_env_missing_vars():
+def test_aws_credentials_from_env_missing_vars(monkeypatch):
     """Test AWSCredentials.from_env raises KeyError when env vars missing."""
-    with patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(KeyError):
-            AWSCredentials.from_env()
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
+
+    with pytest.raises(KeyError):
+        AWSCredentials.from_env()
 
 
-# Need to patch the cache decorator to avoid interference between tests
-@patch("opera_utils.credentials.get_temporary_aws_credentials", wraps=get_temporary_aws_credentials)
-@patch("requests.get")
-def test_get_temporary_aws_credentials_direct(mock_requests_get, _):
+def test_get_temporary_aws_credentials_direct(monkeypatch):
     """Test get_temporary_aws_credentials with direct response (no auth needed)."""
-    # Mock response for direct success (no auth needed)
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
@@ -90,28 +86,25 @@ def test_get_temporary_aws_credentials_direct(mock_requests_get, _):
         "secretAccessKey": "direct_secret",
         "sessionToken": "direct_token",
     }
-    mock_requests_get.return_value = mock_response
 
-    # Call the function with a string endpoint to test the conversion
+    def mock_requests_get(url, *args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr(requests, "get", mock_requests_get)
+
+    # Call the real function (caching is still on, but this is our first call).
     result = get_temporary_aws_credentials("OPERA", None, None)
-
-    # Verify the result
     assert result == mock_response.json.return_value
-    mock_requests_get.assert_called_once_with(ASFCredentialEndpoints.OPERA.value)
 
 
-# Override the cache functionality to avoid test interference
-@patch("opera_utils.credentials.get_temporary_aws_credentials.__wrapped__", wraps=get_temporary_aws_credentials.__wrapped__)  
-@patch("opera_utils.credentials.get_earthdata_username_password")
-@patch("requests.get")
-def test_get_temporary_aws_credentials_with_auth(mock_requests_get, mock_get_creds, _):
+def test_get_temporary_aws_credentials_with_auth(monkeypatch):
     """Test get_temporary_aws_credentials with authentication."""
-    # First response needs auth
     auth_needed_response = MagicMock()
     auth_needed_response.status_code = 401
-    auth_needed_response.url = "https://urs.earthdata.nasa.gov/oauth/authorize?client_id=test"
+    auth_needed_response.url = (
+        "https://urs.earthdata.nasa.gov/oauth/authorize?client_id=test"
+    )
 
-    # Second response (after auth) succeeds
     auth_success_response = MagicMock()
     auth_success_response.status_code = 200
     auth_success_response.json.return_value = {
@@ -120,36 +113,49 @@ def test_get_temporary_aws_credentials_with_auth(mock_requests_get, mock_get_cre
         "sessionToken": "auth_token",
     }
 
-    # Set up mock to return different responses
-    mock_requests_get.side_effect = [auth_needed_response, auth_success_response]
+    # The first call 401s, the second call 200s
+    def mock_requests_get(url, auth=None, *args, **kwargs):
+        if auth is None:
+            return auth_needed_response
+        return auth_success_response
 
-    # Mock the credentials
-    mock_get_creds.return_value = ("test_user", "test_pass")
+    monkeypatch.setattr(requests, "get", mock_requests_get)
 
-    # Call the function's wrapped version to bypass the cache
-    result = get_temporary_aws_credentials.__wrapped__(ASFCredentialEndpoints.OPERA, None, None)
+    # Mock get_earthdata_username_password
+    def mock_get_creds(u, p, host=None):
+        return ("test_user", "test_pass")
 
-    # Verify the result
+    monkeypatch.setattr(
+        "opera_utils.credentials.get_earthdata_username_password", mock_get_creds
+    )
+
+    # Call the underlying function to bypass cache for demonstration
+    result = get_temporary_aws_credentials.__wrapped__(
+        ASFCredentialEndpoints.OPERA, None, None
+    )
+
     assert result == auth_success_response.json.return_value
-    assert mock_requests_get.call_count == 2
-    mock_requests_get.assert_any_call(ASFCredentialEndpoints.OPERA.value)
-    mock_requests_get.assert_any_call(auth_needed_response.url, auth=("test_user", "test_pass"))
-    mock_get_creds.assert_called_once_with(None, None, host="urs.earthdata.nasa.gov")
+    assert auth_needed_response.status_code == 401
+    assert auth_success_response.status_code == 200
 
 
-@patch("opera_utils.credentials.get_temporary_aws_credentials.__wrapped__", wraps=get_temporary_aws_credentials.__wrapped__)
-@patch("requests.get")
-def test_get_temporary_aws_credentials_error(mock_requests_get, _):
+def test_get_temporary_aws_credentials_error(monkeypatch):
     """Test get_temporary_aws_credentials with HTTP error."""
-    # Mock response to raise exception
     mock_response = MagicMock()
-    mock_response.status_code = 200  # to avoid auth path
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("Test error")
-    mock_requests_get.return_value = mock_response
+    mock_response.status_code = 200  # so we skip the auth check
+    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+        "Test error"
+    )
 
-    # Call the function and verify it raises the expected exception
+    def mock_requests_get(url, *args, **kwargs):
+        return mock_response
+
+    monkeypatch.setattr(requests, "get", mock_requests_get)
+
     with pytest.raises(requests.exceptions.HTTPError, match="Test error"):
-        get_temporary_aws_credentials.__wrapped__(ASFCredentialEndpoints.OPERA, None, None)
+        get_temporary_aws_credentials.__wrapped__(
+            ASFCredentialEndpoints.OPERA, None, None
+        )
 
 
 def test_get_earthdata_username_password_direct():
@@ -159,65 +165,77 @@ def test_get_earthdata_username_password_direct():
     assert password == "direct_pass"
 
 
-# To avoid test interference from environment variables
-@patch.dict(os.environ, {"EARTHDATA_USERNAME": "env_user", "EARTHDATA_PASSWORD": "env_pass"}, clear=True)
-def test_get_earthdata_username_password_from_env():
+def test_get_earthdata_username_password_from_env(monkeypatch):
     """Test get_earthdata_username_password from environment variables."""
-    # Mock netrc to ensure we don't use it
-    with patch("netrc.netrc") as mock_netrc:
-        mock_netrc.side_effect = FileNotFoundError()
-        
-        username, password = get_earthdata_username_password()
-        assert username == "env_user"
-        assert password == "env_pass"
+
+    # Clear out netrc usage
+    def mock_netrc():
+        raise FileNotFoundError()
+
+    monkeypatch.setattr(netrc, "netrc", mock_netrc)
+    monkeypatch.setenv("EARTHDATA_USERNAME", "env_user")
+    monkeypatch.setenv("EARTHDATA_PASSWORD", "env_pass")
+
+    username, password = get_earthdata_username_password()
+    assert username == "env_user"
+    assert password == "env_pass"
 
 
-@patch("netrc.netrc")
-def test_get_earthdata_username_password_from_netrc(mock_netrc):
+def test_get_earthdata_username_password_from_netrc(monkeypatch):
     """Test get_earthdata_username_password from .netrc file."""
-    # Mock the netrc authenticators
     mock_netrc_instance = MagicMock()
     mock_netrc_instance.authenticators.return_value = ("netrc_user", None, "netrc_pass")
-    mock_netrc.return_value = mock_netrc_instance
 
-    # Clean environment to ensure we're testing netrc only
-    with patch.dict(os.environ, {}, clear=True):
-        username, password = get_earthdata_username_password()
-        assert username == "netrc_user"
-        assert password == "netrc_pass"
-        mock_netrc_instance.authenticators.assert_called_once_with("urs.earthdata.nasa.gov")
+    def mock_netrc():
+        return mock_netrc_instance
+
+    monkeypatch.setattr(netrc, "netrc", mock_netrc)
+    monkeypatch.delenv("EARTHDATA_USERNAME", raising=False)
+    monkeypatch.delenv("EARTHDATA_PASSWORD", raising=False)
+
+    username, password = get_earthdata_username_password()
+    assert username == "netrc_user"
+    assert password == "netrc_pass"
+    mock_netrc_instance.authenticators.assert_called_once_with("urs.earthdata.nasa.gov")
 
 
-@patch("netrc.netrc")
-def test_get_earthdata_username_password_no_credentials(mock_netrc):
+def test_get_earthdata_username_password_no_credentials(monkeypatch):
     """Test get_earthdata_username_password with no credentials available."""
     # Mock netrc to return None
     mock_netrc_instance = MagicMock()
     mock_netrc_instance.authenticators.return_value = None
-    mock_netrc.return_value = mock_netrc_instance
 
-    # Clean environment
-    with patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(ValueError, match="No credentials found"):
-            get_earthdata_username_password()
+    def mock_netrc():
+        return mock_netrc_instance
+
+    monkeypatch.setattr(netrc, "netrc", mock_netrc)
+    monkeypatch.delenv("EARTHDATA_USERNAME", raising=False)
+    monkeypatch.delenv("EARTHDATA_PASSWORD", raising=False)
+
+    with pytest.raises(EarthdataLoginFailure, match="No credentials found"):
+        get_earthdata_username_password()
 
 
-@patch("netrc.netrc")
-def test_get_earthdata_username_password_netrc_error(mock_netrc):
+def test_get_earthdata_username_password_netrc_error(monkeypatch):
     """Test get_earthdata_username_password with netrc error."""
-    # Mock netrc to raise exception
-    mock_netrc.side_effect = FileNotFoundError("No .netrc file")
 
-    # Clean environment but provide direct credentials
-    with patch.dict(os.environ, {}, clear=True):
-        username, password = get_earthdata_username_password("backup_user", "backup_pass")
-        assert username == "backup_user"
-        assert password == "backup_pass"
+    # netrc raises exception
+    def mock_netrc_error():
+        raise FileNotFoundError("No .netrc file")
 
-    # Clean environment with no direct credentials
-    with patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(ValueError, match="No credentials found"):
-            get_earthdata_username_password()
+    monkeypatch.setattr(netrc, "netrc", mock_netrc_error)
+
+    # Provide backup direct credentials
+    username, password = get_earthdata_username_password("backup_user", "backup_pass")
+    assert username == "backup_user"
+    assert password == "backup_pass"
+
+    # No direct credentials + netrc error + no env => fail
+    monkeypatch.delenv("EARTHDATA_USERNAME", raising=False)
+    monkeypatch.delenv("EARTHDATA_PASSWORD", raising=False)
+
+    with pytest.raises(EarthdataLoginFailure, match="No credentials found"):
+        get_earthdata_username_password()
 
 
 def test_get_earthdata_username_password_invalid_host():

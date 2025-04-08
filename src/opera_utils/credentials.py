@@ -32,6 +32,13 @@ class ASFCredentialEndpoints(Enum):
     SENTINEL1 = "https://sentinel1.asf.alaska.edu/s3credentials"
 
 
+ENDPOINT_TO_HOST = {
+    ASFCredentialEndpoints.OPERA: "urs.earthdata.nasa.gov",
+    ASFCredentialEndpoints.OPERA_UAT: "uat.urs.earthdata.nasa.gov",
+    ASFCredentialEndpoints.SENTINEL1: "urs.earthdata.nasa.gov",
+}
+
+
 @dataclass
 class AWSCredentials:
     """AWS credentials for direct S3 access."""
@@ -100,7 +107,6 @@ def get_temporary_aws_credentials(
     endpoint: str | ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
     earthdata_username: str | None = None,
     earthdata_password: str | None = None,
-    host: str = "urs.earthdata.nasa.gov",
 ) -> dict[str, str]:
     """Get temporary AWS S3 access credentials.
 
@@ -116,9 +122,6 @@ def get_temporary_aws_credentials(
         Earthdata Login username.
     earthdata_password : str | None
         Earthdata Login password.
-    host : str
-        The host for which to authenticate using netrc.
-        Default is "urs.earthdata.nasa.gov".
 
     Returns
     -------
@@ -141,7 +144,7 @@ def get_temporary_aws_credentials(
     resp = requests.get(endpoint.value)
     if resp.status_code == 401 and "nasa.gov/oauth/authorize?" in resp.url:
         username, password = get_earthdata_username_password(
-            earthdata_username, earthdata_password, host
+            earthdata_username, earthdata_password, host=ENDPOINT_TO_HOST[endpoint]
         )
         auth = (username, password)
         resp = requests.get(resp.url, auth=auth)
@@ -176,6 +179,9 @@ def get_earthdata_username_password(
     ValueError
         If no credentials are found.
     """
+    if host not in set(ENDPOINT_TO_HOST.values()):
+        raise ValueError(f"Invalid host: {host}. Choices: {ENDPOINT_TO_HOST.values()}")
+
     # Case 1: Use provided credentials if both are specified
     if earthdata_username and earthdata_password:
         return earthdata_username, earthdata_password
@@ -195,7 +201,7 @@ def get_earthdata_username_password(
         return username, password
 
     # No valid credentials found
-    raise ValueError(
+    raise EarthdataLoginFailure(
         "No credentials found: neither valid parameters provided, .netrc file has a"
         f" '{host}' entry, nor environment variables set."
     )
