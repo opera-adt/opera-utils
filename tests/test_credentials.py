@@ -102,7 +102,7 @@ def test_get_temporary_aws_credentials_different_endpoint():
         # ('Received response with content-encoding: gzip, but failed to decode it.',
         #     error('Error -3 while decompressing data: incorrect header check'))
         pytest.skip("Skipping fake decoding on Python 3.9")
-    result = get_temporary_aws_credentials(endpoint="OPERA_UAT")
+    result = get_temporary_aws_credentials(endpoint=ASFCredentialEndpoints.OPERA_UAT)
     expected = {
         "accessKeyId": "FAKEACCESS",
         "secretAccessKey": "FAKESECRET",
