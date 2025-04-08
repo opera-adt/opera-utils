@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from os import fsdecode
 from pathlib import Path
+from typing import Any
 
 import aiohttp
 import fsspec
@@ -24,7 +25,8 @@ def open_h5(
     rdcc_nbytes: int = 1024 * 1024 * 1000,
     earthdata_username: str | None = None,
     earthdata_password: str | None = None,
-    asf_endpoint: str = "opera",
+    asf_endpoint: str | ASFCredentialEndpoints = "OPERA",
+    fsspec_kwargs: dict[str, Any] = {"cache_type": "first"},
 ) -> h5py.File:
     """Open a remote (or local) HDF5 file.
 
@@ -66,6 +68,9 @@ def open_h5(
     asf_endpoint : str, optional
         (For S3 access) The ASF endpoint to use for temporary AWS credentials.
         Default is "opera".
+    fsspec_kwargs : dict[str, Any], optional
+        Additional keyword arguments to pass to fsspec.
+        Default is `{"cache_type": "first"}`.
 
 
     Returns
@@ -80,28 +85,30 @@ def open_h5(
         specified host.
 
     """
-    url_str = fsdecode(url.resolve().as_uri()) if isinstance(url, Path) else str(url)
+    url_str = (
+        fsdecode(url.resolve().as_uri()) if isinstance(url, Path) else fsdecode(url)
+    )
 
+    endpoint = (
+        ASFCredentialEndpoints[asf_endpoint.upper()]
+        if isinstance(asf_endpoint, str)
+        else asf_endpoint
+    )
     if url_str.startswith("http"):
-        endpoint = (
-            ASFCredentialEndpoints[asf_endpoint.upper()]
-            if isinstance(asf_endpoint, str)
-            else asf_endpoint
-        )
         fs = get_https_fs(
             earthdata_username, earthdata_password, host=ENDPOINT_TO_HOST[endpoint]
         )
     elif url_str.startswith("s3://"):
-        fs = get_s3_fs(asf_endpoint=asf_endpoint)
+        fs = get_s3_fs(asf_endpoint=endpoint.value)
     elif url_str.startswith("file://"):
         fs = fsspec.filesystem("file")
     else:
-        raise ValueError(f"Unrecognized scheme for {url}")
+        raise ValueError(f"Unrecognized scheme for {url_str}")
 
     # h5py arguments used to set the "cloud-friendly" parameters
     cloud_kwargs = dict(fs_page_size=page_size, rdcc_nbytes=rdcc_nbytes)
     # Create the Open File-like object from fsspec
-    byte_stream = fs.open(path=url, mode="rb", cache_type="first")
+    byte_stream = fs.open(path=url_str, mode="rb", **fsspec_kwargs)
     return h5py.File(byte_stream, mode="r", **cloud_kwargs)
 
 
@@ -144,12 +151,14 @@ def get_https_fs(
     return fs
 
 
-def get_s3_fs(asf_endpoint: str = "opera") -> s3fs.S3FileSystem:
+def get_s3_fs(
+    asf_endpoint: str | ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
+) -> s3fs.S3FileSystem:
     """Create an fsspec filesystem object authenticated using temporary AWS credentials.
 
     Parameters
     ----------
-    asf_endpoint : str, optional
+    asf_endpoint : str | ASFCredentialEndpoints, optional
         The ASF endpoint to use for temporary AWS credentials, by default "opera"
         Choices are "opera", "opera-uat"
 
@@ -161,7 +170,7 @@ def get_s3_fs(asf_endpoint: str = "opera") -> s3fs.S3FileSystem:
     try:
         creds = AWSCredentials.from_env()
     except KeyError:
-        creds = AWSCredentials.from_asf(asf_endpoint)
+        creds = AWSCredentials.from_asf(endpoint=asf_endpoint)
     s3_fs = s3fs.S3FileSystem(
         key=creds.access_key_id,
         secret=creds.secret_access_key,

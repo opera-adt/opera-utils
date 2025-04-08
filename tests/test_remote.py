@@ -5,10 +5,28 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from opera_utils.credentials import AWSCredentials
+from opera_utils.disp._product import DispProduct
 from opera_utils.disp._remote import get_https_fs, get_s3_fs, open_h5
+
+
+# @pytest.mark.vcr
+@pytest.mark.skip(
+    reason="fsspec fetching entire file; `size_policy` needs investigation"
+)
+def test_open_h5_disp_product():
+    url = "https://datapool-test.asf.alaska.edu/DISP/OPERA-S1/OPERA_L3_DISP-S1_IW_F11115_VV_20160810T140735Z_20160903T140736Z_v1.1_20250215T012240Z.nc"
+    dp = DispProduct(url)
+    with open_h5(url, asf_endpoint="OPERA_UAT", rdcc_nbytes=1024) as hf:
+        assert "displacement" in hf.keys()
+        assert "phase_similarity" in hf.keys()
+        assert hf["displacement"].shape == dp.shape
+        # Fetch real displacement value at one pixel
+        d = hf["displacement"][4000, 4000]
+        assert d == np.float32(0.047729492)
 
 
 def test_get_https_fs(monkeypatch):
@@ -121,8 +139,9 @@ def test_open_h5_https(monkeypatch):
 
     monkeypatch.setattr("h5py.File", mock_h5py_file)
 
+    url = "https://datapool-test.asf.alaska.edu/DISP/OPERA-S1/OPERA_L3_DISP-S1_IW_F11115_VV_20160810T140735Z_20160903T140736Z_v1.1_20250215T012240Z.nc"
     result = open_h5(
-        "https://example.com/file.h5",
+        url,
         page_size=8192,
         rdcc_nbytes=2000000,
         earthdata_username="test_user",
@@ -155,7 +174,7 @@ def test_open_h5_s3(monkeypatch):
     # Call the function
     result = open_h5(
         "s3://bucket/file.h5",
-        asf_endpoint="opera-uat",
+        asf_endpoint="OPERA_UAT",
     )
     assert result == mock_file
 

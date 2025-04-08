@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import netrc
+import sys
 from unittest.mock import MagicMock
 
 import pytest
@@ -96,6 +97,11 @@ def test_get_temporary_aws_credentials():
 @pytest.mark.vcr
 def test_get_temporary_aws_credentials_different_endpoint():
     """Test get_temporary_aws_credentials with authentication."""
+    if sys.version_info < (3, 10):
+        # Problem:
+        # ('Received response with content-encoding: gzip, but failed to decode it.',
+        #     error('Error -3 while decompressing data: incorrect header check'))
+        pytest.skip("Skipping fake decoding on Python 3.9")
     result = get_temporary_aws_credentials(endpoint="OPERA_UAT")
     expected = {
         "accessKeyId": "FAKEACCESS",

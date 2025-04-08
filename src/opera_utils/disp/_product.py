@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -115,6 +116,9 @@ class DispProduct:
         )
         profile["crs"] = f"EPSG:{self.epsg}"
         return profile
+
+    def __fspath__(self) -> str:
+        return os.fspath(self.filename)
 
 
 @dataclass
