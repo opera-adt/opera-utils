@@ -1,7 +1,5 @@
-from contextlib import contextmanager
 from os import fsdecode
 from pathlib import Path
-from typing import Generator
 
 import aiohttp
 import fsspec
@@ -13,7 +11,6 @@ from opera_utils.credentials import AWSCredentials, get_earthdata_username_passw
 __all__ = ["open_h5"]
 
 
-@contextmanager
 def open_h5(
     url: str | Path,
     page_size: int = 4 * 1024 * 1024,
@@ -22,8 +19,8 @@ def open_h5(
     earthdata_password: str | None = None,
     host: str = "urs.earthdata.nasa.gov",
     asf_endpoint: str = "opera",
-) -> Generator[h5py.File, None, None]:
-    """Context manager to open a remote (or local) HDF5 file.
+) -> h5py.File:
+    """Open a remote (or local) HDF5 file.
 
     Can handle both HTTPS access (your Earthdata login credentials) and
     S3 URLs (for direct S3 access via temporary AWS credentials).
@@ -55,7 +52,7 @@ def open_h5(
         HDF5 file (which is 4 MB for OPERA DISP-S1)
     rdcc_nbytes : int
         The number of bytes to use for the read cache.
-        Default is 1000MB.
+        Default is 1GB
     earthdata_username : str | None, optional
         Earthdata Login username, if environment variables are not set.
     earthdata_password : str | None, optional
@@ -68,10 +65,10 @@ def open_h5(
         Default is "opera".
 
 
-    Yields
-    ------
-    Generator[h5py.File, None, None]
-        Generator for the opened HDF5 file.
+    Returns
+    -------
+    h5py.File
+        An opened HDF5 file.
 
     Raises
     ------
@@ -95,8 +92,7 @@ def open_h5(
     cloud_kwargs = dict(fs_page_size=page_size, rdcc_nbytes=rdcc_nbytes)
     # Create the Open File-like object from fsspec
     byte_stream = fs.open(path=url, mode="rb", cache_type="first")
-    with h5py.File(byte_stream, mode="r", **cloud_kwargs) as hf:
-        yield hf
+    return h5py.File(byte_stream, mode="r", **cloud_kwargs)
 
 
 def get_https_fs(
