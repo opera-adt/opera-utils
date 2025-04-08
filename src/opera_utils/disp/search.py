@@ -152,6 +152,7 @@ def get_products(
     product_version: str | None = None,
     start_datetime: datetime | None = None,
     end_datetime: datetime | None = None,
+    url_type: Literal["s3", "https"] = "https",
     use_uat: bool = False,
 ) -> list[Granule]:
     """Query the CMR for granules matching the given frame ID and product version.
@@ -166,6 +167,9 @@ def get_products(
         The start of the temporal range in UTC.
     end_datetime : datetime, optional
         The end of the temporal range in UTC.
+    url_type : Literal["s3", "https"]
+        The protocol to use for downloading, either "s3" or "https".
+        Default is "https".
     use_uat : bool
         Whether to use the UAT environment.
         Default is False (uses main Earthdata environment)
@@ -212,7 +216,9 @@ def get_products(
         response = requests.get(search_url, params=params, headers=headers)
         response.raise_for_status()
         data = response.json()
-        cur_granules = [Granule.from_umm(item["umm"]) for item in data["items"]]
+        cur_granules = [
+            Granule.from_umm(item["umm"], url_type=url_type) for item in data["items"]
+        ]
         # CMR filters apply to both the reference and secondary time (as of 2025-03-29)
         # We want to filter just by the secondary time
         granules.extend(

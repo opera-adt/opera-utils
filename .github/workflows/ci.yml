@@ -51,7 +51,7 @@ jobs:
               - conda-forge
       - name: Install
         run: |
-          pip install .[test]
+          pip install .[test,remote]
       - name: Test
         run: |
           pytest -n0
