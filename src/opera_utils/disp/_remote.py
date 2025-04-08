@@ -80,8 +80,7 @@ def open_h5(
         specified host.
 
     """
-    if isinstance(url, Path):
-        url_str = fsdecode(url.resolve().as_uri())
+    url_str = fsdecode(url.resolve().as_uri()) if isinstance(url, Path) else str(url)
 
     if url_str.startswith("http"):
         fs = get_https_fs(earthdata_username, earthdata_password, host)

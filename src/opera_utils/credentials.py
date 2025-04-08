@@ -69,7 +69,7 @@ class AWSCredentials:
         Assumes Earthdata Login credentials are available via a .netrc file,
         or via EARTHDATA_USERNAME and EARTHDATA_PASSWORD environment variables.
         """
-        data = get_temporary_aws_credentials(ASFCredentialEndpoints(endpoint))
+        data = get_temporary_aws_credentials(endpoint)
         return cls(
             access_key_id=data["accessKeyId"],
             secret_access_key=data["secretAccessKey"],
@@ -97,7 +97,7 @@ class AWSCredentials:
 
 @cache
 def get_temporary_aws_credentials(
-    endpoint: ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
+    endpoint: str | ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
     earthdata_username: str | None = None,
     earthdata_password: str | None = None,
     host: str = "urs.earthdata.nasa.gov",
@@ -133,11 +133,18 @@ def get_temporary_aws_credentials(
         If the request to the endpoint fails.
 
     """
-    username, password = get_earthdata_username_password(
-        earthdata_username, earthdata_password, host
+    endpoint = (
+        ASFCredentialEndpoints[endpoint.upper()]
+        if isinstance(endpoint, str)
+        else endpoint
     )
-    auth = (username, password)
-    resp = requests.get(endpoint.value, auth=auth)
+    resp = requests.get(endpoint.value)
+    if resp.status_code == 401 and "nasa.gov/oauth/authorize?" in resp.url:
+        username, password = get_earthdata_username_password(
+            earthdata_username, earthdata_password, host
+        )
+        auth = (username, password)
+        resp = requests.get(resp.url, auth=auth)
     resp.raise_for_status()
     return resp.json()
 
