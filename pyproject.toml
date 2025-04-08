@@ -55,7 +55,10 @@ opera-utils = "opera_utils.cli:cli_app"
 
 # extra requirements: `pip install .[docs]` or `pip install .[test]`
 [project.optional-dependencies]
+# For geopandas functionality with burst/frame databases:
 geopandas = ["geopandas", "pyogrio"]
+# Access remote hdf5 files over S3 or HTTPS:
+remote = ["aiohttp", "fsspec", "s3fs"]
 
 test = [
   "asf_search",

@@ -7,6 +7,12 @@ from typing import Self
 
 import requests
 
+__all__ = [
+    "AWSCredentials",
+    "get_earthdata_username_password",
+    "get_temporary_aws_credentials",
+]
+
 
 class EarthdataLoginFailure(Exception):
     """Exception raised when Earthdata Login credentials are not found."""
