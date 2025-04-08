@@ -1,5 +1,7 @@
 """Tests for the credentials module using pytest monkeypatch."""
 
+from __future__ import annotations
+
 import netrc
 from unittest.mock import MagicMock
 
@@ -77,66 +79,32 @@ def test_aws_credentials_from_env_missing_vars(monkeypatch):
         AWSCredentials.from_env()
 
 
-def test_get_temporary_aws_credentials_direct(monkeypatch):
-    """Test get_temporary_aws_credentials with direct response (no auth needed)."""
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "accessKeyId": "direct_id",
-        "secretAccessKey": "direct_secret",
-        "sessionToken": "direct_token",
-    }
-
-    def mock_requests_get(url, *args, **kwargs):
-        return mock_response
-
-    monkeypatch.setattr(requests, "get", mock_requests_get)
-
-    # Call the real function (caching is still on, but this is our first call).
-    result = get_temporary_aws_credentials("OPERA", None, None)
-    assert result == mock_response.json.return_value
-
-
-def test_get_temporary_aws_credentials_with_auth(monkeypatch):
+@pytest.mark.vcr
+def test_get_temporary_aws_credentials():
     """Test get_temporary_aws_credentials with authentication."""
-    auth_needed_response = MagicMock()
-    auth_needed_response.status_code = 401
-    auth_needed_response.url = (
-        "https://urs.earthdata.nasa.gov/oauth/authorize?client_id=test"
-    )
+    result = get_temporary_aws_credentials()
 
-    auth_success_response = MagicMock()
-    auth_success_response.status_code = 200
-    auth_success_response.json.return_value = {
-        "accessKeyId": "auth_id",
-        "secretAccessKey": "auth_secret",
-        "sessionToken": "auth_token",
+    expected = {
+        "accessKeyId": "FAKEACCESS",
+        "secretAccessKey": "FAKESECRET",
+        "sessionToken": "FAKESESSION",
+        "expiration": "2025-04-08 14:20:17+00:00",
+    }
+    assert result == expected
+
+
+@pytest.mark.vcr
+def test_get_temporary_aws_credentials_different_endpoint():
+    """Test get_temporary_aws_credentials with authentication."""
+    result = get_temporary_aws_credentials(endpoint="OPERA_UAT")
+    expected = {
+        "accessKeyId": "FAKEACCESS",
+        "secretAccessKey": "FAKESECRET",
+        "sessionToken": "FAKESESSION",
+        "expiration": "2025-04-08 14:22:33+00:00",
     }
 
-    # The first call 401s, the second call 200s
-    def mock_requests_get(url, auth=None, *args, **kwargs):
-        if auth is None:
-            return auth_needed_response
-        return auth_success_response
-
-    monkeypatch.setattr(requests, "get", mock_requests_get)
-
-    # Mock get_earthdata_username_password
-    def mock_get_creds(u, p, host=None):
-        return ("test_user", "test_pass")
-
-    monkeypatch.setattr(
-        "opera_utils.credentials.get_earthdata_username_password", mock_get_creds
-    )
-
-    # Call the underlying function to bypass cache for demonstration
-    result = get_temporary_aws_credentials.__wrapped__(
-        ASFCredentialEndpoints.OPERA, None, None
-    )
-
-    assert result == auth_success_response.json.return_value
-    assert auth_needed_response.status_code == 401
-    assert auth_success_response.status_code == 200
+    assert result == expected
 
 
 def test_get_temporary_aws_credentials_error(monkeypatch):

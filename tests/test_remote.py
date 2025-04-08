@@ -1,5 +1,7 @@
 """Tests for the remote module in disp package, rewritten to use pytest monkeypatch."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -106,7 +108,7 @@ def test_open_h5_https(monkeypatch):
     mock_byte_stream = MagicMock()
     mock_fs.open.return_value = mock_byte_stream
 
-    def mock_get_https_fs(u=None, p=None, h=None):
+    def mock_get_https_fs(earthdata_username=None, earthdata_password=None, host=None):
         return mock_fs
 
     monkeypatch.setattr("opera_utils.disp._remote.get_https_fs", mock_get_https_fs)
@@ -125,7 +127,6 @@ def test_open_h5_https(monkeypatch):
         rdcc_nbytes=2000000,
         earthdata_username="test_user",
         earthdata_password="test_pass",
-        host="custom.host",
     )
 
     assert result == mock_file

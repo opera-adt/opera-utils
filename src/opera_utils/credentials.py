@@ -3,9 +3,9 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-from typing import Self
 
 import requests
+from typing_extensions import Self
 
 __all__ = [
     "AWSCredentials",

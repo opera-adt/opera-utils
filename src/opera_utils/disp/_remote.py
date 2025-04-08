@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from os import fsdecode
 from pathlib import Path
 
@@ -6,7 +8,12 @@ import fsspec
 import h5py
 import s3fs
 
-from opera_utils.credentials import AWSCredentials, get_earthdata_username_password
+from opera_utils.credentials import (
+    ENDPOINT_TO_HOST,
+    ASFCredentialEndpoints,
+    AWSCredentials,
+    get_earthdata_username_password,
+)
 
 __all__ = ["open_h5"]
 
@@ -17,7 +24,6 @@ def open_h5(
     rdcc_nbytes: int = 1024 * 1024 * 1000,
     earthdata_username: str | None = None,
     earthdata_password: str | None = None,
-    host: str = "urs.earthdata.nasa.gov",
     asf_endpoint: str = "opera",
 ) -> h5py.File:
     """Open a remote (or local) HDF5 file.
@@ -57,9 +63,6 @@ def open_h5(
         Earthdata Login username, if environment variables are not set.
     earthdata_password : str | None, optional
         Earthdata Login password, if environment variables are not set.
-    host : str, optional
-        (For S3 access) The host used to request temporary AWS credentials.
-        Default is "urs.earthdata.nasa.gov".
     asf_endpoint : str, optional
         (For S3 access) The ASF endpoint to use for temporary AWS credentials.
         Default is "opera".
@@ -80,7 +83,14 @@ def open_h5(
     url_str = fsdecode(url.resolve().as_uri()) if isinstance(url, Path) else str(url)
 
     if url_str.startswith("http"):
-        fs = get_https_fs(earthdata_username, earthdata_password, host)
+        endpoint = (
+            ASFCredentialEndpoints[asf_endpoint.upper()]
+            if isinstance(asf_endpoint, str)
+            else asf_endpoint
+        )
+        fs = get_https_fs(
+            earthdata_username, earthdata_password, host=ENDPOINT_TO_HOST[endpoint]
+        )
     elif url_str.startswith("s3://"):
         fs = get_s3_fs(asf_endpoint=asf_endpoint)
     elif url_str.startswith("file://"):

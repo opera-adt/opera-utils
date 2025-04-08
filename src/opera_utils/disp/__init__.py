@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ._product import DispProduct, DispProductStack
 from ._utils import get_frame_coordinates
 
