@@ -65,9 +65,10 @@ def open_h5(
         Earthdata Login username, if environment variables are not set.
     earthdata_password : str | None, optional
         Earthdata Login password, if environment variables are not set.
-    asf_endpoint : str, optional
+    asf_endpoint : str
         (For S3 access) The ASF endpoint to use for temporary AWS credentials.
-        Default is "opera".
+        Choices are "OPERA", "OPERA_UAT", "SENTINEL1"
+        Default is "OPERA"
     fsspec_kwargs : dict[str, Any], optional
         Additional keyword arguments to pass to fsspec.
         Default is `{"cache_type": "first"}`.
@@ -89,17 +90,16 @@ def open_h5(
         fsdecode(url.resolve().as_uri()) if isinstance(url, Path) else fsdecode(url)
     )
 
-    endpoint = (
-        ASFCredentialEndpoints[asf_endpoint.upper()]
-        if isinstance(asf_endpoint, str)
-        else asf_endpoint
-    )
+    if isinstance(asf_endpoint, str):
+        assert asf_endpoint.upper() in {"OPERA", "OPERA_UAT", "SENTINEL1"}
+        asf_endpoint = ASFCredentialEndpoints[asf_endpoint.upper()]
+
     if url_str.startswith("http"):
         fs = get_https_fs(
-            earthdata_username, earthdata_password, host=ENDPOINT_TO_HOST[endpoint]
+            earthdata_username, earthdata_password, host=ENDPOINT_TO_HOST[asf_endpoint]
         )
     elif url_str.startswith("s3://"):
-        fs = get_s3_fs(asf_endpoint=endpoint.value)
+        fs = get_s3_fs(asf_endpoint=asf_endpoint)
     elif url_str.startswith("file://"):
         fs = fsspec.filesystem("file")
     else:
@@ -152,15 +152,14 @@ def get_https_fs(
 
 
 def get_s3_fs(
-    asf_endpoint: str | ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
+    asf_endpoint: ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
 ) -> s3fs.S3FileSystem:
     """Create an fsspec filesystem object authenticated using temporary AWS credentials.
 
     Parameters
     ----------
-    asf_endpoint : str | ASFCredentialEndpoints, optional
-        The ASF endpoint to use for temporary AWS credentials, by default "opera"
-        Choices are "opera", "opera-uat"
+    asf_endpoint : ASFCredentialEndpoints, optional
+        The ASF endpoint to use for temporary AWS credentials, by default "OPERA"
 
     Returns
     -------

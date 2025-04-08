@@ -69,7 +69,7 @@ class AWSCredentials:
 
     @classmethod
     def from_asf(
-        cls, endpoint: str | ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA
+        cls, endpoint: ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA
     ) -> Self:
         """Get temporary AWS S3 access credentials.
 
@@ -106,7 +106,7 @@ class AWSCredentials:
 
 @cache
 def get_temporary_aws_credentials(
-    endpoint: str | ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
+    endpoint: ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
     earthdata_username: str | None = None,
     earthdata_password: str | None = None,
 ) -> dict[str, str]:
@@ -138,11 +138,6 @@ def get_temporary_aws_credentials(
         If the request to the endpoint fails.
 
     """
-    endpoint = (
-        ASFCredentialEndpoints[endpoint.upper()]
-        if isinstance(endpoint, str)
-        else endpoint
-    )
     resp = requests.get(endpoint.value)
     if resp.status_code == 401 and "nasa.gov/oauth/authorize?" in resp.url:
         username, password = get_earthdata_username_password(
