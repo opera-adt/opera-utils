@@ -86,9 +86,7 @@ def open_h5(
         specified host.
 
     """
-    url_str = (
-        fsdecode(url.resolve().as_uri()) if isinstance(url, Path) else fsdecode(url)
-    )
+    url_str = fsdecode(url.resolve().as_uri() if isinstance(url, Path) else url)
 
     if isinstance(asf_endpoint, str):
         assert asf_endpoint.upper() in {"OPERA", "OPERA_UAT", "SENTINEL1"}

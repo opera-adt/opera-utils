@@ -17,14 +17,10 @@ if TYPE_CHECKING:
 GeojsonOrGdf = Union[dict, "geopandas.GeoDataFrame"]
 
 # Check if geopandas is available
-_has_geopandas = False
-try:
-    import geopandas
-
-    if importlib.util.find_spec("pyogrio"):
-        _has_geopandas = True
-except ImportError:
-    pass
+_has_geopandas = (
+    importlib.util.find_spec("pyogrio") is not None
+    and importlib.util.find_spec("geopandas") is not None
+)
 
 
 def read_zipped_json(filename: PathOrStr) -> dict:
