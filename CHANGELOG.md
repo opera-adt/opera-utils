@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/) and follows t
 
 ## [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.19.0...HEAD)
 
+## [0.19.0](https://github.com/opera-adt/opera-utils/compare/v0.18.1...v0.19.0) - 2025-04-11
+
+### Added
+* Add DISP-S1 product handling: search with `opera_utils.disp.search`, read and parse files with `opera_utils.disp.DispProduct` and `DispProductStack`
+* Add `credentials` and `disp._remote` module with `open_h5` for https/s3 access
+* Restrict `str` usage for `ASFCredentialEndpoints`
+* Add `plot-disp-s1-frame.py` and `plot-intersecting-frames.py` scripts for visualization DISP-S1 Frames
+
+### Changed
+* Make `disp-s1` and `disp-nisar` sub-commands, add `intersects`
+
+### Fixed
+* Add missing tests for `stitching` and `burst_frame_db` modules
+* Use `Enum` for `UrlType` instead of `Literal["s3", "https"]` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/111
+
+
 ## [0.18.1](https://github.com/opera-adt/opera-utils/compare/v0.18.0...v0.18.1) - 2025-03-25
 
 ### Changed
