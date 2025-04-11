@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Literal
+from typing import Any
 
 import requests
 
@@ -27,6 +27,19 @@ class OrbitPass(str, Enum):
 
     ASCENDING = "ASCENDING"
     DESCENDING = "DESCENDING"
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+
+class UrlType(str, Enum):
+    """Choices for the orbit direction of a granule."""
+
+    S3 = "s3"
+    HTTPS = "https"
+
+    def __str__(self) -> str:
+        return str(self.value)
 
 
 @dataclass
@@ -55,9 +68,7 @@ class Granule:
 
     @classmethod
     def from_umm(
-        cls,
-        umm_data: dict[str, Any],
-        url_type: Literal["s3", "https"] = "https",
+        cls, umm_data: dict[str, Any], url_type: UrlType = UrlType.HTTPS
     ) -> "Granule":
         """Construct a Granule instance from a raw dictionary.
 
@@ -65,7 +76,7 @@ class Granule:
         ----------
         umm_data : dict[str, Any]
             The raw granule UMM data from the CMR API.
-        url_type : Literal["s3", "https"]
+        url_type : UrlType
             Type of url to use from the Product.
             "s3" for S3 URLs (direct access), "https" for HTTPS URLs.
 
@@ -105,8 +116,7 @@ class Granule:
 
 
 def _get_download_url(
-    umm_data: dict[str, Any],
-    protocol: Literal["s3", "https"] = "https",
+    umm_data: dict[str, Any], protocol: UrlType = UrlType.HTTPS
 ) -> str:
     """Extract a download URL from the product's UMM metadata.
 
@@ -114,7 +124,7 @@ def _get_download_url(
     ----------
     umm_data : dict[str, Any]
         The product's umm metadata dictionary
-    protocol : Literal["s3", "https"]
+    protocol : UrlType
         The protocol to use for downloading, either "s3" or "https"
 
     Returns
@@ -149,10 +159,10 @@ def _get_attr(attrs: list[dict[str, Any]], name: str) -> str:
 
 def get_products(
     frame_id: int | None = None,
-    product_version: str | None = None,
+    product_version: str | None = "1.0",
     start_datetime: datetime | None = None,
     end_datetime: datetime | None = None,
-    url_type: Literal["s3", "https"] = "https",
+    url_type: UrlType = UrlType.HTTPS,
     use_uat: bool = False,
 ) -> list[Granule]:
     """Query the CMR for granules matching the given frame ID and product version.
@@ -167,12 +177,10 @@ def get_products(
         The start of the temporal range in UTC.
     end_datetime : datetime, optional
         The end of the temporal range in UTC.
-    url_type : Literal["s3", "https"]
+    url_type : UrlType
         The protocol to use for downloading, either "s3" or "https".
-        Default is "https".
     use_uat : bool
-        Whether to use the UAT environment.
-        Default is False (uses main Earthdata environment)
+        Whether to use the UAT environment instead of main Earthdata endpoint.
 
     Returns
     -------
