@@ -65,6 +65,7 @@ class Granule:
     product: DispProduct
     url: str
     orbit_pass: OrbitPass
+    size_in_bytes: int | None
 
     @classmethod
     def from_umm(
@@ -93,6 +94,10 @@ class Granule:
         url = _get_download_url(umm_data, protocol=url_type)
         product = DispProduct.from_filename(url)
         additional_attributes = umm_data.get("AdditionalAttributes", [])
+        archive_info = umm_data.get("DataGranule", {}).get(
+            "ArchiveAndDistributionInformation", []
+        )
+        size_in_bytes = archive_info[0].get("SizeInBytes", 0) if archive_info else None
         orbit_pass = OrbitPass(
             _get_attr(additional_attributes, "ASCENDING_DESCENDING").upper()
         )
@@ -100,6 +105,7 @@ class Granule:
             product=product,
             url=url,
             orbit_pass=orbit_pass,
+            size_in_bytes=size_in_bytes,
         )
 
     @property
