@@ -155,7 +155,7 @@ def rereference(
         for r in corrections_readers:
             current_displacement -= r[idx]
 
-        # Apply spaitla reference point if needed
+        # Apply spaital reference point if needed
         if reference_point is not None:
             current_displacement -= current_displacement[reference_point]
 

@@ -120,6 +120,28 @@ class DispProduct:
     def __fspath__(self) -> str:
         return os.fspath(self.filename)
 
+    def _lonlat_to_rowcol(self: Self, lon: float, lat: float):
+        import pyproj
+
+        epsg = self.epsg
+        transform = self.get_rasterio_profile()["transform"]
+
+        # Create transformer from WGS84 to the target CRS
+        transformer = pyproj.Transformer.from_crs(
+            "EPSG:4326",
+            f"EPSG:{epsg}",
+            always_xy=True,
+        )
+
+        # Transform lon/lat to the raster's CRS
+        x, y = transformer.transform(lon, lat)
+
+        # Apply the inverse of the affine transform to get row/col
+        col, row = ~transform * (x, y)
+
+        # Return as integers
+        return int(round(row)), int(round(col))
+
 
 @dataclass
 class DispProductStack:
@@ -140,6 +162,7 @@ class DispProductStack:
             msg += f"but {len(self.products)} products."
             msg += f"Versions: {version_count.most_common()}"
             raise ValueError(msg)
+        # TODO: SORT!
 
     @classmethod
     def from_file_list(cls, file_list: Iterable[Path | str]) -> Self:
@@ -191,3 +214,55 @@ class DispProductStack:
 
     def __getitem__(self, idx: int) -> DispProduct:
         return self.products[idx]
+
+
+from tqdm.auto import trange
+
+
+def create_continuous_timeseries(stack, results):
+    """
+    Create a continuous time series from interferogram measurements by handling
+    reference date transitions.
+
+    Parameters
+    ----------
+    stack : object
+        Object containing a list of products with reference_datetime and secondary_datetime attributes
+    results : np.ndarray
+        3D array of displacement values [time, height, width]
+
+    Returns
+    -------
+    np.ndarray
+        Continuous displacement time series with consistent reference date
+    """
+    products = stack.products
+
+    # Initialize arrays
+    shape = results.shape[1:]  # Get the 2D spatial dimensions
+    output = np.zeros_like(results)
+    cumulative_offset = np.zeros(shape, dtype=np.float32)
+    last_displacement = np.zeros(shape, dtype=np.float32)
+
+    # Set initial reference date
+    latest_reference_date = products[0].reference_datetime
+
+    # Process each time step
+    for idx in trange(len(products), desc="Creating continuous time series"):
+        # Get current product and displacement
+        product = products[idx]
+        current_displacement = results[idx]
+
+        # Check for shift in temporal reference date
+        if product.reference_datetime != latest_reference_date:
+            # When reference date changes, accumulate the previous displacement
+            cumulative_offset += last_displacement
+            latest_reference_date = product.reference_datetime
+
+        # Store current displacement for next iteration
+        last_displacement = current_displacement.copy()
+
+        # Add cumulative offset to get consistent reference
+        output[idx] = current_displacement + cumulative_offset
+
+    return output

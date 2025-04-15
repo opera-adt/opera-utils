@@ -174,3 +174,106 @@ def get_s3_fs(
         token=creds.session_token,
     )
     return s3_fs
+
+
+import numpy as np
+
+from ._product import DispProduct
+
+
+def read_lonlat(
+    product: DispProduct, lon_slice: slice, lat_slice: slice, dset: str = "displacement"
+) -> np.ndarray:
+    # Convert lon/lat to row/col
+    lon_start, lon_stop = lon_slice.start, lon_slice.stop
+    lat_start, lat_stop = lat_slice.start, lat_slice.stop
+    row_start, col_start = product._lonlat_to_rowcol(lon_start, lat_start)
+    row_stop, col_stop = product._lonlat_to_rowcol(lon_stop, lat_stop)
+
+    # TODO: this is hacky
+    if col_stop < col_start:
+        raise ValueError(f"{col_start}, {col_stop}")
+    elif col_stop == col_start:
+        col_stop += 1
+
+    if row_stop < row_start:
+        raise ValueError(f"{row_start}, {row_stop}")
+    elif row_stop == row_start:
+        row_stop += 1
+
+    with open_h5(product) as hf:
+        dset = hf[dset]
+        return dset[row_start:row_stop, col_start:col_stop]
+
+
+def read_stack(product, lons, lats, dset="displacement"):
+    """
+    Read data from a single product at specified point.
+
+    Parameters
+    ----------
+    product : DispProduct
+        The product to read from
+    point : object
+        Object containing x and y attributes for the point to read
+
+    Returns
+    -------
+    np.ndarray
+        Data at the specified location
+    """
+    if not isinstance(lons, slice):
+        if np.array(lons).size == 1:
+            lons = slice(lons, lons)
+    if not isinstance(lats, slice):
+        if np.array(lats).size == 1:
+            lats = slice(lats, lats)
+    return read_lonlat(product, lons, lats, dset=dset)
+
+
+def process_stack(stack, lons, lats, n_processes=None, dset: str = "displacement"):
+    """
+    Process the entire stack using multiprocessing.
+
+    Parameters
+    ----------
+    stack : object
+        Object containing a list of products
+    point : object
+        Object containing x and y attributes for the point to read
+    n_processes : int, optional
+        Number of processes to use, by default None (uses number of CPUs)
+
+    Returns
+    -------
+    np.ndarray
+        Stacked results from all products
+    """
+    import multiprocessing as mp
+    from functools import partial
+
+    import numpy as np
+    from tqdm import tqdm
+
+    # Set the start method to 'spawn' for better compatibility across platforms
+    ctx = mp.get_context("spawn")
+
+    # Create a partial function with fixed point parameter
+    read_func = partial(read_stack, lons=lons, lats=lats, dset=dset)
+
+    # Use the specified number of processes or default to CPU count
+    n_processes = n_processes or mp.cpu_count()
+
+    # Create a process pool
+    with ctx.Pool(processes=n_processes) as pool:
+        # Map read_func to all products with progress bar
+        results = list(
+            tqdm(
+                pool.imap(read_func, stack.products),
+                total=len(stack.products),
+                desc="Reading products",
+            )
+        )
+
+    # Stack the results
+    return np.stack(results)
