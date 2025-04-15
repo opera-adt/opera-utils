@@ -359,17 +359,18 @@ def find_reference_point(
     # Step back from high to low and pick all points meeting a threshold.
     # We don't just want the highest quality, isolated pixel:
     # We want one toward the middle of the good data pixels.
+    # TODO: implement median of all candidates as a `reference_mask`
     for threshold in np.arange(max_quality_test, min_quality - step, -step):
         candidates = quality > threshold
         if not np.any(candidates):
             continue
         # Find the pixel closest to the center of mass of the good pixels.
-        center_of_mass = ndimage.center_of_mass(candidates)
+        r, c = ndimage.center_of_mass(candidates)
         # The center may not be a good pixel! So find the candidate closest:
-        row, col = np.unravel_index(
-            np.argmin(np.abs(candidates - center_of_mass)), candidates.shape
-        )
-        return int(row), int(col)
+        rows, cols = np.where(candidates)
+        dists = np.sqrt((rows - r) ** 2 + (cols - c) ** 2)
+        idx = np.argmin(dists)
+        return rows[idx], cols[idx]
     raise ValueError(f"No valid candidates found with quality above {min_quality}")
 
 
