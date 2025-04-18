@@ -1,3 +1,7 @@
+"""
+OPERA DISP-S1 utilities for reading and analyzing displacement data.
+"""
+
 from __future__ import annotations
 
 from ._product import DispProduct, DispProductStack
@@ -9,4 +13,13 @@ try:
 except ImportError:
     pass
 
-__all__ = ["DispProduct", "DispProductStack", "open_h5", "get_frame_coordinates"]
+# Import reader module for higher-level API
+from . import _reader as reader
+
+__all__ = [
+    "DispProduct",
+    "DispProductStack",
+    "open_h5",
+    "get_frame_coordinates",
+    "reader",
+]
