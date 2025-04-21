@@ -13,13 +13,16 @@ from ._rebase import rebase_timeseries
 from ._remote import open_h5
 
 
-class ReferenceMethod(Enum):
+class ReferenceMethod(str, Enum):
     """Method to use for spatially referencing displacement results."""
 
-    NONE = "none"
-    POINT = "point"
-    MEDIAN = "median"
-    BORDER = "border"
+    none = "none"
+    point = "point"
+    median = "median"
+    border = "border"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 def read_lonlat(
@@ -58,13 +61,13 @@ def read_stack_lonlat(
     stack: DispProductStack,
     lons: float | slice,
     lats: float | slice,
-    reference_method: ReferenceMethod = ReferenceMethod.NONE,
+    reference_method: ReferenceMethod = ReferenceMethod.none,
     # ref_lon: Optional[float] = None,
     # ref_lat: Optional[float] = None,
     # ref_pixel: Optional[tuple[int, int]] = None,
     max_workers: int | None = None,
     dset: str = "displacement",
-) -> np.ndarray:
+) -> tuple[np.ndarray, dict[str, str | float]]:
     """Process a stack using the lon/lat box method with optional multiprocessing.
 
     Parameters
@@ -89,8 +92,10 @@ def read_stack_lonlat(
 
     Returns
     -------
-    np.ndarray
+    referenced_data : np.ndarray
         3D array with dimensions (time, lat, lon) containing the requested data
+    attrs : dict[str, str|float]
+        Attributes for the dataset
     """
     # Create a partial function with fixed parameters
     read_func = partial(read_lonlat, lon_slice=lons, lat_slice=lats, dset=dset)
@@ -108,6 +113,16 @@ def read_stack_lonlat(
                 desc="Reading products",
             )
         )
+    with open_h5(stack.products[0]) as hf:
+        # pop off internal netcdf4 attributes
+        attrs = dict(hf[dset].attrs)
+        for k in [
+            "_Netcdf4Coordinates",
+            "_FillValue",
+            "_Netcdf4Dimid",
+            "DIMENSION_LIST",
+        ]:
+            attrs.pop(k, None)
 
     # Stack the results and adjust reference (if needed)
     unreffed_data = np.stack(results)
@@ -118,20 +133,20 @@ def read_stack_lonlat(
     rebased_stack = rebase_timeseries(unreffed_data, stack.reference_dates)
 
     # Apply referencing if needed
-    if reference_method == ReferenceMethod.NONE:
-        referenced_data = rebased_stack
-    elif reference_method == ReferenceMethod.MEDIAN:
+    if reference_method == ReferenceMethod.none:
+        ref_values = np.zeros((rebased_stack.shape[0], 1, 1))
+    elif reference_method == ReferenceMethod.median:
         ref_values = np.nanmedian(rebased_stack, axis=(1, 2), keepdims=True)
-        referenced_data = rebased_stack - ref_values
-    elif reference_method == ReferenceMethod.POINT:
+    elif reference_method == ReferenceMethod.point:
         # TODO: figure out where in the stack it is
         raise NotImplementedError()
-    elif reference_method == ReferenceMethod.BORDER:
-        referenced_data = _get_border(rebased_stack)
+    elif reference_method == ReferenceMethod.border:
+        ref_values = _get_border(rebased_stack)
     else:
         raise ValueError(f"Unknown {reference_method = }")
 
-    return referenced_data
+    referenced_data = rebased_stack - ref_values
+    return referenced_data, attrs
 
 
 def _get_rows_cols(

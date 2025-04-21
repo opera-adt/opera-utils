@@ -103,6 +103,10 @@ class DispProduct:
         return self._frame_bbox_result[0]
 
     @property
+    def crs(self) -> pyproj.CRS:
+        return pyproj.CRS.from_epsg(self.epsg)
+
+    @property
     def shape(self) -> tuple[int, int]:
         left, bottom, right, top = self._frame_bbox_result[1]
         return (int(round((top - bottom) / 30)), int(round((right - left) / 30)))
@@ -242,8 +246,16 @@ class DispProductStack:
         return self.products[0].orbit_pass
 
     @property
+    def transform(self) -> Affine:
+        return self.products[0].transform
+
+    @property
     def epsg(self) -> int:
         return self.products[0].epsg
+
+    @property
+    def crs(self) -> pyproj.CRS:
+        return self.products[0].crs
 
     @property
     def shape(self) -> tuple[int, int, int]:
