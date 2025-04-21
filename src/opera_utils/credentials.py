@@ -108,20 +108,22 @@ class AWSCredentials:
         )
 
     @classmethod
-    def from_boto3(cls) -> Self:
-        """Get AWS credentials for the current session using boto3.
+    def from_boto(cls) -> Self:
+        """Get AWS credentials for the current session using botocore.
 
-        Boto3 must be installed.
+        botocore must be installed.
 
         Raises
         ------
         ImportError
-            If boto3 is not installed.
+            If botocore is not installed.
         """
-        import boto3
+        import botocore.session
 
-        session = boto3.Session()
+        session = botocore.session.get_session()
         credentials = session.get_credentials()
+        if credentials is None:
+            raise ValueError("No credentials found in boto3 session.")
         frozen_credentials = credentials.get_frozen_credentials()
         return cls(
             access_key_id=frozen_credentials.access_key,
