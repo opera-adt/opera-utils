@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from os import fsdecode
+from os import PathLike, fsdecode
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import aiohttp
 import fsspec
@@ -15,13 +16,95 @@ from opera_utils.credentials import (
     AWSCredentials,
     get_earthdata_username_password,
 )
-from opera_utils.disp._product import DispProduct
 
-__all__ = ["open_h5"]
+__all__ = ["open_h5", "open_file"]
+
+
+def open_file(
+    url: PathLike[str],
+    earthdata_username: str | None = None,
+    earthdata_password: str | None = None,
+    asf_endpoint: str | ASFCredentialEndpoints = "OPERA",
+    fsspec_kwargs: dict[str, Any] = {"cache_type": "first"},
+) -> fsspec.core.OpenFile:
+    """Open a remote (or local) HDF5 file using fsspec.
+
+    Can handle both HTTPS access (your Earthdata login credentials) and
+    S3 URLs (for direct S3 access via temporary AWS credentials).
+
+    Note that direct S3 access is only available for Earthdata granules
+    if you are running on an in-region EC2 instance.
+
+    For HTTPS access, the Earthdata Login credentials are used to authenticate
+    the request. There are 3 methods of providing the login credentials:
+    1. Directly passed as arguments
+    2. From the ~.netrc file
+    3. From environment variables EARTHDATA_USERNAME and EARTHDATA_PASSWORD.
+
+    For S3 access, AWS credentials required.
+    They will be retrieved from the environment variables
+    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN, or
+    temporary AWS credentials can be requested from ASF using the
+    Earthdata Login credentials.
+
+    Parameters
+    ----------
+    url : PathLike[str]
+        The URL of the HDF5 file to be accessed. Can be a local file path, an
+        HTTPS URL, or an S3 URL.
+    earthdata_username : str | None, optional
+        Earthdata Login username, if environment variables are not set.
+    earthdata_password : str | None, optional
+        Earthdata Login password, if environment variables are not set.
+    asf_endpoint : str
+        (For S3 access) The ASF endpoint to use for temporary AWS credentials.
+        Choices are "OPERA", "OPERA_UAT", "SENTINEL1"
+        Default is "OPERA"
+    fsspec_kwargs : dict[str, Any], optional
+        Additional keyword arguments to pass to fsspec.
+        Default is `{"cache_type": "first"}`.
+
+
+    Returns
+    -------
+    Opened File-like object from fsspec
+        An opened HDF5 file.
+
+    Raises
+    ------
+    ValueError
+        If the .netrc file does not contain authentication information for the
+        specified host.
+
+    """
+    if isinstance(asf_endpoint, str):
+        assert asf_endpoint.upper() in {"OPERA", "OPERA_UAT", "SENTINEL1"}
+        asf_endpoint = ASFCredentialEndpoints[asf_endpoint.upper()]
+
+    url_str: str = _get_url_str(url)
+    parsed = urlparse(url_str)
+    if parsed.scheme in {"http", "https"}:
+        fs = get_https_fs(
+            earthdata_username, earthdata_password, host=ENDPOINT_TO_HOST[asf_endpoint]
+        )
+    elif parsed.scheme == "s3":
+        fs = get_s3_fs(asf_endpoint=asf_endpoint)
+    elif parsed.scheme == "file" or not parsed.scheme:
+        fs = fsspec.filesystem("file")
+    else:
+        raise ValueError(f"Unrecognized scheme for {url_str}")
+
+    # Create the Open File-like object from fsspec
+    byte_stream = fs.open(path=url_str, mode="rb", **fsspec_kwargs)
+    return byte_stream
+
+
+def _get_url_str(url: PathLike[str]) -> str:
+    return fsdecode(url.resolve().as_uri() if isinstance(url, Path) else url)
 
 
 def open_h5(
-    url: str | Path | DispProduct,
+    url: PathLike[str],
     page_size: int = 4 * 1024 * 1024,
     rdcc_nbytes: int = 1024 * 1024 * 1000,
     earthdata_username: str | None = None,
@@ -51,7 +134,7 @@ def open_h5(
 
     Parameters
     ----------
-    url : str
+    url : PathLike[str]
         The URL of the HDF5 file to be accessed. Can be a local file path, an
         HTTPS URL, or an S3 URL.
     page_size : int, optional
@@ -87,27 +170,15 @@ def open_h5(
         specified host.
 
     """
-    url_str = fsdecode(url.resolve().as_uri() if isinstance(url, Path) else url)
-
-    if isinstance(asf_endpoint, str):
-        assert asf_endpoint.upper() in {"OPERA", "OPERA_UAT", "SENTINEL1"}
-        asf_endpoint = ASFCredentialEndpoints[asf_endpoint.upper()]
-
-    if url_str.startswith("http"):
-        fs = get_https_fs(
-            earthdata_username, earthdata_password, host=ENDPOINT_TO_HOST[asf_endpoint]
-        )
-    elif url_str.startswith("s3://"):
-        fs = get_s3_fs(asf_endpoint=asf_endpoint)
-    elif url_str.startswith("file://"):
-        fs = fsspec.filesystem("file")
-    else:
-        raise ValueError(f"Unrecognized scheme for {url_str}")
-
+    byte_stream = open_file(
+        url,
+        earthdata_username,
+        earthdata_password,
+        asf_endpoint,
+        fsspec_kwargs,
+    )
     # h5py arguments used to set the "cloud-friendly" parameters
     cloud_kwargs = dict(fs_page_size=page_size, rdcc_nbytes=rdcc_nbytes)
-    # Create the Open File-like object from fsspec
-    byte_stream = fs.open(path=url_str, mode="rb", **fsspec_kwargs)
     return h5py.File(byte_stream, mode="r", **cloud_kwargs)
 
 
