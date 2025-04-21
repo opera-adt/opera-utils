@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-from collections.abc import Sequence
-from datetime import datetime
 from enum import Enum
 from functools import partial
 
@@ -11,6 +9,7 @@ from numpy.typing import NDArray
 from tqdm import tqdm
 
 from ._product import DispProduct, DispProductStack
+from ._rebase import rebase_timeseries
 from ._remote import open_h5
 
 
@@ -119,15 +118,15 @@ def read_stack_lonlat(
     rebased_stack = rebase_timeseries(unreffed_data, stack.reference_dates)
 
     # Apply referencing if needed
-    if reference_method == "none":
+    if reference_method == ReferenceMethod.NONE:
         referenced_data = rebased_stack
-    elif reference_method == "median":
+    elif reference_method == ReferenceMethod.MEDIAN:
         ref_values = np.nanmedian(rebased_stack, axis=(1, 2), keepdims=True)
         referenced_data = rebased_stack - ref_values
-    elif reference_method == "point":
+    elif reference_method == ReferenceMethod.POINT:
         # TODO: figure out where in the stack it is
         raise NotImplementedError()
-    elif reference_method == "border":
+    elif reference_method == ReferenceMethod.BORDER:
         referenced_data = _get_border(rebased_stack)
     else:
         raise ValueError(f"Unknown {reference_method = }")
@@ -137,18 +136,20 @@ def read_stack_lonlat(
 
 def _get_rows_cols(
     lon_slice: float | slice, lat_slice: float | slice, product: DispProduct
-):
+) -> tuple[slice, slice]:
     if isinstance(lon_slice, float):
         lon_slice = slice(lon_slice, lon_slice)
     if isinstance(lat_slice, float):
         lat_slice = slice(lat_slice, lat_slice)
 
     # Convert lon/lat to row/col
-    lon_start, lon_stop = lon_slice.start, lon_slice.stop
-    lat_start, lat_stop = lat_slice.start, lat_slice.stop
+    lon_left, lon_right = lon_slice.start, lon_slice.stop
+    lat_top, lat_bottom = lat_slice.start, lat_slice.stop
+    if lat_bottom > lat_top:
+        lat_top, lat_bottom = lat_bottom, lat_top
     # Get row/col indices
-    row_start, col_start = product.lonlat_to_rowcol(lon_start, lat_start)
-    row_stop, col_stop = product.lonlat_to_rowcol(lon_stop, lat_stop)
+    row_start, col_start = product.lonlat_to_rowcol(lon_left, lat_top)
+    row_stop, col_stop = product.lonlat_to_rowcol(lon_right, lat_bottom)
 
     # Handle edge cases - ensure we have at least a 1x1 window
     if col_stop < col_start:
@@ -160,7 +161,7 @@ def _get_rows_cols(
         raise ValueError(f"Invalid row range: {row_start}, {row_stop}")
     elif row_stop == row_start:
         row_stop += 1
-    return
+    return slice(row_start, row_stop), slice(col_start, col_stop)
 
 
 def _get_border(data_arrays: NDArray[np.floating]) -> NDArray[np.floating]:
@@ -170,50 +171,3 @@ def _get_border(data_arrays: NDArray[np.floating]) -> NDArray[np.floating]:
     right_col = data_arrays[:, :, -1]
     all_pixels = np.hstack([top_row, bottom_row, left_col, right_col])
     return np.nanmedian(all_pixels, axis=1)[:, np.newaxis, np.newaxis]
-
-
-def rebase_timeseries(
-    unreffed_data: np.ndarray, reference_dates: Sequence[datetime]
-) -> np.ndarray:
-    """Adjust for moving reference dates to create a continuous time series.
-
-    Parameters
-    ----------
-    unreffed_data : np.ndarray
-        3D array of displacement values [time, height, width]
-    reference_dates : Sequence[datetime]
-        Reference dates for each time step
-
-    Returns
-    -------
-    np.ndarray
-        Continuous displacement time series with consistent reference date
-    """
-    if len(set(reference_dates)) == 1:
-        return unreffed_data.copy()
-
-    shape2d = unreffed_data.shape[1:]
-    cumulative_offset = np.zeros(shape2d, dtype=np.float32)
-    last_displacement = np.zeros(shape2d, dtype=np.float32)
-
-    # Set initial reference date
-    current_reference_date = reference_dates[0]
-
-    output = np.zeros_like(unreffed_data)
-    # Process each time step
-    for product, current_displacement, output in zip(
-        reference_dates, unreffed_data, output
-    ):
-        # Check for shift in temporal reference date
-        if product != current_reference_date:
-            # When reference date changes, accumulate the previous displacement
-            cumulative_offset += last_displacement
-            current_reference_date = product
-
-        # Store current displacement for next iteration
-        last_displacement = current_displacement.copy()
-
-        # Add cumulative offset to get consistent reference
-        output[:] = current_displacement + cumulative_offset
-
-    return output

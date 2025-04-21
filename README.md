@@ -75,6 +75,25 @@ Out[3]:
  't042_088913_iw3']
  ```
 
+## DISP-S1 Usage examples
+
+```python
+from opera_utils import disp
+
+# Search for DISP-S1 products on CMR
+granules = search.get_products(frame_id=9154)
+
+# Create the product stack for parsing frame metadata
+stack = DispProductStack([g.product for g in granules])
+
+# Read a a lon/lat box
+data = reader.read_stack_lonlat(
+    stack,
+    lons=slice(-120.45, -120.3),
+    lats=slice(34.07, 34.01)
+)
+```
+
 ## Setup for Developers
 
 To contribute to the development of `opera-utils`, you can fork the repository and install the package in development mode.

@@ -1,12 +1,13 @@
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import tyro
 from shapely import from_wkt
 
 from opera_utils import disp
+from opera_utils.disp._product import UrlType
 from opera_utils.disp._reader import ReferenceMethod
-from opera_utils.disp._search import UrlType
 
 
 def read_disp(
@@ -18,6 +19,7 @@ def read_disp(
     reference_method: ReferenceMethod = ReferenceMethod.NONE,
     start_datetime: datetime | None = None,
     end_datetime: datetime | None = None,
+    output: Path | None = None,
     # ref_lon: Optional[float] = None,
     # ref_lat: Optional[float] = None,
     # ref_pixel: Optional[tuple[int, int]] = None,
@@ -51,10 +53,10 @@ def read_disp(
         Maximum number of workers to use for reading
     dset : str
         Dataset name to read from the HDF5 file
-    outname : Path, optional
+    output : Path, optional
         Name of numpy file to save results to.
         If not provided, saves to current directory with default name
-        of `F{frame_id:05d}_{dset}_{lon}_{lat}.npy`.
+        of `F{frame_id:05d}_{dset}.npy`.
 
     Returns
     -------
@@ -64,14 +66,14 @@ def read_disp(
     if lon is None and lat is None and bbox is None and wkt is None:
         raise ValueError("Must provide either lon, lat, or bbox")
 
-    granules = disp.search(
+    products = disp.search(
         frame_id=frame_id,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
         url_type=url_type,
     )
-    print(f"Found {len(granules)} granules for Frame {frame_id:05d}")
-    stack = disp.DispProductStack([g.product for g in granules])
+    print(f"Found {len(products)} products for Frame {frame_id:05d}")
+    stack = disp.DispProductStack(products)
     if wkt is not None:
         poly = from_wkt(wkt)
         bbox = poly.bounds
@@ -92,8 +94,9 @@ def read_disp(
         max_workers=max_workers,
         dset=dset,
     )
-    filename = f"F{frame_id:05d}_{dset}_{lons}_{lats}.npy"
-    np.save(filename, results)
+    if output is None:
+        output = Path(f"F{frame_id:05d}_{dset}.npy")
+    np.save(output, results)
 
 
 if __name__ == "__main__":

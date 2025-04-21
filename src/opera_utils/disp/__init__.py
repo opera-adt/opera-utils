@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from . import _reader as reader
 from ._product import DispProduct, DispProductStack
-from ._search import Granule, search
+from ._search import search
 
 # Remote access is based on optional dependencies
 try:
@@ -20,5 +20,4 @@ __all__ = [
     "open_file",
     "reader",
     "search",
-    "Granule",
 ]
