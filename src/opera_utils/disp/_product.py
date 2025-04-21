@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 from collections import Counter
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from functools import cached_property
 from math import nan
 from pathlib import Path
@@ -23,7 +25,17 @@ from opera_utils.burst_frame_db import (
 )
 from opera_utils.constants import DISP_FILE_REGEX
 
-__all__ = ["DispProduct", "DispProductStack"]
+__all__ = ["DispProduct", "DispProductStack", "UrlType"]
+
+
+class UrlType(str, Enum):
+    """Choices for the orbit direction of a granule."""
+
+    S3 = "s3"
+    HTTPS = "https"
+
+    def __str__(self) -> str:
+        return str(self.value)
 
 
 @dataclass
@@ -39,6 +51,7 @@ class DispProduct:
     secondary_datetime: datetime
     version: str
     generation_datetime: datetime
+    size_in_bytes: int | None = None
 
     @classmethod
     def from_filename(cls, name: Path | str) -> Self:
@@ -140,6 +153,39 @@ class DispProduct:
         """Convert the longitude and latitude (in degrees) row/column indices."""
         return lonlat_to_rowcol(self, lon, lat)
 
+    @classmethod
+    def from_umm(
+        cls, umm_data: dict[str, Any], url_type: UrlType = UrlType.HTTPS
+    ) -> "DispProduct":
+        """Construct a DispProduct instance from a raw dictionary.
+
+        Parameters
+        ----------
+        umm_data : dict[str, Any]
+            The raw granule UMM data from the CMR API.
+        url_type : UrlType
+            Type of url to use from the Product.
+            "s3" for S3 URLs (direct access), "https" for HTTPS URLs.
+
+        Returns
+        -------
+        Granule
+            The parsed Granule instance.
+
+        Raises
+        ------
+        ValueError
+            If required temporal extent data is missing.
+        """
+        url = _get_download_url(umm_data, protocol=url_type)
+        product = DispProduct.from_filename(url)
+        archive_info = umm_data.get("DataGranule", {}).get(
+            "ArchiveAndDistributionInformation", []
+        )
+        size_in_bytes = archive_info[0].get("SizeInBytes", 0) if archive_info else None
+        product.size_in_bytes = size_in_bytes
+        return product
+
 
 @dataclass
 class DispProductStack:
@@ -219,9 +265,44 @@ class DispProductStack:
             return self.products[idx]
         return self.__class__(self.products[idx])
 
+    def __iter__(self) -> Iterator[DispProduct]:
+        return iter(self.products)
+
     def lonlat_to_rowcol(self: Self, lon: float, lat: float):
         """Convert the longitude and latitude (in degrees) row/column indices."""
         return lonlat_to_rowcol(self.products[0], lon, lat)
+
+
+def _get_download_url(
+    umm_data: dict[str, Any], protocol: UrlType = UrlType.HTTPS
+) -> str:
+    """Extract a download URL from the product's UMM metadata.
+
+    Parameters
+    ----------
+    umm_data : dict[str, Any]
+        The product's umm metadata dictionary
+    protocol : UrlType
+        The protocol to use for downloading, either "s3" or "https"
+
+    Returns
+    -------
+    str
+        The download URL
+
+    Raises
+    ------
+    ValueError
+        If no URL with the specified protocol is found or if the protocol is invalid
+    """
+    if protocol not in ["https", "s3"]:
+        raise ValueError(f"Unknown protocol {protocol}; must be https or s3")
+
+    for url in umm_data["RelatedUrls"]:
+        if url["Type"].startswith("GET DATA") and url["URL"].startswith(protocol):
+            return url["URL"]
+
+    raise ValueError(f"No download URL found for granule {umm_data['GranuleUR']}")
 
 
 class OutOfBoundsError(ValueError):

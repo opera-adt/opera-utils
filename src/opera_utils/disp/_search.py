@@ -11,127 +11,15 @@ from __future__ import annotations
 
 import logging
 import warnings
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from enum import Enum
-from typing import Any
 
 import requests
 
-from opera_utils.disp._product import DispProduct
+from opera_utils.disp._product import DispProduct, UrlType
 
-__all__ = ["search", "Granule"]
+__all__ = ["search"]
 
 logger = logging.getLogger("opera_utils")
-
-
-class UrlType(str, Enum):
-    """Choices for the orbit direction of a granule."""
-
-    S3 = "s3"
-    HTTPS = "https"
-
-    def __str__(self) -> str:
-        return str(self.value)
-
-
-@dataclass
-class Granule:
-    """Model representing a single granule from CMR.
-
-    Attributes
-    ----------
-    product : DispProduct
-        Object containing known DISP-S1 frame information.
-    url : str
-        URL (https or s3) containing granule download location.
-    size_in_bytes : int, optional
-        The size in bytes of the file as listed on CMR.
-    """
-
-    product: DispProduct
-    url: str
-    size_in_bytes: int | None
-
-    @classmethod
-    def from_umm(
-        cls, umm_data: dict[str, Any], url_type: UrlType = UrlType.HTTPS
-    ) -> "Granule":
-        """Construct a Granule instance from a raw dictionary.
-
-        Parameters
-        ----------
-        umm_data : dict[str, Any]
-            The raw granule UMM data from the CMR API.
-        url_type : UrlType
-            Type of url to use from the Product.
-            "s3" for S3 URLs (direct access), "https" for HTTPS URLs.
-
-        Returns
-        -------
-        Granule
-            The parsed Granule instance.
-
-        Raises
-        ------
-        ValueError
-            If required temporal extent data is missing.
-        """
-        url = _get_download_url(umm_data, protocol=url_type)
-        product = DispProduct.from_filename(url)
-        archive_info = umm_data.get("DataGranule", {}).get(
-            "ArchiveAndDistributionInformation", []
-        )
-        size_in_bytes = archive_info[0].get("SizeInBytes", 0) if archive_info else None
-        return cls(
-            product=product,
-            url=url,
-            size_in_bytes=size_in_bytes,
-        )
-
-    @property
-    def frame_id(self) -> int:
-        return self.product.frame_id
-
-    @property
-    def reference_datetime(self) -> datetime:
-        return self.product.reference_datetime
-
-    @property
-    def secondary_datetime(self) -> datetime:
-        return self.product.secondary_datetime
-
-
-def _get_download_url(
-    umm_data: dict[str, Any], protocol: UrlType = UrlType.HTTPS
-) -> str:
-    """Extract a download URL from the product's UMM metadata.
-
-    Parameters
-    ----------
-    umm_data : dict[str, Any]
-        The product's umm metadata dictionary
-    protocol : UrlType
-        The protocol to use for downloading, either "s3" or "https"
-
-    Returns
-    -------
-    str
-        The download URL
-
-    Raises
-    ------
-    ValueError
-        If no URL with the specified protocol is found or if the protocol is invalid
-    """
-    if protocol not in ["https", "s3"]:
-        raise ValueError(f"Unknown protocol {protocol}; must be https or s3")
-
-    for url in umm_data["RelatedUrls"]:
-        if url["Type"].startswith("GET DATA") and url["URL"].startswith(protocol):
-            return url["URL"]
-
-    raise ValueError(f"No download URL found for granule {umm_data['GranuleUR']}")
 
 
 def search(
@@ -141,7 +29,7 @@ def search(
     end_datetime: datetime | None = None,
     url_type: UrlType = UrlType.HTTPS,
     use_uat: bool = False,
-) -> list[Granule]:
+) -> list[DispProduct]:
     """Query the CMR for granules matching the given frame ID and product version.
 
     Parameters
@@ -200,13 +88,14 @@ def search(
         warnings.warn("No `frame_id` specified: search may be large", stacklevel=1)
 
     headers: dict[str, str] = {}
-    granules: list[Granule] = []
+    granules: list[DispProduct] = []
     while True:
         response = requests.get(search_url, params=params, headers=headers)
         response.raise_for_status()
         data = response.json()
         cur_granules = [
-            Granule.from_umm(item["umm"], url_type=url_type) for item in data["items"]
+            DispProduct.from_umm(item["umm"], url_type=url_type)
+            for item in data["items"]
         ]
         # CMR filters apply to both the reference and secondary time (as of 2025-03-29)
         # We want to filter just by the secondary time

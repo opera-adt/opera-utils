@@ -70,6 +70,7 @@ def read_disp(
         end_datetime=end_datetime,
         url_type=url_type,
     )
+    print(f"Found {len(granules)} granules for Frame {frame_id:05d}")
     stack = disp.DispProductStack([g.product for g in granules])
     if wkt is not None:
         poly = from_wkt(wkt)
