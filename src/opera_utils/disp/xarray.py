@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import warnings
+
 import dask.array as da
 import numpy as np
-import xarray as xr
-from dask import delayed
 
 from ._product import DispProduct, DispProductStack
 from ._remote import open_h5
+
+try:
+    import xarray as xr
+    from dask import delayed
+except ImportError:
+    warnings.warn("xarray and dask are required for xarray functionality.")
 
 
 def stack_to_dataarray(
@@ -39,7 +45,7 @@ def stack_to_dataarray(
     # The shape is known from the frame database
     ny, nx = stack.shape[1:]
 
-    # Build slices that cover the 2-D grid with (chunks[0] × chunks[1]) blocks
+    # Build slices that cover the 2-D grid with (chunks[0] x chunks[1]) blocks
     y_slices = [slice(i, min(i + chunks[0], ny)) for i in range(0, ny, chunks[0])]
     x_slices = [slice(j, min(j + chunks[1], nx)) for j in range(0, nx, chunks[1])]
 

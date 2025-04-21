@@ -88,51 +88,6 @@ def utm_to_rowcol(
     return row, col
 
 
-def lonlat_to_rowcol(
-    lon: float, lat: float, transform: affine.Affine, epsg: int
-) -> tuple[int, int]:
-    """
-    Convert longitude/latitude coordinates to row/column indices in a raster.
-
-    Parameters
-    ----------
-    lon : float
-        Longitude in degrees
-    lat : float
-        Latitude in degrees
-    transform : affine.Affine
-        Affine transformation matrix from the raster
-    epsg : int
-        EPSG code of the raster's coordinate reference system
-
-    Returns
-    -------
-    tuple[int, int]
-        (row, col) indices in the raster
-
-    Notes
-    -----
-    Row and column indices are 0-based.
-    """
-    import pyproj
-
-    # Create transformer from WGS84 to the target CRS
-    transformer = pyproj.Transformer.from_crs(
-        "EPSG:4326",  # WGS84
-        f"EPSG:{epsg}",
-        always_xy=True,
-    )
-
-    # Transform lon/lat to the raster's CRS
-    x, y = transformer.transform(lon, lat)
-
-    # Apply the inverse of the affine transform to get row/col
-    col, row = ~transform * (x, y)
-
-    # Return as integers
-    return int(row), int(col)
-
-
 def round_mantissa(z: np.ndarray, keep_bits=10) -> None:
     """Zero out mantissa bits of elements of array in place.
 

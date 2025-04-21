@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from . import _reader as reader
 from ._product import DispProduct, DispProductStack
+from ._rebase import rebase_timeseries
 from ._search import search
 
 # Remote access is based on optional dependencies
 try:
+    from ._netcdf import save_data
     from ._remote import open_file, open_h5
 except ImportError:
     pass
@@ -19,5 +21,7 @@ __all__ = [
     "open_h5",
     "open_file",
     "reader",
+    "rebase_timeseries",
     "search",
+    "save_data",
 ]

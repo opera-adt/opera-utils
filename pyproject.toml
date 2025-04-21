@@ -58,7 +58,7 @@ opera-utils = "opera_utils.cli:cli_app"
 # For geopandas functionality with burst/frame databases:
 geopandas = ["geopandas", "pyogrio"]
 # Access remote hdf5 files over S3 or HTTPS:
-remote = ["affine", "botocore", "aiohttp", "fsspec", "h5netcdf", "s3fs"]
+remote = ["affine", "botocore", "aiohttp", "fsspec", "h5netcdf", "s3fs", "tqdm"]
 all = ["opera-utils[remote,geopandas]"]
 
 test = [

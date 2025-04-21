@@ -78,13 +78,13 @@ Out[3]:
 ## DISP-S1 Usage examples
 
 ```python
-from opera_utils import disp
+from opera_utils.disp import search, reader, DispProductStack
 
 # Search for DISP-S1 products on CMR
-granules = search.get_products(frame_id=9154)
+products = search.get_products(frame_id=9154)
 
 # Create the product stack for parsing frame metadata
-stack = DispProductStack([g.product for g in granules])
+stack = DispProductStack(products)
 
 # Read a a lon/lat box
 data = reader.read_stack_lonlat(

@@ -118,9 +118,9 @@ def rereference(
         Position of the progress bar. Default is 0.
 
     """
-    products = DispProductStack.from_file_list(nc_files)
+    product_stack = DispProductStack.from_file_list(nc_files)
     # Flatten all dates, find unique sorted list of SAR epochs
-    all_dates = sorted(set(flatten(products.ifg_date_pairs)))
+    all_dates = sorted(set(flatten(product_stack.ifg_date_pairs)))
 
     # Create the main displacement dataset.
     writer = GeotiffStackWriter.from_dates(
@@ -128,7 +128,7 @@ def rereference(
         dataset=dataset,
         date_list=all_dates,
         keep_bits=keep_bits,
-        profile=products.get_rasterio_profile(),
+        profile=product_stack.get_rasterio_profile(),
     )
 
     reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=nodata)
@@ -142,11 +142,11 @@ def rereference(
 
     # Make a "cumulative offset" which adds up the phase each time theres a reference
     # date changeover.
-    shape = products[0].shape
+    shape = product_stack[0].shape
     cumulative_offset = np.zeros(shape, dtype=np.float32)
     last_displacement = np.zeros(shape, dtype=np.float32)
     current_displacement = np.zeros(shape, dtype=np.float32)
-    latest_reference_date = products[0].reference_datetime
+    latest_reference_date = product_stack.products[0].reference_datetime
 
     for idx in trange(len(nc_files), desc="Summing dates", position=tqdm_position):
         current_displacement[:] = reader[idx]
@@ -160,7 +160,7 @@ def rereference(
             current_displacement -= current_displacement[reference_point]
 
         # Check for the shift in temporal reference date
-        cur_ref, _cur_sec = products.ifg_date_pairs[0]
+        cur_ref, _cur_sec = product_stack.ifg_date_pairs[idx]
         if cur_ref != latest_reference_date:
             # e.g. we had (1,2), (1,3), now we hit (3,4)
             # So to write out (1,4), we need to add the running total
