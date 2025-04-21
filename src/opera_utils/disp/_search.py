@@ -19,6 +19,8 @@ import requests
 
 from opera_utils.disp._product import DispProduct
 
+__all__ = ["search", "Granule"]
+
 logger = logging.getLogger("opera_utils")
 
 
@@ -65,6 +67,7 @@ class Granule:
     product: DispProduct
     url: str
     orbit_pass: OrbitPass
+    size_in_bytes: int | None
 
     @classmethod
     def from_umm(
@@ -93,6 +96,10 @@ class Granule:
         url = _get_download_url(umm_data, protocol=url_type)
         product = DispProduct.from_filename(url)
         additional_attributes = umm_data.get("AdditionalAttributes", [])
+        archive_info = umm_data.get("DataGranule", {}).get(
+            "ArchiveAndDistributionInformation", []
+        )
+        size_in_bytes = archive_info[0].get("SizeInBytes", 0) if archive_info else None
         orbit_pass = OrbitPass(
             _get_attr(additional_attributes, "ASCENDING_DESCENDING").upper()
         )
@@ -100,6 +107,7 @@ class Granule:
             product=product,
             url=url,
             orbit_pass=orbit_pass,
+            size_in_bytes=size_in_bytes,
         )
 
     @property
@@ -157,7 +165,7 @@ def _get_attr(attrs: list[dict[str, Any]], name: str) -> str:
     raise ValueError(f"Missing attribute {name}")
 
 
-def get_products(
+def search(
     frame_id: int | None = None,
     product_version: str | None = "1.0",
     start_datetime: datetime | None = None,
@@ -242,13 +250,5 @@ def get_products(
 
         headers["CMR-Search-After"] = response.headers["CMR-Search-After"]
 
-    return granules
-
-
-if __name__ == "__main__":
-    import tyro
-
-    for granule in sorted(
-        tyro.cli(get_products), key=lambda g: (g.frame_id, g.secondary_datetime)
-    ):
-        print(granule.url)
+    # Return sorted list of granules
+    return sorted(granules, key=lambda g: (g.frame_id, g.secondary_datetime))
