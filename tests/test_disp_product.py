@@ -6,10 +6,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from opera_utils.burst_frame_db import Bbox  # Import Bbox for type hints/mocks
+from opera_utils.burst_frame_db import Bbox
 
 # Assuming the classes are in opera_utils.disp
 from opera_utils.disp import DispProduct, DispProductStack
+from opera_utils.disp._product import OutOfBoundsError
 
 # Create more filenames for stack testing
 FILE_1 = "OPERA_L3_DISP-S1_IW_F11116_VV_20160705T140755Z_20160729T140756Z_v1.0_20250318T222753Z.nc"
@@ -153,6 +154,14 @@ class TestDispProduct:
         assert profile["height"] == EXPECTED_HEIGHT
         assert profile["crs"] == f"EPSG:{EPSG}"
 
+    def test_lonlat_to_rowcol(self):
+        product = DispProduct.from_filename(FILE_1)
+        assert product.lonlat_to_rowcol(-122.0, 36.0) == (4336, 3011)
+        with pytest.raises(OutOfBoundsError):
+            product.lonlat_to_rowcol(-122.0, 30.0)
+        with pytest.raises(OutOfBoundsError):
+            product.lonlat_to_rowcol(-102.0, 36.0)
+
 
 class TestDispProductStack:
     def test_dataclass_definition(self):
@@ -227,6 +236,11 @@ class TestDispProductStack:
         # Check first item corresponds to the first in sorted list
         assert isinstance(stack[0], DispProduct)
         assert stack[0] == DispProduct.from_filename(FILE_1)
+
+    def test_getitem_stack(self):
+        """Test accessing products by a slice, to create a new DispProductStack."""
+        stack = DispProductStack.from_file_list(VALID_FILES)
+        assert stack[:2] == DispProductStack.from_file_list(sorted(VALID_FILES)[:2])
 
     def test_get_rasterio_profile_delegation(self):
         """Test that stack's profile matches the first product's profile."""
