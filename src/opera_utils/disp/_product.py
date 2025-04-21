@@ -14,7 +14,13 @@ import pyproj
 from affine import Affine
 from typing_extensions import Self
 
-from opera_utils.burst_frame_db import Bbox, get_frame_bbox, get_frame_geojson
+from opera_utils.burst_frame_db import (
+    Bbox,
+    OrbitPass,
+    get_frame_bbox,
+    get_frame_geojson,
+    get_frame_orbit_pass,
+)
 from opera_utils.constants import DISP_FILE_REGEX
 
 __all__ = ["DispProduct", "DispProductStack"]
@@ -65,7 +71,6 @@ class DispProduct:
         data["secondary_datetime"] = _to_datetime(data["secondary_datetime"])
         data["generation_datetime"] = _to_datetime(data["generation_datetime"])
         data["frame_id"] = int(data["frame_id"])
-
         return cls(filename=name, **data)
 
     @cached_property
@@ -75,6 +80,10 @@ class DispProduct:
     @cached_property
     def frame_geojson(self) -> dict:
         return get_frame_geojson(frame_ids=[self.frame_id])
+
+    @cached_property
+    def orbit_pass(self) -> OrbitPass:
+        return get_frame_orbit_pass(self.frame_id)[0]
 
     @property
     def epsg(self) -> int:
@@ -116,7 +125,7 @@ class DispProduct:
             "dtype": "float32",
             "count": 1,
         }
-        # Add frame georeference metadata
+        # Add frame georeferencing metadata
         left, bottom, right, top = self._frame_bbox_result[1]
         profile["width"] = self.shape[1]
         profile["height"] = self.shape[0]
@@ -130,51 +139,6 @@ class DispProduct:
     def lonlat_to_rowcol(self: Self, lon: float, lat: float):
         """Convert the longitude and latitude (in degrees) row/column indices."""
         return lonlat_to_rowcol(self, lon, lat)
-
-
-class OutOfBoundsError(ValueError):
-    """Exception raised when the coordinates are out of bounds."""
-
-
-def lonlat_to_rowcol(product: DispProduct, lon: float, lat: float) -> tuple[int, int]:
-    """Convert lon/lat to row/col in the coordinates of `product`.
-
-    Parameters
-    ----------
-    product : DispProduct
-        DispProduct
-    lon : float
-        Longitude (in degrees) of point of interest.
-    lat : float
-        Latitude (in degrees) of point of interest.
-
-    Returns
-    -------
-    tuple[int, int]
-        Row and column indices in the raster
-    """
-    # Create transformer from WGS84 to the target CRS (always UTM)
-    epsg = product.epsg
-    transformer = pyproj.Transformer.from_crs(
-        "EPSG:4326",
-        f"EPSG:{epsg}",
-        always_xy=True,
-    )
-
-    # Transform lon/lat to the raster's UTM coordinates
-    x, y = transformer.transform(lon, lat, radians=False)
-
-    # Apply the inverse of the UTM affine transform to get row/col
-    col, row = ~product.transform * (x, y)
-
-    # Return to nearest, then check if out of bounds
-    row, col = int(round(row)), int(round(col))
-    if col < 0 or col >= product.shape[1] or row < 0 or row >= product.shape[0]:
-        raise OutOfBoundsError(
-            f"Coordinates {lon}, {lat} ({row = }, {col = }) are out of bounds for"
-            f" {product}"
-        )
-    return row, col
 
 
 @dataclass
@@ -228,6 +192,10 @@ class DispProductStack:
         return self.products[0].frame_id
 
     @property
+    def orbit_pass(self) -> OrbitPass:
+        return self.products[0].orbit_pass
+
+    @property
     def epsg(self) -> int:
         return self.products[0].epsg
 
@@ -254,3 +222,48 @@ class DispProductStack:
     def lonlat_to_rowcol(self: Self, lon: float, lat: float):
         """Convert the longitude and latitude (in degrees) row/column indices."""
         return lonlat_to_rowcol(self.products[0], lon, lat)
+
+
+class OutOfBoundsError(ValueError):
+    """Exception raised when the coordinates are out of bounds."""
+
+
+def lonlat_to_rowcol(product: DispProduct, lon: float, lat: float) -> tuple[int, int]:
+    """Convert lon/lat to row/col in the coordinates of `product`.
+
+    Parameters
+    ----------
+    product : DispProduct
+        DispProduct
+    lon : float
+        Longitude (in degrees) of point of interest.
+    lat : float
+        Latitude (in degrees) of point of interest.
+
+    Returns
+    -------
+    tuple[int, int]
+        Row and column indices in the raster
+    """
+    # Create transformer from WGS84 to the target CRS (always UTM)
+    epsg = product.epsg
+    transformer = pyproj.Transformer.from_crs(
+        "EPSG:4326",
+        f"EPSG:{epsg}",
+        always_xy=True,
+    )
+
+    # Transform lon/lat to the raster's UTM coordinates
+    x, y = transformer.transform(lon, lat, radians=False)
+
+    # Apply the inverse of the UTM affine transform to get row/col
+    col, row = ~product.transform * (x, y)
+
+    # Return to nearest, then check if out of bounds
+    row, col = int(round(row)), int(round(col))
+    if col < 0 or col >= product.shape[1] or row < 0 or row >= product.shape[0]:
+        raise OutOfBoundsError(
+            f"Coordinates {lon}, {lat} ({row = }, {col = }) are out of bounds for"
+            f" {product}"
+        )
+    return row, col

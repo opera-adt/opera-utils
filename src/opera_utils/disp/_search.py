@@ -10,6 +10,7 @@ https://datapool.asf.alaska.edu/DISP/OPERA-S1/OPERA_L3_DISP-S1_IW_F11115_VV_2016
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -22,16 +23,6 @@ from opera_utils.disp._product import DispProduct
 __all__ = ["search", "Granule"]
 
 logger = logging.getLogger("opera_utils")
-
-
-class OrbitPass(str, Enum):
-    """Choices for the orbit direction of a granule."""
-
-    ASCENDING = "ASCENDING"
-    DESCENDING = "DESCENDING"
-
-    def __str__(self) -> str:
-        return str(self.value)
 
 
 class UrlType(str, Enum):
@@ -51,22 +42,15 @@ class Granule:
     Attributes
     ----------
     product : DispProduct
-        The product information.
+        Object containing known DISP-S1 frame information.
     url : str
         URL (https or s3) containing granule download location.
-    frame_id : int
-        The frame number of the granule.
-    orbit_pass : OrbitPass
-        The orbit direction ("ASCENDING" or "DESCENDING").
-    reference_datetime : datetime
-        The beginning date/time of the granule.
-    secondary_datetime : datetime
-        The ending date/time of the granule.
+    size_in_bytes : int, optional
+        The size in bytes of the file as listed on CMR.
     """
 
     product: DispProduct
     url: str
-    orbit_pass: OrbitPass
     size_in_bytes: int | None
 
     @classmethod
@@ -95,18 +79,13 @@ class Granule:
         """
         url = _get_download_url(umm_data, protocol=url_type)
         product = DispProduct.from_filename(url)
-        additional_attributes = umm_data.get("AdditionalAttributes", [])
         archive_info = umm_data.get("DataGranule", {}).get(
             "ArchiveAndDistributionInformation", []
         )
         size_in_bytes = archive_info[0].get("SizeInBytes", 0) if archive_info else None
-        orbit_pass = OrbitPass(
-            _get_attr(additional_attributes, "ASCENDING_DESCENDING").upper()
-        )
         return cls(
             product=product,
             url=url,
-            orbit_pass=orbit_pass,
             size_in_bytes=size_in_bytes,
         )
 
@@ -155,16 +134,6 @@ def _get_download_url(
     raise ValueError(f"No download URL found for granule {umm_data['GranuleUR']}")
 
 
-def _get_attr(attrs: list[dict[str, Any]], name: str) -> str:
-    """Get the first attribute value for a given name."""
-    for attr in attrs:
-        if attr.get("Name") == name:
-            values = attr.get("Values", [])
-            if values:
-                return values[0]
-    raise ValueError(f"Missing attribute {name}")
-
-
 def search(
     frame_id: int | None = None,
     product_version: str | None = "1.0",
@@ -177,9 +146,9 @@ def search(
 
     Parameters
     ----------
-    frame_id : int
+    frame_id : int, optional
         The frame ID to search for
-    product_version : str
+    product_version : str, optional
         The product version to search for
     start_datetime : datetime, optional
         The start of the temporal range in UTC.
@@ -203,8 +172,6 @@ def search(
     }
     # Optionally narrow search by frame id, product version
     product_filters: list[str] = []
-    if frame_id:
-        product_filters.append(f"int,FRAME_NUMBER,{frame_id}")
     if product_version:
         product_filters.append(f"float,PRODUCT_VERSION,{product_version}")
     if product_filters:
@@ -226,6 +193,12 @@ def search(
         end_datetime = datetime(2100, 1, 1, tzinfo=timezone.utc)
     else:
         end_datetime = end_datetime.replace(tzinfo=timezone.utc)
+
+    if frame_id:
+        product_filters.append(f"int,FRAME_NUMBER,{frame_id}")
+    else:
+        warnings.warn("No `frame_id` specified: search may be large", stacklevel=1)
+
     headers: dict[str, str] = {}
     granules: list[Granule] = []
     while True:
