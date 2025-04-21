@@ -1,4 +1,4 @@
-"""Search for OPERA DISP granules from CMR.
+"""Search for OPERA DISP products from CMR.
 
 Examples
 --------
@@ -49,8 +49,8 @@ def search(
 
     Returns
     -------
-    list[Granule]
-        list of Granule instances matching the search criteria
+    list[DispProduct]
+        List of products matching the search criteria
     """
     edl_host = "uat.earthdata" if use_uat else "earthdata"
     search_url = f"https://cmr.{edl_host}.nasa.gov/search/granules.umm_json"
@@ -88,21 +88,21 @@ def search(
         warnings.warn("No `frame_id` specified: search may be large", stacklevel=1)
 
     headers: dict[str, str] = {}
-    granules: list[DispProduct] = []
+    products: list[DispProduct] = []
     while True:
         response = requests.get(search_url, params=params, headers=headers)
         response.raise_for_status()
         data = response.json()
-        cur_granules = [
+        cur_products = [
             DispProduct.from_umm(item["umm"], url_type=url_type)
             for item in data["items"]
         ]
         # CMR filters apply to both the reference and secondary time (as of 2025-03-29)
         # We want to filter just by the secondary time
-        granules.extend(
+        products.extend(
             [
                 g
-                for g in cur_granules
+                for g in cur_products
                 if start_datetime <= g.secondary_datetime <= end_datetime
             ]
         )
@@ -112,5 +112,5 @@ def search(
 
         headers["CMR-Search-After"] = response.headers["CMR-Search-After"]
 
-    # Return sorted list of granules
-    return sorted(granules, key=lambda g: (g.frame_id, g.secondary_datetime))
+    # Return sorted list of products
+    return sorted(products, key=lambda g: (g.frame_id, g.secondary_datetime))
