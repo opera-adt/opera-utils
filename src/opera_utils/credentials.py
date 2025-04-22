@@ -47,25 +47,29 @@ class AWSCredentials:
 
     access_key_id: str
     secret_access_key: str
-    session_token: str
+    session_token: str | None
 
     def to_env(self) -> dict[str, str]:
         """Return the environment variable format of values: `AWS_`.
 
         Settable using os.environ.
         """
-        return {
+        creds = {
             "AWS_ACCESS_KEY_ID": self.access_key_id,
             "AWS_SECRET_ACCESS_KEY": self.secret_access_key,
-            "AWS_SESSION_TOKEN": self.session_token,
         }
+        if self.session_token is not None:
+            creds["AWS_SESSION_TOKEN"] = self.session_token
+        return creds
 
     def to_h5py_kwargs(self) -> dict[str, str]:
-        return {
+        creds = {
             "secret_id": self.access_key_id,
             "secret_key": self.secret_access_key,
-            "session_token": self.session_token,
         }
+        if self.session_token is not None:
+            creds["session_token"] = self.session_token
+        return creds
 
     @classmethod
     def from_asf(
@@ -90,7 +94,7 @@ class AWSCredentials:
         """Get AWS credentials from 'AWS_*' environment variables.
 
         Required environment variables:
-            AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN
+            AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, (and optionally AWS_SESSION_TOKEN)
 
         Raises
         ------
@@ -100,7 +104,31 @@ class AWSCredentials:
         return cls(
             access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
             secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
-            session_token=os.environ["AWS_SESSION_TOKEN"],
+            session_token=os.environ.get("AWS_SESSION_TOKEN"),
+        )
+
+    @classmethod
+    def from_boto(cls) -> Self:
+        """Get AWS credentials for the current session using botocore.
+
+        botocore must be installed.
+
+        Raises
+        ------
+        ImportError
+            If botocore is not installed.
+        """
+        import botocore.session
+
+        session = botocore.session.get_session()
+        credentials = session.get_credentials()
+        if credentials is None:
+            raise ValueError("No credentials found in boto3 session.")
+        frozen_credentials = credentials.get_frozen_credentials()
+        return cls(
+            access_key_id=frozen_credentials.access_key,
+            secret_access_key=frozen_credentials.secret_key,
+            session_token=frozen_credentials.token,
         )
 
 

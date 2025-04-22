@@ -51,7 +51,8 @@ jobs:
               - conda-forge
       - name: Install
         run: |
-          pip install .[test,remote]
+          pip install .[test,remote,geopandas]
+          pip install xarray dask
       - name: Test
         run: |
           pytest -n0

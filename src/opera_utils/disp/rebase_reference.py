@@ -1,63 +1,75 @@
-#!/usr/bin/env python3
 # /// script
 # dependencies = ["numpy", "rasterio", "scipy", "tqdm", "tyro"]
 # ///
 """Convert a series of OPERA DISP-S1 products to a single-reference stack.
 
-The OPERA L3 InSAR displacement netCDF files have reference dates which
-move forward in time. Each displacement is relative between two SAR acquisition dates.
+The OPERA L3 InSAR displacement values, which represent relative displacement
+from a reference SAR acquisition to a secondary, have reference dates which
+move forward in time. To get a single, continuous time series, a simple summation
+is needed.
 
-This converts these files into a single continuous displacement time series.
+This script converts these files into a single continuous displacement time series.
 The current format is a stack of geotiff rasters.
 
 Usage:
     python -m opera_utils.disp.rebase_reference single-reference-out/ OPERA_L3_DISP-S1_*.nc
 """
 
+from __future__ import annotations
+
+import json
 import multiprocessing
 from concurrent.futures import FIRST_EXCEPTION, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import date, datetime
-from enum import StrEnum
+from enum import Enum
 from itertools import repeat
 from pathlib import Path
-from typing import Literal, Self, Sequence
+from typing import Any, Literal, Sequence
 
 import h5py
 import numpy as np
 import rasterio as rio
-import tyro
 from numpy.typing import DTypeLike
-from scipy import ndimage
 from tqdm.auto import trange
+from typing_extensions import Self
 
-from opera_utils.disp._product import DispProductStack
-from opera_utils.disp._utils import _last_per_ministack, flatten, round_mantissa
+from ._product import DispProductStack
+from ._utils import PathOrStrT, _last_per_ministack, flatten, round_mantissa
 
 
-class DisplacementDataset(StrEnum):
+class DisplacementDataset(str, Enum):
     """Enumeration of displacement datasets."""
 
     DISPLACEMENT = "displacement"
     SHORT_WAVELENGTH = "short_wavelength_displacement"
 
+    def __str__(self) -> str:
+        return self.value
 
-class CorrectionDataset(StrEnum):
+
+class CorrectionDataset(str, Enum):
     """Enumeration of correction datasets."""
 
     SOLID_EARTH_TIDE = "/corrections/solid_earth_tide"
     IONOSPHERIC_DELAY = "/corrections/ionospheric_delay"
 
+    def __str__(self) -> str:
+        return self.value
 
-class SamePerMinistackDataset(StrEnum):
+
+class SamePerMinistackDataset(str, Enum):
     """Enumeration of datasets that are same per ministack."""
 
     TEMPORAL_COHERENCE = "temporal_coherence"
     PHASE_SIMILARITY = "phase_similarity"
     SHP_COUNTS = "shp_counts"
 
+    def __str__(self) -> str:
+        return self.value
 
-class QualityDataset(StrEnum):
+
+class QualityDataset(str, Enum):
     """Enumeration of quality datasets."""
 
     TIMESERIES_INVERSION_RESIDUALS = "timeseries_inversion_residuals"
@@ -66,6 +78,9 @@ class QualityDataset(StrEnum):
     ESTIMATED_PHASE_QUALITY = "estimated_phase_quality"
     SHP_COUNTS = "shp_counts"
     WATER_MASK = "water_mask"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 SAME_PER_MINISTACK_DATASETS = [
@@ -80,11 +95,13 @@ UNIQUE_PER_DATE_DATASETS = [
 ]
 
 
-def rereference(
+def rebase(
     output_dir: Path | str,
     nc_files: Sequence[Path | str],
     dataset: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
-    apply_corrections: bool = True,
+    mask_dataset: QualityDataset | None = QualityDataset.RECOMMENDED_MASK,
+    apply_solid_earth_corrections: bool = True,
+    apply_ionospheric_corrections: bool = True,
     reference_point: tuple[int, int] | None = None,
     nodata: float = np.nan,
     keep_bits: int = 9,
@@ -101,8 +118,14 @@ def rereference(
         for a reference_date -> secondary_date interferogram.
     dataset : DisplacementDataset
         Name of HDF5 dataset within product to convert.
-    apply_corrections : bool
-        Apply corrections to the data.
+    mask_dataset : QualityDataset | None
+        Name of HDF5 dataset within product to use as a mask.
+        If None, no masking is performed.
+    apply_solid_earth_corrections : bool
+        Apply solid earth tides to the data.
+        Default is True.
+    apply_ionospheric_corrections : bool
+        Apply ionospheric delay to the data.
         Default is True.
     reference_point : tuple[int, int] | None
         Reference point to use when rebasing /displacement.
@@ -118,9 +141,9 @@ def rereference(
         Position of the progress bar. Default is 0.
 
     """
-    products = DispProductStack.from_file_list(nc_files)
+    product_stack = DispProductStack.from_file_list(nc_files)
     # Flatten all dates, find unique sorted list of SAR epochs
-    all_dates = sorted(set(flatten(products.ifg_date_pairs)))
+    all_dates = sorted(set(flatten(product_stack.ifg_date_pairs)))
 
     # Create the main displacement dataset.
     writer = GeotiffStackWriter.from_dates(
@@ -128,25 +151,45 @@ def rereference(
         dataset=dataset,
         date_list=all_dates,
         keep_bits=keep_bits,
-        profile=products.get_rasterio_profile(),
+        profile=product_stack.get_rasterio_profile(),
     )
 
     reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=nodata)
-    if apply_corrections:
-        corrections_readers = [
-            HDF5StackReader(nc_files, dset_name=str(correction_dataset), nodata=nodata)
-            for correction_dataset in CorrectionDataset
-        ]
-    else:
-        corrections_readers = []
+    corrections_readers = []
+    if apply_solid_earth_corrections:
+        corrections_readers.append(
+            HDF5StackReader(
+                nc_files,
+                dset_name=str(CorrectionDataset.SOLID_EARTH_TIDE),
+                nodata=nodata,
+            )
+        )
+    if apply_ionospheric_corrections:
+        corrections_readers.append(
+            HDF5StackReader(
+                nc_files,
+                dset_name=str(CorrectionDataset.IONOSPHERIC_DELAY),
+                nodata=nodata,
+            )
+        )
+    mask_reader = (
+        HDF5StackReader(
+            nc_files,
+            dset_name=str(mask_dataset),
+            nodata=nodata,
+        )
+        if mask_dataset is not None
+        else None
+    )
 
     # Make a "cumulative offset" which adds up the phase each time theres a reference
     # date changeover.
-    shape = products[0].shape
+    shape = product_stack[0].shape
     cumulative_offset = np.zeros(shape, dtype=np.float32)
     last_displacement = np.zeros(shape, dtype=np.float32)
     current_displacement = np.zeros(shape, dtype=np.float32)
-    latest_reference_date = products[0].reference_datetime
+    cur_mask = np.ones(shape, dtype=bool)
+    latest_reference_date = product_stack.products[0].reference_datetime
 
     for idx in trange(len(nc_files), desc="Summing dates", position=tqdm_position):
         current_displacement[:] = reader[idx]
@@ -155,12 +198,18 @@ def rereference(
         for r in corrections_readers:
             current_displacement -= r[idx]
 
-        # Apply spaitla reference point if needed
+        # Apply mask if needed
+        if mask_reader is not None:
+            cur_mask[:] = mask_reader[idx].astype(bool)
+            current_displacement[cur_mask] = np.nan
+            # TODO: Do i want to do some kind of "nan_policy" to fill 0s?
+
+        # Apply spatial reference point if needed
         if reference_point is not None:
             current_displacement -= current_displacement[reference_point]
 
         # Check for the shift in temporal reference date
-        cur_ref, _cur_sec = products.ifg_date_pairs[0]
+        cur_ref, _cur_sec = product_stack.ifg_date_pairs[idx]
         if cur_ref != latest_reference_date:
             # e.g. we had (1,2), (1,3), now we hit (3,4)
             # So to write out (1,4), we need to add the running total
@@ -170,6 +219,10 @@ def rereference(
         last_displacement = current_displacement
 
         writer[idx] = current_displacement + cumulative_offset
+
+    # Save the reference point(s), if used
+    if reference_point is not None:
+        writer.save_attr({"reference_point": json.dumps(reference_point)})
 
 
 @dataclass
@@ -235,6 +288,20 @@ class GeotiffStackWriter:
 
     def __len__(self):
         return len(self.files)
+
+    def save_attr(self, attr: dict[str, Any], namespace: str | None = None) -> None:
+        """Save metadata to all geotiff files.
+
+        Parameters
+        ----------
+        attr
+            Dictionary of metadata to save.
+        namespace
+            Namespace for metadata.
+        """
+        for f in self.files:
+            with rio.open(f, "r+", **self.profile) as dst:
+                dst.update_tags(ns=namespace, **attr)
 
     @classmethod
     def from_dates(
@@ -353,30 +420,35 @@ def find_reference_point(
     tuple[int, int]
         Reference point (row, column)
     """
+    from scipy import ndimage
+
     with rio.open(average_quality_raster) as src:
         quality = src.read(1)
 
     # Step back from high to low and pick all points meeting a threshold.
     # We don't just want the highest quality, isolated pixel:
     # We want one toward the middle of the good data pixels.
+    # TODO: implement median of all candidates as a `reference_mask`
     for threshold in np.arange(max_quality_test, min_quality - step, -step):
         candidates = quality > threshold
         if not np.any(candidates):
             continue
         # Find the pixel closest to the center of mass of the good pixels.
-        center_of_mass = ndimage.center_of_mass(candidates)
+        r, c = ndimage.center_of_mass(candidates)
         # The center may not be a good pixel! So find the candidate closest:
-        row, col = np.unravel_index(
-            np.argmin(np.abs(candidates - center_of_mass)), candidates.shape
-        )
-        return int(row), int(col)
+        rows, cols = np.where(candidates)
+        dists = np.sqrt((rows - r) ** 2 + (cols - c) ** 2)
+        idx = np.argmin(dists)
+        return rows[idx], cols[idx]
     raise ValueError(f"No valid candidates found with quality above {min_quality}")
 
 
 def main(
-    nc_files: list[str],
+    nc_files: Sequence[PathOrStrT],
     output_dir: Path | str,
-    apply_corrections: bool = True,
+    apply_solid_earth_corrections: bool = True,
+    apply_ionospheric_corrections: bool = True,
+    apply_mask: bool = True,
     reference_point: tuple[int, int] | None = None,
     num_workers: int = 5,
 ):
@@ -384,12 +456,16 @@ def main(
 
     Parameters
     ----------
-    nc_files : list[str]
+    nc_files : list[Path]
         List of netCDF files to process.
     output_dir : Path or str
         Output directory for the processed files.
-    apply_corrections : bool, optional
-        Whether to apply corrections to the data, by default True
+    apply_solid_earth_corrections : bool, optional
+        Whether to apply solid earth corrections to the data, by default True
+    apply_ionospheric_corrections : bool, optional
+        Whether to apply ionospheric corrections to the data, by default True
+    apply_mask : bool, optional
+        Whether to apply a mask to the data, by default True
     reference_point : tuple[int, int] | None, optional
         Reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
@@ -434,15 +510,18 @@ def main(
 
     all_products = DispProductStack.from_file_list(nc_files)
     futures: list[Future] = []
+    mask_dataset = QualityDataset.RECOMMENDED_MASK if apply_mask else None
     with ProcessPoolExecutor(num_workers) as pool:
         # Submit time series rebase function
         futures.append(
             pool.submit(
-                rereference,
+                rebase,
                 output_dir,
                 nc_files,
-                DisplacementDataset.DISPLACEMENT,
-                apply_corrections=apply_corrections,
+                dataset=DisplacementDataset.DISPLACEMENT,
+                mask_dataset=mask_dataset,
+                apply_solid_earth_corrections=apply_solid_earth_corrections,
+                apply_ionospheric_corrections=apply_ionospheric_corrections,
                 reference_point=reference_point,
             )
         )
@@ -461,4 +540,6 @@ def main(
 
 
 if __name__ == "__main__":
+    import tyro
+
     tyro.cli(main)
