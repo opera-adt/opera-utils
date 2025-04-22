@@ -99,7 +99,9 @@ def rebase(
     output_dir: Path | str,
     nc_files: Sequence[Path | str],
     dataset: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
-    apply_corrections: bool = True,
+    mask_dataset: QualityDataset | None = QualityDataset.RECOMMENDED_MASK,
+    apply_solid_earth_corrections: bool = True,
+    apply_ionospheric_corrections: bool = True,
     reference_point: tuple[int, int] | None = None,
     nodata: float = np.nan,
     keep_bits: int = 9,
@@ -116,8 +118,14 @@ def rebase(
         for a reference_date -> secondary_date interferogram.
     dataset : DisplacementDataset
         Name of HDF5 dataset within product to convert.
-    apply_corrections : bool
-        Apply corrections to the data.
+    mask_dataset : QualityDataset | None
+        Name of HDF5 dataset within product to use as a mask.
+        If None, no masking is performed.
+    apply_solid_earth_corrections : bool
+        Apply solid earth tides to the data.
+        Default is True.
+    apply_ionospheric_corrections : bool
+        Apply ionospheric delay to the data.
         Default is True.
     reference_point : tuple[int, int] | None
         Reference point to use when rebasing /displacement.
@@ -147,13 +155,32 @@ def rebase(
     )
 
     reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=nodata)
-    if apply_corrections:
-        corrections_readers = [
-            HDF5StackReader(nc_files, dset_name=str(correction_dataset), nodata=nodata)
-            for correction_dataset in CorrectionDataset
-        ]
-    else:
-        corrections_readers = []
+    corrections_readers = []
+    if apply_solid_earth_corrections:
+        corrections_readers.append(
+            HDF5StackReader(
+                nc_files,
+                dset_name=str(CorrectionDataset.SOLID_EARTH_TIDE),
+                nodata=nodata,
+            )
+        )
+    if apply_ionospheric_corrections:
+        corrections_readers.append(
+            HDF5StackReader(
+                nc_files,
+                dset_name=str(CorrectionDataset.IONOSPHERIC_DELAY),
+                nodata=nodata,
+            )
+        )
+    mask_reader = (
+        HDF5StackReader(
+            nc_files,
+            dset_name=str(mask_dataset),
+            nodata=nodata,
+        )
+        if mask_dataset is not None
+        else None
+    )
 
     # Make a "cumulative offset" which adds up the phase each time theres a reference
     # date changeover.
@@ -161,6 +188,7 @@ def rebase(
     cumulative_offset = np.zeros(shape, dtype=np.float32)
     last_displacement = np.zeros(shape, dtype=np.float32)
     current_displacement = np.zeros(shape, dtype=np.float32)
+    cur_mask = np.ones(shape, dtype=bool)
     latest_reference_date = product_stack.products[0].reference_datetime
 
     for idx in trange(len(nc_files), desc="Summing dates", position=tqdm_position):
@@ -170,7 +198,13 @@ def rebase(
         for r in corrections_readers:
             current_displacement -= r[idx]
 
-        # Apply spaital reference point if needed
+        # Apply mask if needed
+        if mask_reader is not None:
+            cur_mask[:] = mask_reader[idx].astype(bool)
+            current_displacement[cur_mask] = np.nan
+            # TODO: Do i want to do some kind of "nan_policy" to fill 0s?
+
+        # Apply spatial reference point if needed
         if reference_point is not None:
             current_displacement -= current_displacement[reference_point]
 
@@ -412,7 +446,9 @@ def find_reference_point(
 def main(
     nc_files: Sequence[PathOrStrT],
     output_dir: Path | str,
-    apply_corrections: bool = True,
+    apply_solid_earth_corrections: bool = True,
+    apply_ionospheric_corrections: bool = True,
+    apply_mask: bool = True,
     reference_point: tuple[int, int] | None = None,
     num_workers: int = 5,
 ):
@@ -424,8 +460,12 @@ def main(
         List of netCDF files to process.
     output_dir : Path or str
         Output directory for the processed files.
-    apply_corrections : bool, optional
-        Whether to apply corrections to the data, by default True
+    apply_solid_earth_corrections : bool, optional
+        Whether to apply solid earth corrections to the data, by default True
+    apply_ionospheric_corrections : bool, optional
+        Whether to apply ionospheric corrections to the data, by default True
+    apply_mask : bool, optional
+        Whether to apply a mask to the data, by default True
     reference_point : tuple[int, int] | None, optional
         Reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
@@ -470,6 +510,7 @@ def main(
 
     all_products = DispProductStack.from_file_list(nc_files)
     futures: list[Future] = []
+    mask_dataset = QualityDataset.RECOMMENDED_MASK if apply_mask else None
     with ProcessPoolExecutor(num_workers) as pool:
         # Submit time series rebase function
         futures.append(
@@ -477,8 +518,10 @@ def main(
                 rebase,
                 output_dir,
                 nc_files,
-                DisplacementDataset.DISPLACEMENT,
-                apply_corrections=apply_corrections,
+                dataset=DisplacementDataset.DISPLACEMENT,
+                mask_dataset=mask_dataset,
+                apply_solid_earth_corrections=apply_solid_earth_corrections,
+                apply_ionospheric_corrections=apply_ionospheric_corrections,
                 reference_point=reference_point,
             )
         )
