@@ -1,13 +1,14 @@
-#!/usr/bin/env python3
 # /// script
 # dependencies = ["numpy", "rasterio", "scipy", "tqdm", "tyro"]
 # ///
 """Convert a series of OPERA DISP-S1 products to a single-reference stack.
 
-The OPERA L3 InSAR displacement netCDF files have reference dates which
-move forward in time. Each displacement is relative between two SAR acquisition dates.
+The OPERA L3 InSAR displacement values, which represent relative displacement
+from a reference SAR acquisition to a secondary, have reference dates which
+move forward in time. To get a single, continuous time series, a simple summation
+is needed.
 
-This converts these files into a single continuous displacement time series.
+This script converts these files into a single continuous displacement time series.
 The current format is a stack of geotiff rasters.
 
 Usage:
@@ -26,13 +27,11 @@ from typing import Literal, Self, Sequence
 import h5py
 import numpy as np
 import rasterio as rio
-import tyro
 from numpy.typing import DTypeLike
-from scipy import ndimage
 from tqdm.auto import trange
 
-from opera_utils.disp._product import DispProductStack
-from opera_utils.disp._utils import _last_per_ministack, flatten, round_mantissa
+from ._product import DispProductStack
+from ._utils import _last_per_ministack, flatten, round_mantissa
 
 
 class DisplacementDataset(StrEnum):
@@ -80,7 +79,7 @@ UNIQUE_PER_DATE_DATASETS = [
 ]
 
 
-def rereference(
+def rebase(
     output_dir: Path | str,
     nc_files: Sequence[Path | str],
     dataset: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
@@ -353,6 +352,8 @@ def find_reference_point(
     tuple[int, int]
         Reference point (row, column)
     """
+    from scipy import ndimage
+
     with rio.open(average_quality_raster) as src:
         quality = src.read(1)
 
@@ -439,7 +440,7 @@ def main(
         # Submit time series rebase function
         futures.append(
             pool.submit(
-                rereference,
+                rebase,
                 output_dir,
                 nc_files,
                 DisplacementDataset.DISPLACEMENT,
@@ -462,4 +463,6 @@ def main(
 
 
 if __name__ == "__main__":
+    import tyro
+
     tyro.cli(main)
