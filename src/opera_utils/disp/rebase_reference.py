@@ -15,48 +15,59 @@ Usage:
     python -m opera_utils.disp.rebase_reference single-reference-out/ OPERA_L3_DISP-S1_*.nc
 """
 
+import json
 import multiprocessing
 from concurrent.futures import FIRST_EXCEPTION, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import date, datetime
-from enum import StrEnum
+from enum import Enum
 from itertools import repeat
 from pathlib import Path
-from typing import Literal, Self, Sequence
+from typing import Any, Literal, Sequence
 
 import h5py
 import numpy as np
 import rasterio as rio
 from numpy.typing import DTypeLike
 from tqdm.auto import trange
+from typing_extensions import Self
 
 from ._product import DispProductStack
-from ._utils import _last_per_ministack, flatten, round_mantissa
+from ._utils import PathOrStrT, _last_per_ministack, flatten, round_mantissa
 
 
-class DisplacementDataset(StrEnum):
+class DisplacementDataset(str, Enum):
     """Enumeration of displacement datasets."""
 
     DISPLACEMENT = "displacement"
     SHORT_WAVELENGTH = "short_wavelength_displacement"
 
+    def __str__(self) -> str:
+        return self.value
 
-class CorrectionDataset(StrEnum):
+
+class CorrectionDataset(str, Enum):
     """Enumeration of correction datasets."""
 
     SOLID_EARTH_TIDE = "/corrections/solid_earth_tide"
     IONOSPHERIC_DELAY = "/corrections/ionospheric_delay"
 
+    def __str__(self) -> str:
+        return self.value
 
-class SamePerMinistackDataset(StrEnum):
+
+class SamePerMinistackDataset(str, Enum):
     """Enumeration of datasets that are same per ministack."""
 
     TEMPORAL_COHERENCE = "temporal_coherence"
     PHASE_SIMILARITY = "phase_similarity"
     SHP_COUNTS = "shp_counts"
 
+    def __str__(self) -> str:
+        return self.value
 
-class QualityDataset(StrEnum):
+
+class QualityDataset(str, Enum):
     """Enumeration of quality datasets."""
 
     TIMESERIES_INVERSION_RESIDUALS = "timeseries_inversion_residuals"
@@ -65,6 +76,9 @@ class QualityDataset(StrEnum):
     ESTIMATED_PHASE_QUALITY = "estimated_phase_quality"
     SHP_COUNTS = "shp_counts"
     WATER_MASK = "water_mask"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 SAME_PER_MINISTACK_DATASETS = [
@@ -170,6 +184,10 @@ def rebase(
 
         writer[idx] = current_displacement + cumulative_offset
 
+    # Save the reference point(s), if used
+    if reference_point is not None:
+        writer.save_attr({"reference_point": json.dumps(reference_point)})
+
 
 @dataclass
 class HDF5StackReader:
@@ -234,6 +252,20 @@ class GeotiffStackWriter:
 
     def __len__(self):
         return len(self.files)
+
+    def save_attr(self, attr: dict[str, Any], namespace: str | None = None) -> None:
+        """Save metadata to all geotiff files.
+
+        Parameters
+        ----------
+        attr
+            Dictionary of metadata to save.
+        namespace
+            Namespace for metadata.
+        """
+        for f in self.files:
+            with rio.open(f, "r+", **self.profile) as dst:
+                dst.update_tags(ns=namespace, **attr)
 
     @classmethod
     def from_dates(
@@ -376,7 +408,7 @@ def find_reference_point(
 
 
 def main(
-    nc_files: list[str],
+    nc_files: Sequence[PathOrStrT],
     output_dir: Path | str,
     apply_corrections: bool = True,
     reference_point: tuple[int, int] | None = None,
@@ -386,7 +418,7 @@ def main(
 
     Parameters
     ----------
-    nc_files : list[str]
+    nc_files : list[Path]
         List of netCDF files to process.
     output_dir : Path or str
         Output directory for the processed files.

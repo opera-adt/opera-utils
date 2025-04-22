@@ -5,36 +5,27 @@ import h5netcdf
 import numpy as np
 import pytest
 
-# Import fixtures/constants from existing test_disp_product.py
-from test_disp_product import (
-    MOCK_FRAME_BBOX_RESULT,
-    VALID_FILES,
-)
-
 from opera_utils.disp import DispProductStack
 from opera_utils.disp._netcdf import (
     _create_time_array,
     save_data,
 )
 
-
-@pytest.fixture
-def mock_get_frame_bbox(monkeypatch):
-    monkeypatch.setattr(
-        "opera_utils.burst_frame_db.get_frame_bbox",
-        lambda frame_id: MOCK_FRAME_BBOX_RESULT,
-    )
+FILE_1 = "OPERA_L3_DISP-S1_IW_F11116_VV_20160705T140755Z_20160729T140756Z_v1.0_20250318T222753Z.nc"
+FILE_2 = "OPERA_L3_DISP-S1_IW_F11116_VV_20160705T140755Z_20160810T140756Z_v1.0_20250318T222753Z.nc"
+FILE_3 = "OPERA_L3_DISP-S1_IW_F11116_VV_20160717T140755Z_20160729T140756Z_v1.0_20250318T222753Z.nc"
+FILE_LIST = [FILE_1, FILE_2, FILE_3]
 
 
 @pytest.fixture
-def test_stack(mock_get_frame_bbox):
-    return DispProductStack.from_file_list(VALID_FILES)
+def test_stack():
+    return DispProductStack.from_file_list(FILE_LIST)
 
 
 @pytest.fixture
 def test_data():
     # Create sample 3D array [time, height, width]
-    return np.random.randn(len(VALID_FILES), 10, 15).astype(np.float32)
+    return np.random.randn(len(FILE_LIST), 10, 15).astype(np.float32)
 
 
 def test_create_time_array():
