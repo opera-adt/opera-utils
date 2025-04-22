@@ -15,6 +15,8 @@ Usage:
     python -m opera_utils.disp.rebase_reference single-reference-out/ OPERA_L3_DISP-S1_*.nc
 """
 
+from __future__ import annotations
+
 import json
 import multiprocessing
 from concurrent.futures import FIRST_EXCEPTION, Future, ProcessPoolExecutor, wait
