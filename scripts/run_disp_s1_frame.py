@@ -14,7 +14,6 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
-import tyro
 
 from opera_utils.disp import rebase_reference, search
 from opera_utils.disp._rebase import NaNPolicy
@@ -132,4 +131,6 @@ def process_frame(
 
 
 if __name__ == "__main__":
+    import tyro
+
     tyro.cli(process_frame)

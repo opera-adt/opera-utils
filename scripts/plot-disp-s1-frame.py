@@ -22,7 +22,6 @@ from typing import Optional
 import cartopy.crs as ccrs
 import cartopy.io.shapereader as shpreader
 import matplotlib.pyplot as plt
-import tyro
 from shapely.ops import unary_union
 
 import opera_utils
@@ -183,4 +182,6 @@ def plot_single_frame_on_background(
 
 
 if __name__ == "__main__":
+    import tyro
+
     tyro.cli(plot_single_frame_on_background)

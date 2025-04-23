@@ -20,7 +20,6 @@ Examples
 from datetime import datetime
 from pathlib import Path
 
-import tyro
 from shapely import from_wkt
 
 from opera_utils import disp
@@ -123,4 +122,6 @@ def read_disp(
 
 
 if __name__ == "__main__":
+    import tyro
+
     tyro.cli(read_disp)
