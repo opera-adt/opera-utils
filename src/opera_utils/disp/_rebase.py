@@ -2,12 +2,25 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from enum import Enum
 
 import numpy as np
 
 
+class NaNPolicy(str, Enum):
+    """Policy for handling NaN values in rebase_timeseries."""
+
+    propagate = "propagate"
+    omit = "omit"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 def rebase_timeseries(
-    raw_data: np.ndarray, reference_dates: Sequence[datetime]
+    raw_data: np.ndarray,
+    reference_dates: Sequence[datetime],
+    nan_policy: str | NaNPolicy = NaNPolicy.propagate,
 ) -> np.ndarray:
     """Adjust for moving reference dates to create a continuous time series.
 
@@ -32,6 +45,12 @@ def rebase_timeseries(
         shape = (time, rows, cols)
     reference_dates : Sequence[datetime]
         Reference dates for each time step
+    nan_policy : choices = ["propagate", "omit"]
+        Whether to propagate or omit (zero out) NaNs in the data.
+        By default "propagate", which means any ministack, or any "reference crossover"
+        product, with nan at a pixel causes all subsequent data to be nan.
+        If "omit", then any nan causes the pixel to be zeroed out, which is
+        equivalent to assuming that 0 displacement occurred during that time.
 
     Returns
     -------
@@ -56,6 +75,8 @@ def rebase_timeseries(
         # Check for shift in temporal reference date
         if cur_ref_date != current_reference_date:
             # When reference date changes, accumulate the previous displacement
+            if nan_policy == NaNPolicy.omit:
+                np.nan_to_num(last_displacement, copy=False)
             cumulative_offset += last_displacement
             current_reference_date = cur_ref_date
 

@@ -2,6 +2,7 @@ import sys
 from datetime import datetime, timezone
 
 import numpy as np
+import pytest
 
 sys.path.insert(0, "/Users/staniewi/repos/opera-utils")
 
@@ -105,7 +106,8 @@ def test_rebase_with_three_references():
     np.testing.assert_array_equal(result, expected)
 
 
-def test_rebase_with_nan_values():
+@pytest.mark.parametrize("nan_policy", ["propagate", "omit"])
+def test_rebase_with_nan_values(nan_policy: str):
     """Test with NaN values to ensure they're handled correctly."""
     # Create 3D array with some NaN values at one pixel
     raw_data = np.ones((3, 2, 2), dtype=np.float32)
@@ -123,25 +125,19 @@ def test_rebase_with_nan_values():
         datetime(2020, 3, 1, tzinfo=timezone.utc),  # Reference date changes here
     ]
 
-    result = rebase_timeseries(raw_data, reference_dates)
+    result = rebase_timeseries(raw_data, reference_dates, nan_policy=nan_policy)
 
     # Second column had no nans, should be all fine:
     np.testing.assert_array_equal(result[:, 0, 1], np.array([1, 2, 6]))
     np.testing.assert_array_equal(result[:, 1, 1], np.array([1, 2, 6]))
 
-    # First time step remains unchanged
-    assert np.isnan(result[0, 0, 0])
-    assert result[0, 1, 0] == 1.0
-
-    # When reference date changes (step 1), we add the cumulative offset from step 0
-    # Because at [0,0], the value is NaN, the cumulative offset will be:
-    # - NaN at [0,0]
-    # - 1.0 at all other positions
-
-    # Step 1 + cumulative offset from Step 0
-    assert result[1, 0, 0] == 2.0
-    assert np.isnan(result[1, 1, 0])
+    # Top left pixel had a nan *only* during the first time step, not during
+    # a reference change
+    np.testing.assert_array_equal(result[:, 0, 0], np.array([np.nan, 2, 6]))
 
     # Step 2 (same reference date as step 1) has the same cumulative offset
-    assert result[2, 0, 0] == 6.0
-    assert np.isnan(result[2, 1, 0])  # NaN + anything = NaN
+    if nan_policy == "omit":
+        # We assumed here was zero deformation, so we add the offset to the previous value
+        np.testing.assert_array_equal(result[:, 1, 0], np.array([1, np.nan, 4]))
+    else:
+        np.testing.assert_array_equal(result[:, 1, 0], np.array([1, np.nan, np.nan]))
