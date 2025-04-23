@@ -62,7 +62,7 @@ def rebase_timeseries(
 
     shape2d = raw_data.shape[1:]
     cumulative_offset = np.zeros(shape2d, dtype=np.float32)
-    last_displacement = np.zeros(shape2d, dtype=np.float32)
+    previous_displacement = np.zeros(shape2d, dtype=np.float32)
 
     # Set initial reference date
     current_reference_date = reference_dates[0]
@@ -76,12 +76,12 @@ def rebase_timeseries(
         if cur_ref_date != current_reference_date:
             # When reference date changes, accumulate the previous displacement
             if nan_policy == NaNPolicy.omit:
-                np.nan_to_num(last_displacement, copy=False)
-            cumulative_offset += last_displacement
+                np.nan_to_num(previous_displacement, copy=False)
+            cumulative_offset += previous_displacement
             current_reference_date = cur_ref_date
 
         # Store current displacement for next iteration
-        last_displacement = current_displacement.copy()
+        previous_displacement = current_displacement.copy()
 
         # Add cumulative offset to get consistent reference
         out_layer[:] = current_displacement + cumulative_offset
