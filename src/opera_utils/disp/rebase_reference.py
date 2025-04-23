@@ -35,6 +35,7 @@ from tqdm.auto import trange
 from typing_extensions import Self
 
 from ._product import DispProductStack
+from ._rebase import NaNPolicy
 from ._utils import PathOrStrT, _last_per_ministack, flatten, round_mantissa
 
 
@@ -102,6 +103,7 @@ def rebase(
     mask_dataset: QualityDataset | None = QualityDataset.RECOMMENDED_MASK,
     apply_solid_earth_corrections: bool = True,
     apply_ionospheric_corrections: bool = True,
+    nan_policy: str | NaNPolicy = NaNPolicy.propagate,
     reference_point: tuple[int, int] | None = None,
     nodata: float = np.nan,
     keep_bits: int = 9,
@@ -127,10 +129,16 @@ def rebase(
     apply_ionospheric_corrections : bool
         Apply ionospheric delay to the data.
         Default is True.
+    nan_policy : str | NaNPolicy
+        Whether to propagate or omit (zero out) NaNs in the data.
+        By default "propagate", which means any ministack, or any "reference crossover"
+        product, with nan at a pixel causes all subsequent data to be nan.
+        If "omit", then any nan causes the pixel to be zeroed out, which is
+        equivalent to assuming that 0 displacement occurred during that time.
     reference_point : tuple[int, int] | None
         Reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
-        Default is None
+        Default is None.
     nodata : float
         Value to use in translated rasters as nodata value.
         Default is np.nan
@@ -211,10 +219,12 @@ def rebase(
         # Check for the shift in temporal reference date
         cur_ref, _cur_sec = product_stack.ifg_date_pairs[idx]
         if cur_ref != latest_reference_date:
+            latest_reference_date = cur_ref
             # e.g. we had (1,2), (1,3), now we hit (3,4)
             # So to write out (1,4), we need to add the running total
             # to the current displacement
-            latest_reference_date = cur_ref
+            if nan_policy == NaNPolicy.omit:
+                np.nan_to_num(last_displacement, copy=False)
             cumulative_offset += last_displacement
         last_displacement = current_displacement
 
@@ -449,6 +459,7 @@ def main(
     apply_solid_earth_corrections: bool = True,
     apply_ionospheric_corrections: bool = True,
     apply_mask: bool = True,
+    nan_policy: str | NaNPolicy = NaNPolicy.propagate,
     reference_point: tuple[int, int] | None = None,
     num_workers: int = 5,
 ):
@@ -466,6 +477,12 @@ def main(
         Whether to apply ionospheric corrections to the data, by default True
     apply_mask : bool, optional
         Whether to apply a mask to the data, by default True
+    nan_policy : choices = ["propagate", "omit"]
+        Whether to propagate or omit (zero out) NaNs in the data.
+        By default "propagate", which means any ministack, or any "reference crossover"
+        product, with nan at a pixel causes all subsequent data to be nan.
+        If "omit", then any nan causes the pixel to be zeroed out, which is
+        equivalent to assuming that 0 displacement occurred during that time.
     reference_point : tuple[int, int] | None, optional
         Reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
@@ -499,7 +516,6 @@ def main(
             ),
         )
 
-    # Find the reference point
     # Load in the coherence dataset
     # TODO: Any way to extract the name, rather than relying on this matching
     # the function `extract_quality_layers`?
@@ -522,6 +538,7 @@ def main(
                 mask_dataset=mask_dataset,
                 apply_solid_earth_corrections=apply_solid_earth_corrections,
                 apply_ionospheric_corrections=apply_ionospheric_corrections,
+                nan_policy=nan_policy,
                 reference_point=reference_point,
             )
         )
