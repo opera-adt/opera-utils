@@ -133,10 +133,17 @@ def process_frame(
     )
     # Copy with more compression options
     temp_file = aligned_dir / "velocity_temp.tif"
-    options = {"nbits": "16", "predictor": "2", "tiled": "yes", "compress": "deflate"}
-    with rio.open(vel_file, "r") as src:
-        with rio.open(temp_file, "w", **src.profile, **options) as dst:
-            dst.write(src.read(1))
+    options = {
+        "nbits": "16",
+        "predictor": "2",
+        "tiled": "256x256",
+        "compress": "deflate",
+    }
+    with (
+        rio.open(vel_file, "r") as src,
+        rio.open(temp_file, "w", **(src.profile | options)) as dst,
+    ):
+        dst.write(src.read(1), 1)
     temp_file.replace(vel_file)
 
 
