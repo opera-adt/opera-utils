@@ -17,6 +17,7 @@ import requests
 import tyro
 
 from opera_utils.disp import rebase_reference, search
+from opera_utils.disp._rebase import NaNPolicy
 from opera_utils.disp._search import UrlType
 
 
@@ -41,10 +42,14 @@ def process_frame(
     url_type: UrlType = UrlType.HTTPS,
     start_datetime: datetime | None = None,
     end_datetime: datetime | None = None,
+    apply_solid_earth_corrections: bool = True,
+    apply_ionospheric_corrections: bool = True,
+    apply_mask: bool = True,
+    nan_policy: str | NaNPolicy = NaNPolicy.propagate,
+    reference_point: tuple[int, int] | None = None,
     num_workers: int = 4,
-    apply_corrections: bool = True,
 ) -> None:
-    """Search, download, align one DISP-S1 frame, then create a velocity map.
+    """Search, download, rebase one DISP-S1 frame, then create a velocity map.
 
     Parameters
     ----------
@@ -52,16 +57,30 @@ def process_frame(
         DISP-S1 frame ID to process.
     work_dir
         Where outputs (and temp `.nc` files) are written.
-    url_type
-        "https" (default) or "s3".
+    url_type : str, choices = ["https", "s3"]
+        Whether to use HTTPS or S3 URLs when downloading from ASF.
     start_datetime
         Start datetime for search.
     end_datetime
         End datetime for search.
+    apply_solid_earth_corrections : bool, optional
+        Whether to apply solid earth corrections to the data, by default True
+    apply_ionospheric_corrections : bool, optional
+        Whether to apply ionospheric corrections to the data, by default True
+    apply_mask : bool, optional
+        Whether to apply the recommended mask to the data, by default True
+    nan_policy : choices = ["propagate", "omit"]
+        Whether to propagate or omit (zero out) NaNs in the data.
+        By default "propagate", which means any ministack, or any "reference crossover"
+        product, with nan at a pixel causes all subsequent data to be nan.
+        If "omit", then any nan causes the pixel to be zeroed out, which is
+        equivalent to assuming that 0 displacement occurred during that time.
+    reference_point : tuple[int, int] | None, optional
+        Reference point to use when rebasing /displacement.
+        If None, finds a point with the highest harmonic mean of temporal coherence.
+        Default is None.
     num_workers
         Number of parallel download and reference-rebasing workers.
-    apply_corrections
-        Pass-through flag for `rebase_reference`.
     """
     work_dir = work_dir.resolve()
     nc_dir = work_dir / "ncs"
@@ -86,13 +105,16 @@ def process_frame(
     rebase_reference.main(
         nc_files=nc_paths,
         output_dir=aligned_dir,
-        apply_corrections=apply_corrections,
-        reference_point=None,
+        apply_solid_earth_corrections=apply_solid_earth_corrections,
+        apply_ionospheric_corrections=apply_ionospheric_corrections,
+        apply_mask=apply_mask,
+        nan_policy=nan_policy,
+        reference_point=reference_point,
         num_workers=num_workers,
     )
 
     try:
-        from dolphin import timeseries, utils
+        from dolphin import ReferencePoint, timeseries, utils
     except ImportError as e:
         raise ImportError("dolphin is required for velocity creation.") from e
 
@@ -104,10 +126,9 @@ def process_frame(
     timeseries.create_velocity(
         unw_file_list=disp_files,
         output_file=vel_file,
-        reference=None,
+        reference=ReferencePoint(*reference_point) if reference_point else None,
         num_threads=num_workers,
     )
-    print(f"✓ Velocity written to {vel_file}")
 
 
 if __name__ == "__main__":
