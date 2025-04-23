@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
+import rasterio as rio
 import requests
 
 from opera_utils.disp import rebase_reference, search
@@ -122,12 +123,21 @@ def process_frame(
     if not disp_files:
         raise RuntimeError("No displacement TIFFs produced by rebase step.")
     vel_file = aligned_dir / "velocity.tif"
+    mask_files = sorted(aligned_dir.glob("recommended_mask*20*.tif"))
     timeseries.create_velocity(
         unw_file_list=disp_files,
         output_file=vel_file,
         reference=ReferencePoint(*reference_point) if reference_point else None,
+        cor_file_list=mask_files,
         num_threads=num_workers,
     )
+    # Copy with more compression options
+    temp_file = aligned_dir / "velocity_temp.tif"
+    options = {"nbits": "16", "predictor": "2", "tiled": "yes", "compress": "deflate"}
+    with rio.open(vel_file, "r") as src:
+        with rio.open(temp_file, "w", **src.profile, **options) as dst:
+            dst.write(src.read(1))
+    temp_file.replace(vel_file)
 
 
 if __name__ == "__main__":

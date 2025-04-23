@@ -161,6 +161,8 @@ def rebase(
         keep_bits=keep_bits,
         profile=product_stack.get_rasterio_profile(),
     )
+    if all(Path(f).exists() for f in writer.files):
+        return
 
     reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=nodata)
     corrections_readers = []
@@ -196,7 +198,7 @@ def rebase(
     cumulative_offset = np.zeros(shape, dtype=np.float32)
     last_displacement = np.zeros(shape, dtype=np.float32)
     current_displacement = np.zeros(shape, dtype=np.float32)
-    cur_mask = np.ones(shape, dtype=bool)
+    cur_good_mask = np.ones(shape, dtype=bool)
     latest_reference_date = product_stack.products[0].reference_datetime
 
     for idx in trange(len(nc_files), desc="Summing dates", position=tqdm_position):
@@ -208,9 +210,8 @@ def rebase(
 
         # Apply mask if needed
         if mask_reader is not None:
-            cur_mask[:] = mask_reader[idx].astype(bool)
-            current_displacement[cur_mask] = np.nan
-            # TODO: Do i want to do some kind of "nan_policy" to fill 0s?
+            cur_good_mask[:] = mask_reader[idx].astype(bool)
+            current_displacement[~cur_good_mask] = np.nan
 
         # Apply spatial reference point if needed
         if reference_point is not None:
@@ -352,7 +353,7 @@ def extract_quality_layers(
     dataset: str,
     save_mean: bool = True,
     mean_type: Literal["harmonic", "arithmetic"] = "harmonic",
-):
+) -> None:
     """Extract quality layers from the displacement products and write them to GeoTIFF files."""
     reader = HDF5StackReader(products.filenames, dataset)
     writer = GeotiffStackWriter.from_dates(
@@ -361,6 +362,8 @@ def extract_quality_layers(
         date_pairs=products.ifg_date_pairs,
         profile=products.get_rasterio_profile(),
     )
+    if all(Path(f).exists() for f in writer.files):
+        return
     if save_mean:
         # For harmonic mean, we need to accumulate the reciprocals
         if mean_type == "harmonic":
