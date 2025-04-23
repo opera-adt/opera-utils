@@ -149,6 +149,7 @@ def rebase(
         Position of the progress bar. Default is 0.
 
     """
+    nc_files = sorted(nc_files)
     product_stack = DispProductStack.from_file_list(nc_files)
     # Flatten all dates, find unique sorted list of SAR epochs
     all_dates = sorted(set(flatten(product_stack.ifg_date_pairs)))
@@ -196,13 +197,13 @@ def rebase(
     # date changeover.
     shape = product_stack[0].shape
     cumulative_offset = np.zeros(shape, dtype=np.float32)
-    last_displacement = np.zeros(shape, dtype=np.float32)
+    previous_displacement = np.zeros(shape, dtype=np.float32)
     current_displacement = np.zeros(shape, dtype=np.float32)
     cur_good_mask = np.ones(shape, dtype=bool)
-    latest_reference_date = product_stack.products[0].reference_datetime
+    previous_reference_date = product_stack.products[0].reference_datetime
 
     for idx in trange(len(nc_files), desc="Summing dates", position=tqdm_position):
-        current_displacement[:] = reader[idx]
+        current_displacement = reader[idx]
 
         # Apply corrections if needed
         for r in corrections_readers:
@@ -219,17 +220,18 @@ def rebase(
 
         # Check for the shift in temporal reference date
         cur_ref, _cur_sec = product_stack.ifg_date_pairs[idx]
-        if cur_ref != latest_reference_date:
-            latest_reference_date = cur_ref
+        if cur_ref != previous_reference_date:
             # e.g. we had (1,2), (1,3), now we hit (3,4)
             # So to write out (1,4), we need to add the running total
             # to the current displacement
             if nan_policy == NaNPolicy.omit:
-                np.nan_to_num(last_displacement, copy=False)
-            cumulative_offset += last_displacement
-        last_displacement = current_displacement
+                np.nan_to_num(previous_displacement, copy=False)
+            cumulative_offset += previous_displacement
+            previous_reference_date = cur_ref
 
         writer[idx] = current_displacement + cumulative_offset
+
+        previous_displacement = current_displacement
 
     # Save the reference point(s), if used
     if reference_point is not None:
