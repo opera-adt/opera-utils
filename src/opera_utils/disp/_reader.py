@@ -62,9 +62,8 @@ def read_stack_lonlat(
     lons: float | slice,
     lats: float | slice,
     reference_method: ReferenceMethod = ReferenceMethod.none,
-    # ref_lon: Optional[float] = None,
-    # ref_lat: Optional[float] = None,
-    # ref_pixel: Optional[tuple[int, int]] = None,
+    ref_lon: float | None = None,
+    ref_lat: float | None = None,
     max_workers: int | None = None,
     dset: str = "displacement",
 ) -> tuple[np.ndarray, dict[str, str | float]]:
@@ -86,6 +85,10 @@ def read_stack_lonlat(
         - "point": Reference to specified ref_lon/ref_lat
         - "median": Reference to median of each date
         - "border": Reference to median value of data border
+    ref_lon : float | None, optional
+        Longitude of the reference point
+    ref_lat : float | None, optional
+        Latitude of the reference point
     max_workers : int, optional
         Number of processes to use for parallel reading.
         If None, uses the number of CPU cores.
@@ -97,6 +100,16 @@ def read_stack_lonlat(
     attrs : dict[str, str|float]
         Attributes for the dataset
     """
+    if ref_lon is not None and ref_lat is not None:
+        reference_method = ReferenceMethod.point
+
+    if reference_method == ReferenceMethod.point and (
+        ref_lon is None or ref_lat is None
+    ):
+        raise ValueError(
+            "ref_lon and ref_lat must be provided when using point referencing"
+        )
+
     # Create a partial function with fixed parameters
     read_func = partial(read_lonlat, lon_slice=lons, lat_slice=lats, dset=dset)
 
@@ -113,6 +126,7 @@ def read_stack_lonlat(
                 desc="Reading products",
             )
         )
+
     with open_h5(stack.products[0]) as hf:
         # pop off internal netcdf4 attributes
         attrs = dict(hf[dset].attrs)
@@ -123,6 +137,10 @@ def read_stack_lonlat(
             "DIMENSION_LIST",
         ]:
             attrs.pop(k, None)
+        attrs["reference_datetime"] = stack.reference_dates[0].isoformat()
+        attrs["reference_method"] = reference_method.value
+        attrs["reference_lon"] = ref_lon or "None"
+        attrs["reference_lat"] = ref_lat or "None"
 
     # Stack the results and adjust reference (if needed)
     unreffed_data = np.stack(results)
@@ -134,12 +152,26 @@ def read_stack_lonlat(
 
     # Apply referencing if needed
     if reference_method == ReferenceMethod.none:
-        ref_values = np.zeros((rebased_stack.shape[0], 1, 1))
+        return rebased_stack, attrs
+
+    if reference_method == ReferenceMethod.point:
+        read_func = partial(
+            read_lonlat,
+            lon_slice=slice(ref_lon, ref_lon),
+            lat_slice=slice(ref_lat, ref_lat),
+            dset=dset,
+        )
+        with ctx.Pool(processes=max_workers) as pool:
+            ref_value_list = list(
+                tqdm(
+                    pool.imap(read_func, stack.products),
+                    total=len(stack.products),
+                    desc="Reading reference points",
+                )
+            )
+        ref_values = np.stack(ref_value_list)
     elif reference_method == ReferenceMethod.median:
         ref_values = np.nanmedian(rebased_stack, axis=(1, 2), keepdims=True)
-    elif reference_method == ReferenceMethod.point:
-        # TODO: figure out where in the stack it is
-        raise NotImplementedError()
     elif reference_method == ReferenceMethod.border:
         ref_values = _get_border(rebased_stack)
     else:
