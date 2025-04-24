@@ -30,10 +30,10 @@ from opera_utils.disp._reader import ReferenceMethod
 
 def read_disp(
     frame_id: int,
-    lon: float | None = None,
-    lat: float | None = None,
     bbox: tuple[float, float, float, float] | None = None,
     wkt: str | None = None,
+    ref_lon: float | None = None,
+    ref_lat: float | None = None,
     reference_method: ReferenceMethod = ReferenceMethod.none,
     start_datetime: datetime | None = None,
     end_datetime: datetime | None = None,
@@ -51,16 +51,18 @@ def read_disp(
     ----------
     frame_id : int
         Frame ID of the product
-    lon : float | None
-        Longitude of the reference point
-    lat : float | None
-        Latitude of the reference point
     bbox : tuple[float, float, float, float] | None
         Bounding box of the region of interest
     wkt : str | None
         Well-known text representation of the region of interest
+    ref_lon : float | None
+        Longitude of the reference point
+    ref_lat : float | None
+        Latitude of the reference point
     reference_method : ReferenceMethod
-        Method to use for spatially referencing displacement results
+        Method to use for spatially referencing displacement results.
+        If `ref_lon` and `ref_lat` are provided, this parameter is ignored
+        and `ReferenceMethod.point` is used.
     start_datetime : datetime | None
         Start datetime of the product
     end_datetime : datetime | None
@@ -81,8 +83,10 @@ def read_disp(
     np.ndarray
         3D array of displacement values [time, height, width]
     """
-    if lon is None and lat is None and bbox is None and wkt is None:
+    if bbox is None and wkt is None:
         raise ValueError("Must provide either lon, lat, or bbox")
+    if ref_lon is not None and ref_lat is not None:
+        reference_method = ReferenceMethod.point
 
     products = disp.search(
         frame_id=frame_id,
@@ -96,18 +100,16 @@ def read_disp(
         poly = from_wkt(wkt)
         bbox = poly.bounds
 
-    if bbox is not None:
-        lons: float | slice = slice(bbox[0], bbox[2])
-        lats: float | slice = slice(bbox[1], bbox[3])
-    else:
-        assert lat is not None and lon is not None
-        lons = lon
-        lats = lat
+    assert bbox is not None
+    lons: float | slice = slice(bbox[0], bbox[2])
+    lats: float | slice = slice(bbox[1], bbox[3])
 
     results, attrs = disp.reader.read_stack_lonlat(
         stack,
         lons=lons,
         lats=lats,
+        ref_lon=ref_lon,
+        ref_lat=ref_lat,
         reference_method=reference_method,
         max_workers=max_workers,
         dset=dset,
