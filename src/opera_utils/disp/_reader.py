@@ -109,6 +109,8 @@ def read_stack_lonlat(
         raise ValueError(
             "ref_lon and ref_lat must be provided when using point referencing"
         )
+    elif reference_method not in ReferenceMethod:
+        raise ValueError(f"Unknown reference_method: {reference_method}")
 
     # Create a partial function with fixed parameters
     read_func = partial(read_lonlat, lon_slice=lons, lat_slice=lats, dset=dset)
