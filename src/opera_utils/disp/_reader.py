@@ -137,6 +137,10 @@ def read_stack_lonlat(
             "DIMENSION_LIST",
         ]:
             attrs.pop(k, None)
+        attrs["reference_datetime"] = stack.reference_dates[0].isoformat()
+        attrs["reference_method"] = reference_method.value
+        attrs["reference_lon"] = ref_lon or "None"
+        attrs["reference_lat"] = ref_lat or "None"
 
     # Stack the results and adjust reference (if needed)
     unreffed_data = np.stack(results)
@@ -148,28 +152,24 @@ def read_stack_lonlat(
 
     # Apply referencing if needed
     if reference_method == ReferenceMethod.none:
-        attrs["reference_method"] = "none"
-        attrs["reference_lon"] = None
-        attrs["reference_lat"] = None
         return rebased_stack, attrs
 
     if reference_method == ReferenceMethod.point:
-        reference_func = partial(
-            read_func,
-            reference_method=ReferenceMethod.point,
-            ref_lon=ref_lon,
-            ref_lat=ref_lat,
+        read_func = partial(
+            read_lonlat,
+            lon_slice=slice(ref_lon, ref_lon),
+            lat_slice=slice(ref_lat, ref_lat),
+            dset=dset,
         )
         with ctx.Pool(processes=max_workers) as pool:
-            reference_vals = list(
+            ref_value_list = list(
                 tqdm(
-                    pool.imap(reference_func, stack.products),
+                    pool.imap(read_func, stack.products),
                     total=len(stack.products),
                     desc="Reading reference points",
                 )
             )
-        ref_values = np.stack(reference_vals)
-
+        ref_values = np.stack(ref_value_list)
     elif reference_method == ReferenceMethod.median:
         ref_values = np.nanmedian(rebased_stack, axis=(1, 2), keepdims=True)
     elif reference_method == ReferenceMethod.border:
