@@ -43,9 +43,9 @@ def flatten(list_of_lists: Iterable[Iterable[Any]]) -> itertools.chain[Any]:
 
 
 def _last_per_ministack(
-    opera_file_list: Sequence[PathOrStrT],
-) -> list[PathOrStrT]:
-    def _get_generation_time(fname: PathOrStrT) -> datetime.datetime:
+    opera_file_list: Sequence[Path | str],
+) -> list[Path | str]:
+    def _get_generation_time(fname: Path | str) -> datetime.datetime:
         return get_dates(fname)[2]
 
     last_per_ministack = []
