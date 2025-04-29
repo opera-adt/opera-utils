@@ -36,7 +36,7 @@ from typing_extensions import Self
 
 from ._product import DispProductStack
 from ._rebase import NaNPolicy
-from ._utils import PathOrStrT, _last_per_ministack, flatten, round_mantissa
+from ._utils import _last_per_ministack, flatten, round_mantissa
 
 
 class DisplacementDataset(str, Enum):
@@ -136,7 +136,7 @@ def rebase(
         If "omit", then any nan causes the pixel to be zeroed out, which is
         equivalent to assuming that 0 displacement occurred during that time.
     reference_point : tuple[int, int] | None
-        Reference point to use when rebasing /displacement.
+        The (row, column) of the reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
         Default is None.
     nodata : float
@@ -235,7 +235,7 @@ def rebase(
 
     # Save the reference point(s), if used
     if reference_point is not None:
-        writer.save_attr({"reference_point": json.dumps(reference_point)})
+        writer.save_attr({"reference_point": json.dumps(reference_point, default=str)})
 
 
 @dataclass
@@ -459,7 +459,7 @@ def find_reference_point(
 
 
 def main(
-    nc_files: Sequence[PathOrStrT],
+    nc_files: Sequence[Path | str],
     output_dir: Path | str,
     apply_solid_earth_corrections: bool = True,
     apply_ionospheric_corrections: bool = True,
@@ -489,7 +489,7 @@ def main(
         If "omit", then any nan causes the pixel to be zeroed out, which is
         equivalent to assuming that 0 displacement occurred during that time.
     reference_point : tuple[int, int] | None, optional
-        Reference point to use when rebasing /displacement.
+        The (row, column) to use for spatial referencing the `displacement` rasters.
         If None, finds a point with the highest harmonic mean of temporal coherence.
         Default is None.
     num_workers : int, optional
@@ -527,14 +527,16 @@ def main(
     coherence_path = output_path / "average_temporal_coherence.tif"
 
     # Find the reference point
-    reference_point = find_reference_point(coherence_path)
+    if reference_point is None:
+        reference_point = find_reference_point(coherence_path)
 
     all_products = DispProductStack.from_file_list(nc_files)
-    futures: list[Future] = []
+    futures: set[Future] = set()
     mask_dataset = QualityDataset.RECOMMENDED_MASK if apply_mask else None
+
     with ProcessPoolExecutor(num_workers) as pool:
         # Submit time series rebase function
-        futures.append(
+        futures.add(
             pool.submit(
                 rebase,
                 output_dir,
@@ -549,7 +551,7 @@ def main(
         )
         # Submit the others to extract
         for dataset in UNIQUE_PER_DATE_DATASETS:
-            futures.append(
+            futures.add(
                 pool.submit(
                     extract_quality_layers,
                     Path(output_dir),
@@ -557,8 +559,13 @@ def main(
                     str(dataset),
                 )
             )
-        # Wait for all futures to complete
-        wait(futures, return_when=FIRST_EXCEPTION)
+        # Wait for all futures to complete, raising exceptions if they arrive
+        while futures:
+            done, futures = wait(futures, timeout=1, return_when=FIRST_EXCEPTION)
+            for future in done:
+                e = future.exception()
+                if e is not None:
+                    raise e
 
 
 if __name__ == "__main__":

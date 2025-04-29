@@ -43,9 +43,9 @@ def flatten(list_of_lists: Iterable[Iterable[Any]]) -> itertools.chain[Any]:
 
 
 def _last_per_ministack(
-    opera_file_list: Sequence[PathOrStrT],
-) -> list[PathOrStrT]:
-    def _get_generation_time(fname: PathOrStrT) -> datetime.datetime:
+    opera_file_list: Sequence[Path | str],
+) -> list[Path | str]:
+    def _get_generation_time(fname: Path | str) -> datetime.datetime:
         return get_dates(fname)[2]
 
     last_per_ministack = []
@@ -57,35 +57,6 @@ def _last_per_ministack(
         last_file = list(cur_groupby)[-1]
         last_per_ministack.append(last_file)
     return last_per_ministack
-
-
-def utm_to_rowcol(
-    utm_x: float,
-    utm_y: float,
-    geotransform: tuple[float, float, float, float, float, float],
-) -> tuple[int, int]:
-    """Convert UTM coordinates to pixel row and column indices.
-
-    Parameters
-    ----------
-    utm_x : float
-        The UTM x coordinate.
-    utm_y : float
-        The UTM y coordinate.
-    geotransform : tuple
-        Geotransform tuple of the form
-        (xmin, pixel_width, 0, ymax, 0, pixel_height),
-        where pixel_height is negative for top-down images.
-
-    Returns
-    -------
-    tuple[int, int]
-        (row, col) indices corresponding to the UTM coordinate.
-    """
-    xmin, pixel_width, _, ymax, _, pixel_height = geotransform
-    col = int(round((utm_x - xmin) / pixel_width))
-    row = int(round((ymax - utm_y) / abs(pixel_height)))
-    return row, col
 
 
 def round_mantissa(z: np.ndarray, keep_bits=10) -> None:

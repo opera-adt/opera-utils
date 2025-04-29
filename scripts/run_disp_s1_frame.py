@@ -76,7 +76,7 @@ def process_frame(
         If "omit", then any nan causes the pixel to be zeroed out, which is
         equivalent to assuming that 0 displacement occurred during that time.
     reference_point : tuple[int, int] | None, optional
-        Reference point to use when rebasing /displacement.
+        The (row, column) of the reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
         Default is None.
     num_workers
