@@ -136,7 +136,7 @@ def rebase(
         If "omit", then any nan causes the pixel to be zeroed out, which is
         equivalent to assuming that 0 displacement occurred during that time.
     reference_point : tuple[int, int] | None
-        Reference point to use when rebasing /displacement.
+        The (row, column) of the reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
         Default is None.
     nodata : float
@@ -489,7 +489,7 @@ def main(
         If "omit", then any nan causes the pixel to be zeroed out, which is
         equivalent to assuming that 0 displacement occurred during that time.
     reference_point : tuple[int, int] | None, optional
-        Reference point to use when rebasing /displacement.
+        The (row, column) to use for spatial referencing the `displacement` rasters.
         If None, finds a point with the highest harmonic mean of temporal coherence.
         Default is None.
     num_workers : int, optional
@@ -527,7 +527,8 @@ def main(
     coherence_path = output_path / "average_temporal_coherence.tif"
 
     # Find the reference point
-    reference_point = find_reference_point(coherence_path)
+    if reference_point is None:
+        reference_point = find_reference_point(coherence_path)
 
     all_products = DispProductStack.from_file_list(nc_files)
     futures: list[Future] = []
