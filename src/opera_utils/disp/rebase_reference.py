@@ -25,18 +25,21 @@ from datetime import date, datetime
 from enum import Enum
 from itertools import repeat
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Final, Literal, Sequence
 
 import h5py
 import numpy as np
 import rasterio as rio
 from numpy.typing import DTypeLike
+from rasterio.enums import Resampling
 from tqdm.auto import trange
 from typing_extensions import Self
 
 from ._product import DispProductStack
 from ._rebase import NaNPolicy
 from ._utils import _last_per_ministack, flatten, round_mantissa
+
+UINT16_MAX: Final = 65535
 
 
 class DisplacementDataset(str, Enum):
@@ -64,6 +67,7 @@ class SamePerMinistackDataset(str, Enum):
 
     TEMPORAL_COHERENCE = "temporal_coherence"
     PHASE_SIMILARITY = "phase_similarity"
+    PERSISTENT_SCATTERER_MASK = "persistent_scatterer_mask"
     SHP_COUNTS = "shp_counts"
 
     def __str__(self) -> str:
@@ -87,6 +91,7 @@ class QualityDataset(str, Enum):
 SAME_PER_MINISTACK_DATASETS = [
     SamePerMinistackDataset.TEMPORAL_COHERENCE,
     SamePerMinistackDataset.PHASE_SIMILARITY,
+    SamePerMinistackDataset.PERSISTENT_SCATTERER_MASK,
     SamePerMinistackDataset.SHP_COUNTS,
 ]
 UNIQUE_PER_DATE_DATASETS = [
@@ -94,6 +99,11 @@ UNIQUE_PER_DATE_DATASETS = [
     QualityDataset.CONNECTED_COMPONENT_LABELS,
     QualityDataset.RECOMMENDED_MASK,
 ]
+
+NODATA_VALUES = {
+    "shp_counts": 0,
+    "persistent_scatterer_mask": 255,
+}
 
 
 def rebase(
@@ -105,8 +115,8 @@ def rebase(
     apply_ionospheric_corrections: bool = True,
     nan_policy: str | NaNPolicy = NaNPolicy.propagate,
     reference_point: tuple[int, int] | None = None,
-    nodata: float = np.nan,
     keep_bits: int = 9,
+    make_overviews: bool = True,
     tqdm_position: int = 0,
 ) -> None:
     """Create a single-reference stack from a list of OPERA displacement files.
@@ -139,12 +149,12 @@ def rebase(
         The (row, column) of the reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
         Default is None.
-    nodata : float
-        Value to use in translated rasters as nodata value.
-        Default is np.nan
     keep_bits : int
         Number of floating point mantissa bits to retain in the output rasters.
         Default is 9.
+    make_overviews : bool
+        Whether to make overviews for the output rasters.
+        Default is True.
     tqdm_position : int
         Position of the progress bar. Default is 0.
 
@@ -165,14 +175,14 @@ def rebase(
     if all(Path(f).exists() for f in writer.files):
         return
 
-    reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=nodata)
+    reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=np.nan)
     corrections_readers = []
     if apply_solid_earth_corrections:
         corrections_readers.append(
             HDF5StackReader(
                 nc_files,
                 dset_name=str(CorrectionDataset.SOLID_EARTH_TIDE),
-                nodata=nodata,
+                nodata=np.nan,
             )
         )
     if apply_ionospheric_corrections:
@@ -180,14 +190,14 @@ def rebase(
             HDF5StackReader(
                 nc_files,
                 dset_name=str(CorrectionDataset.IONOSPHERIC_DELAY),
-                nodata=nodata,
+                nodata=np.nan,
             )
         )
     mask_reader = (
         HDF5StackReader(
             nc_files,
             dset_name=str(mask_dataset),
-            nodata=nodata,
+            nodata=255,
         )
         if mask_dataset is not None
         else None
@@ -236,6 +246,8 @@ def rebase(
     # Save the reference point(s), if used
     if reference_point is not None:
         writer.save_attr({"reference_point": json.dumps(reference_point, default=str)})
+    if make_overviews:
+        writer.make_overviews()
 
 
 @dataclass
@@ -296,7 +308,8 @@ class GeotiffStackWriter:
             keys = list(key)
 
         for idx in keys:
-            with rio.open(self.files[idx], "w", **self.profile) as dst:
+            mode = "r+" if Path(self.files[idx]).exists() else "w"
+            with rio.open(self.files[idx], mode, **self.profile) as dst:
                 dst.write(value, 1)
 
     def __len__(self):
@@ -343,6 +356,11 @@ class GeotiffStackWriter:
         output_dir.mkdir(exist_ok=True, parents=True)
         return cls(files=out_paths, **kwargs)
 
+    def make_overviews(self, resampling: Resampling = Resampling.average):
+        for f in self.files:
+            with rio.open(f, "r+") as dst:
+                dst.build_overviews([2, 4, 8, 16, 32], resampling)
+
 
 def _format_dates(*dates: datetime | date, fmt: str = "%Y%m%d", sep: str = "_") -> str:
     """Format a date pair into a string."""
@@ -355,6 +373,7 @@ def extract_quality_layers(
     dataset: str,
     save_mean: bool = True,
     mean_type: Literal["harmonic", "arithmetic"] = "harmonic",
+    make_overviews: bool = True,
 ) -> None:
     """Extract quality layers from the displacement products and write them to GeoTIFF files."""
     reader = HDF5StackReader(products.filenames, dataset)
@@ -363,6 +382,7 @@ def extract_quality_layers(
         dataset=dataset,
         date_pairs=products.ifg_date_pairs,
         profile=products.get_rasterio_profile(),
+        nodata=NODATA_VALUES.get(dataset, np.nan),
     )
     if all(Path(f).exists() for f in writer.files):
         return
@@ -392,6 +412,8 @@ def extract_quality_layers(
                 valid_count[valid_mask] += 1
             else:  # arithmetic mean
                 cumulative += cur_data
+    if make_overviews:
+        writer.make_overviews()
 
     if save_mean:
         if mean_type == "harmonic":
@@ -547,6 +569,19 @@ def main(
                 apply_ionospheric_corrections=apply_ionospheric_corrections,
                 nan_policy=nan_policy,
                 reference_point=reference_point,
+            )
+        )
+        futures.add(
+            pool.submit(
+                rebase,
+                output_dir,
+                nc_files,
+                dataset=DisplacementDataset.SHORT_WAVELENGTH,
+                mask_dataset=None,
+                apply_solid_earth_corrections=False,
+                apply_ionospheric_corrections=False,
+                nan_policy=nan_policy,
+                reference_point=None,
             )
         )
         # Submit the others to extract
