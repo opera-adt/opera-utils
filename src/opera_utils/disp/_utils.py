@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 
 import numpy as np
 
-from opera_utils._dates import get_dates
+from opera_utils._dates import DATETIME_FORMAT, get_dates
 
 PathOrStrT = TypeVar("PathOrStrT", Path, str)
 
@@ -46,7 +46,7 @@ def _last_per_ministack(
     opera_file_list: Sequence[Path | str],
 ) -> list[Path | str]:
     def _get_generation_time(fname: Path | str) -> datetime.datetime:
-        return get_dates(fname)[2]
+        return get_dates(fname, fmt=DATETIME_FORMAT)[2]
 
     last_per_ministack = []
     for d, cur_groupby in itertools.groupby(
