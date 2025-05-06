@@ -115,6 +115,9 @@ def rebase(
     apply_ionospheric_corrections: bool = True,
     nan_policy: str | NaNPolicy = NaNPolicy.propagate,
     reference_point: tuple[int, int] | None = None,
+    reference_latlon: tuple[float, float] | None = None,
+    distributed_reference: bool = False,
+    distributed_reference_threshold: float = 0.90,
     keep_bits: int = 9,
     make_overviews: bool = True,
     tqdm_position: int = 0,
@@ -149,6 +152,23 @@ def rebase(
         The (row, column) of the reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
         Default is None.
+    reference_latlon : tuple[float, float] | None
+        Reference point to use when rebasing /displacement, specified as
+            (longitude, latitude)
+        in degrees.
+        Takes precedence over reference_point if both are provided.
+        Default is None.
+    distributed_reference : bool
+        Whether to use a distributed reference approach instead of a single point.
+        If True, for each date, the median value of all pixels with temporal coherence
+        above the `distributed_reference_threshold` will be subtracted from the data
+        to act as a "virtual reference point", assuming that the average of all points
+        has approximately zero displacement.
+        Default is False.
+    distributed_reference_threshold : float
+        Coherence threshold for selecting pixels to include in distributed reference calculation.
+        Only used when distributed_reference is True.
+        Default is 0.90.
     keep_bits : int
         Number of floating point mantissa bits to retain in the output rasters.
         Default is 9.
@@ -174,6 +194,9 @@ def rebase(
     )
     if all(Path(f).exists() for f in writer.files):
         return
+
+    if reference_latlon is not None:
+        reference_point = product_stack.lonlat_to_rowcol(*reference_latlon)
 
     reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=np.nan)
     corrections_readers = []
