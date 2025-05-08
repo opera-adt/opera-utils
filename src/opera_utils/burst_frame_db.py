@@ -4,6 +4,8 @@ import importlib.util
 import json
 import zipfile
 from enum import Enum
+from functools import cache
+from os import fsdecode
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, Sequence, Union, overload
 
@@ -33,7 +35,8 @@ class OrbitPass(str, Enum):
         return str(self.value)
 
 
-def read_zipped_json(filename: PathOrStr) -> dict:
+@cache
+def read_zipped_json(filename: Path | str) -> dict:
     """Read a zipped JSON file and returns its contents as a dictionary.
 
     Parameters
@@ -74,7 +77,7 @@ def get_frame_to_burst_mapping(
     """
     if json_file is None:
         json_file = datasets.fetch_frame_to_burst_mapping_file()
-    js = read_zipped_json(json_file)
+    js = read_zipped_json(fsdecode(json_file))
     return js["data"][str(frame_id)]
 
 
@@ -329,7 +332,7 @@ def get_burst_to_frame_mapping(
     """
     if json_file is None:
         json_file = datasets.fetch_burst_to_frame_mapping_file()
-    js = read_zipped_json(json_file)
+    js = read_zipped_json(fsdecode(json_file))
     return js["data"][normalize_burst_id(burst_id)]
 
 
