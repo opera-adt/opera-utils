@@ -63,7 +63,9 @@ def save_data(
         full_y, full_x = product_stack.y, product_stack.x
         y = full_y[rows] if rows is not None else full_y
         x = full_x[cols] if cols is not None else full_x
-        _create_dimension_variables(group=f, product=product_stack, y=y, x=x)
+        _create_dimension_variables(
+            group=f, datetimes=product_stack.secondary_dates, y=y, x=x
+        )
         _create_geo_dataset(
             group=f,
             name=dataset_name,
@@ -113,12 +115,12 @@ def _create_geo_dataset(
 
 
 def _create_dimension_variables(
-    group: h5netcdf.Group, product: DispProductStack, y: np.ndarray, x: np.ndarray
+    group: h5netcdf.Group, datetimes: Sequence[datetime], y: np.ndarray, x: np.ndarray
 ) -> tuple[h5netcdf.Variable, h5netcdf.Variable, h5netcdf.Variable]:
     """Create the y, x, and coordinate datasets."""
     ny = len(y)
     nx = len(x)
-    nt = product.shape[0]
+    nt = len(datetimes)
 
     if not group.dimensions:
         dims = {"y": ny, "x": nx, "time": nt}
@@ -134,7 +136,7 @@ def _create_dimension_variables(
         ds.attrs["units"] = "m"
 
     # Create the time coordinate dataset."""
-    times, calendar, units = _create_time_array(product.secondary_dates)
+    times, calendar, units = _create_time_array(datetimes)
     t_ds = group.create_variable("time", ("time",), data=times, dtype=float)
     t_ds.attrs["standard_name"] = "time"
     t_ds.attrs["long_name"] = "time"
