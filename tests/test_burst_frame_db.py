@@ -357,6 +357,22 @@ def test_get_burst_geojson_dict(mock_dataset_files):
         assert result["features"][0]["properties"]["burst_id_jpl"] == "t001_000001_iw1"
 
 
+def test_get_frame_orbit_pass(mock_dataset_files):
+    """Test getting frame to burst mapping."""
+    with mock.patch(
+        "opera_utils.datasets.fetch_burst_id_geometries_simple",
+        return_value=mock_dataset_files["burst_geo"],
+    ):
+        result = burst_frame_db.get_frame_orbit_pass(1)
+        assert result == [burst_frame_db.OrbitPass("ASCENDING")]
+
+        result = burst_frame_db.get_frame_orbit_pass([1, 2])
+        assert result == [
+            burst_frame_db.OrbitPass("ASCENDING"),
+            burst_frame_db.OrbitPass("ASCENDING"),
+        ]
+
+
 # Tests that require geopandas
 @pytest.mark.skipif(
     not opera_utils.burst_frame_db._has_geopandas,

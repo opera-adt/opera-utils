@@ -215,6 +215,10 @@ def test_open_h5_local(monkeypatch):
     result = open_h5(file_path)
     assert result == mock_file
 
+    # Try with a str, not path
+    result = open_h5("/path/to/local/file.h5")
+    assert result == mock_file
+
 
 def test_open_h5_invalid_url():
     """Test open_h5 with an invalid URL scheme."""

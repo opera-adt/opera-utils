@@ -3,6 +3,9 @@ from __future__ import annotations
 import importlib.util
 import json
 import zipfile
+from enum import Enum
+from functools import cache
+from os import fsdecode
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, Sequence, Union, overload
 
@@ -13,7 +16,6 @@ from .bursts import normalize_burst_id
 if TYPE_CHECKING:
     import geopandas
 
-
 GeojsonOrGdf = Union[dict, "geopandas.GeoDataFrame"]
 
 # Check if geopandas is available
@@ -23,7 +25,18 @@ _has_geopandas = (
 )
 
 
-def read_zipped_json(filename: PathOrStr) -> dict:
+class OrbitPass(str, Enum):
+    """Choices for the orbit direction of a granule."""
+
+    ASCENDING = "ASCENDING"
+    DESCENDING = "DESCENDING"
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+
+@cache
+def read_zipped_json(filename: Path | str) -> dict:
     """Read a zipped JSON file and returns its contents as a dictionary.
 
     Parameters
@@ -64,7 +77,7 @@ def get_frame_to_burst_mapping(
     """
     if json_file is None:
         json_file = datasets.fetch_frame_to_burst_mapping_file()
-    js = read_zipped_json(json_file)
+    js = read_zipped_json(fsdecode(json_file))
     return js["data"][str(frame_id)]
 
 
@@ -319,7 +332,7 @@ def get_burst_to_frame_mapping(
     """
     if json_file is None:
         json_file = datasets.fetch_burst_to_frame_mapping_file()
-    js = read_zipped_json(json_file)
+    js = read_zipped_json(fsdecode(json_file))
     return js["data"][normalize_burst_id(burst_id)]
 
 
@@ -371,3 +384,31 @@ def get_intersecting_frames(bounds: Bbox) -> dict:
     frames = gdf[gdf.geometry.intersects(box(*bounds))]
 
     return frames.to_geo_dict()
+
+
+def get_frame_orbit_pass(
+    frame_ids: int | Sequence[int], json_file: Optional[PathOrStr] = None
+) -> list[OrbitPass]:
+    """Return the orbit pass direction for `frame_id`.
+
+    Parameters
+    ----------
+    frame_ids : int | Sequence[int]
+        Frame ID (or multuple frame IDs) to query.
+    as_geodataframe : bool, default=False
+        If True, returns a GeoDataFrame. If False, returns a GeoJSON dict.
+    json_file : PathOrStr, optional
+        The path to the JSON file containing the frame geometries.
+        If None, uses the default file from datasets.
+
+
+    Returns
+    -------
+    OrbitPass
+        The orbit direction for the requested frame_id.
+    """
+    frame_list = [frame_ids] if isinstance(frame_ids, int) else frame_ids
+    features = get_frame_geojson(frame_list, as_geodataframe=False)["features"]
+    if not features:
+        raise ValueError("No Frame {frame_id} found")
+    return [OrbitPass(f["properties"]["orbit_pass"]) for f in features]

@@ -299,7 +299,6 @@ def generate_burst_subset_options(
         selected_burst_ids = tuple(burst_ids[i] for i in valid_row_idxs)
         selected_dates = tuple(dates[i] for i in valid_col_idxs)
         total_num_bursts = B_sub2.sum()
-        # breakpoint()
         options.append(
             BurstSubsetOption(
                 total_num_bursts=total_num_bursts,
