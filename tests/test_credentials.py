@@ -12,7 +12,7 @@ import requests
 from opera_utils.credentials import (
     ASFCredentialEndpoints,
     AWSCredentials,
-    EarthdataLoginFailure,
+    EarthdataLoginError,
     get_earthdata_username_password,
     get_temporary_aws_credentials,
 )
@@ -186,7 +186,7 @@ def test_get_earthdata_username_password_no_credentials(monkeypatch):
     monkeypatch.delenv("EARTHDATA_USERNAME", raising=False)
     monkeypatch.delenv("EARTHDATA_PASSWORD", raising=False)
 
-    with pytest.raises(EarthdataLoginFailure, match="No credentials found"):
+    with pytest.raises(EarthdataLoginError, match="No credentials found"):
         get_earthdata_username_password()
 
 
@@ -209,7 +209,7 @@ def test_get_earthdata_username_password_netrc_error(monkeypatch):
     monkeypatch.delenv("EARTHDATA_USERNAME", raising=False)
     monkeypatch.delenv("EARTHDATA_PASSWORD", raising=False)
 
-    with pytest.raises(EarthdataLoginFailure, match="No credentials found"):
+    with pytest.raises(EarthdataLoginError, match="No credentials found"):
         get_earthdata_username_password()
 
 

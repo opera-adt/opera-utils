@@ -134,7 +134,7 @@ def test_get_combined_bounds_gt_different_proj(
     bnds, gt = stitching.get_combined_bounds_nodata(*slc_file_list_nc)
     assert bnds == (-5.5, -2.0, 4.5, 3.0)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="The input files have different projections"):
         stitching.get_combined_bounds_nodata(
             slc_file_list_nc_wgs84[0], slc_file_list_nc[0]
         )

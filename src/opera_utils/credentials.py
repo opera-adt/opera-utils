@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-class EarthdataLoginFailure(Exception):
+class EarthdataLoginError(Exception):
     """Exception raised when Earthdata Login credentials are not found."""
 
 
@@ -233,4 +233,4 @@ def get_earthdata_username_password(
         "No credentials found: neither valid parameters provided, .netrc file has a"
         f" '{host}' entry, nor environment variables set."
     )
-    raise EarthdataLoginFailure(msg)
+    raise EarthdataLoginError(msg)

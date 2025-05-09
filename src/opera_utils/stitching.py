@@ -219,13 +219,13 @@ def get_downsampled_vrts(
     warped_files = []
     res = _get_resolution(filenames)
     for idx, fn in enumerate(filenames):
-        fn = Path(fn)
-        warped_fn = Path(dirname) / _get_temp_filename(fn, idx, "_downsampled")
-        logger.debug(f"Downsampling {fn} by {strides}")
+        p = Path(fn)
+        warped_fn = Path(dirname) / _get_temp_filename(p, idx, "_downsampled")
+        logger.debug(f"Downsampling {p} by {strides}")
         warped_files.append(warped_fn)
         gdal.Translate(
             fspath(warped_fn),
-            fspath(fn),
+            fspath(p),
             format="VRT",  # Just creates a file that will warp on the fly
             resampleAlg="nearest",  # nearest neighbor for resampling
             xRes=res[0] * strides["x"],
@@ -280,24 +280,24 @@ def warp_to_projection(
 
     warped_files = []
     for idx, fn in enumerate(filenames):
-        fn = Path(fn)
-        ds = gdal.Open(fspath(fn))
+        p = Path(fn)
+        ds = gdal.Open(fspath(p))
         proj_in = ds.GetProjection()
         if proj_in == projection:
-            warped_files.append(fn)
+            warped_files.append(p)
             continue
-        warped_fn = Path(dirname) / _get_temp_filename(fn, idx, "_warped")
-        warped_fn = Path(dirname) / f"{fn.stem}_{idx}_warped.vrt"
+        warped_fn = Path(dirname) / _get_temp_filename(p, idx, "_warped")
+        warped_fn = Path(dirname) / f"{p.stem}_{idx}_warped.vrt"
         from_srs_name = ds.GetSpatialRef().GetName()
         to_srs_name = osr.SpatialReference(projection).GetName()
         logger.info(
-            f"Reprojecting {fn} from {from_srs_name} to match mode projection"
+            f"Reprojecting {p} from {from_srs_name} to match mode projection"
             f" {to_srs_name}"
         )
         warped_files.append(warped_fn)
         gdal.Warp(
             fspath(warped_fn),
-            fspath(fn),
+            fspath(p),
             format="VRT",  # Just creates a file that will warp on the fly
             dstSRS=projection,
             resampleAlg=resample_alg,

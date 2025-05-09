@@ -378,7 +378,7 @@ def extract_quality_layers(
     mean_type: Literal["harmonic", "arithmetic"] = "harmonic",
     make_overviews: bool = True,
 ) -> None:
-    """Extract quality layers from the displacement products and write them to GeoTIFF files."""
+    """Extract quality layers from the displacement products."""
     reader = HDF5StackReader(products.filenames, dataset)
     writer = GeotiffStackWriter.from_dates(
         output_dir,

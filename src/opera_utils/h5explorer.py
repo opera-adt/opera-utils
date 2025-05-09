@@ -16,7 +16,9 @@ class HDF5Explorer:
     Useful for interactive exploration of large HDF5 files in IPython/Jupyter.
     """
 
-    def __init__(self, hdf5_filepath: PathOrStr, load_less_than: float = 1e3):
+    def __init__(  # noqa: D107
+        self, hdf5_filepath: PathOrStr, load_less_than: float = 1e3
+    ):
         self.hdf5_filepath = hdf5_filepath
         self._hf = h5py.File(hdf5_filepath, "r")
         self._root_group = _HDF5GroupExplorer(

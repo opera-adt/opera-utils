@@ -405,7 +405,7 @@ class TestGeopandasIntegration:
             burst_frame_db.get_burst_geodataframe()
             mock_read.assert_called_once()
 
-    def test_get_intersecting_frames(self, mock_dataset_files):
+    def test_get_intersecting_frames(self):
         """Test getting intersecting frames."""
         with mock.patch(
             "opera_utils.burst_frame_db.get_frame_geodataframe"

@@ -89,7 +89,7 @@ class TestDispProduct:
     def mock_get_frame_bbox(self, monkeypatch):
         monkeypatch.setattr(
             "opera_utils.burst_frame_db.get_frame_bbox",
-            lambda frame_id: MOCK_FRAME_BBOX_RESULT,
+            lambda frame_id: MOCK_FRAME_BBOX_RESULT,  # noqa: ARG005
         )
 
     def test_epsg_property(self):

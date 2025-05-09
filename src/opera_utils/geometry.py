@@ -42,13 +42,13 @@ class Layer(Enum):
     INCIDENCE_ANGLE = "incidence_angle"
 
 
-# Layover shadow mask. 0=no layover, no shadow; 1=shadow; 2=layover; 3=shadow and layover.
 DEFAULT_LAYERS = list(Layer)[:3]  # Skip the local incidence, much less compressible
 DEFAULT_STRIDES = {"x": 6, "y": 3}
 LAYER_TO_NODATA = {
     Layer.LOS_EAST: 0,
     Layer.LOS_NORTH: 0,
     Layer.LOCAL_INCIDENCE_ANGLE: 0,
+    # 0=no layover, no shadow; 1=shadow; 2=layover; 3=shadow and layover.
     # layover_shadow_mask is Int8 with 127 meaning nodata
     Layer.LAYOVER_SHADOW_MASK: 127,
     Layer.SLANT_RANGE_DISTANCE: 0,

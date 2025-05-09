@@ -90,6 +90,7 @@ def test_group_by_burst_product_version():
 def test_group_by_burst_non_opera():
     with pytest.raises(ValueError, match="Could not parse burst id"):
         group_by_burst(["20200101.slc", "20200202.slc"])
+    with pytest.raises(ValueError, match="Could not parse burst id"):
         # A combination should still error
         group_by_burst(
             [
