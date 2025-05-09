@@ -23,12 +23,23 @@ from .burst_frame_db import get_frame_bbox
 def frame_bbox(
     frame_id: int, /, latlon: bool = False, bounds_only: bool = False
 ) -> None:
-    """Look up the DISP-S1 EPSG/bounding box for FRAME_ID.
+    """Print the DISP-S1 EPSG/bounding box for FRAME_ID.
 
     Outputs as JSON string to stdout like
     {"epsg": 32618, "bbox": [157140.0, 4145220.0, 440520.0, 4375770.0]}
 
-    Unless `--bounds-only` is given
+    unless `--bounds-only` is given, which prints a JSON of 4 numbers
+        [left, bottom, right, top]
+
+    Parameters
+    ----------
+    frame_id : int
+        The ID of the frame to get the bounding box for.
+    latlon : bool
+        Print the bounds at latitude/longitude (in degrees).
+        Default is False, meaning bounds are printed in UTM coordinates.
+    bounds_only : bool
+        Print only a JSON array of the bounds, not the EPSG code.
     """
     epsg, bounds = get_frame_bbox(frame_id=frame_id)
     if latlon:
@@ -48,7 +59,20 @@ def intersects(
     point: Optional[Tuple[float, float]] = None,
     ids_only: bool = False,
 ) -> None:
-    """Get the DISP-S1 frames that intersect with the given bounding box."""
+    """Get the DISP-S1 frames that intersect with the given bounding box.
+
+    Parameters
+    ----------
+    bbox : tuple[float, float, float, float], optional
+        Bounding box (in degrees longitude/latitude) to search for intersection.
+        The four numbers are (west, south, east, north).
+    point : tuple[float, float], optional
+        Point as (longitude, latitude), in degrees, to search for intersection.
+        Mututally exclusive with `bbox`.
+    ids_only : bool
+        Print only the Frame IDs as newline-separate ints.
+        By default False, which returns a GeoJSON string of Frame geometries.
+    """
     if bbox is None and point is None:
         raise ValueError("Either bbox or point must be provided")
 
