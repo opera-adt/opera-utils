@@ -27,7 +27,7 @@ def test_frame_bbox_help(
         with pytest.raises(SystemExit):
             cli_app()
         s = capsys.readouterr()
-        assert "Look up the DISP-S1 EPSG/bounding box for FRAME_ID" in s.out
+        assert "Print the DISP-S1 EPSG/bounding box for FRAME_ID" in s.out
 
 
 def test_frame_bbox_basic(
