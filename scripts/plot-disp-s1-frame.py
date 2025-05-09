@@ -1,6 +1,14 @@
 #!/usr/bin/env python
 # /// script
-# dependencies = ["matplotlib", "pykdtree", "cartopy", "geopandas", "shapely", "opera_utils", "tyro"]
+# dependencies = [
+#  "matplotlib"
+#  "pykdtree"
+#  "cartopy"
+#  "geopandas"
+#  "shapely"
+#  "opera_utils"
+#  "tyro"
+# ]
 # ///
 """Plot a DISP-S1 frame on a background map.
 

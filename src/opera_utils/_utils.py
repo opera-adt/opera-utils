@@ -206,7 +206,8 @@ def create_yx_arrays(
     shape : tuple[int, int]
         Shape of the dataset (ysize, xsize).
     step_size : float
-        Pixel spacing, in units matching the projection of `gt` (e.g. meters for a UTM geotransform)
+        Pixel spacing, in units matching the projection of `gt`
+        (e.g. meters for a UTM geotransform)
 
     Returns
     -------

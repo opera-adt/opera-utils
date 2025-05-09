@@ -53,8 +53,8 @@ def read_zipped_json(filename: Path | str) -> dict:
     """
     if Path(filename).suffix == ".zip":
         with zipfile.ZipFile(filename) as zf:
-            bytes = zf.read(str(Path(filename).name).replace(".zip", ""))
-            return json.loads(bytes.decode())
+            b = zf.read(str(Path(filename).name).replace(".zip", ""))
+            return json.loads(b.decode())
     else:
         with open(filename) as f:
             return json.load(f)
@@ -89,6 +89,7 @@ def get_frame_to_burst_mapping(
 def get_frame_geojson(
     frame_ids: Sequence[int | str] | None = None,
     as_geodataframe: Literal[True] = True,
+    json_file: PathOrStr | None = None,
 ) -> geopandas.GeoDataFrame: ...
 
 
@@ -96,6 +97,7 @@ def get_frame_geojson(
 def get_frame_geojson(
     frame_ids: Sequence[int | str] | None = None,
     as_geodataframe: Literal[False] = False,
+    json_file: PathOrStr | None = None,
 ) -> dict: ...
 
 
@@ -420,7 +422,9 @@ def get_frame_orbit_pass(
 
     """
     frame_list = [frame_ids] if isinstance(frame_ids, int) else frame_ids
-    features = get_frame_geojson(frame_list, as_geodataframe=False)["features"]
+    features = get_frame_geojson(
+        frame_list, as_geodataframe=False, json_file=json_file
+    )["features"]
     if not features:
         msg = "No Frame {frame_id} found"
         raise ValueError(msg)

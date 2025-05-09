@@ -4,7 +4,7 @@
 Examples
 --------
 # defaults: https URLs, 4 download workers, outputs under ./work
-python disp_process_frame.py --frame-id 11116 --start-datetime 2018-01-01 --end-datetime 2020-01-01
+python disp_process_frame.py --frame-id 11116 --end-datetime 2020-01-01
 
 """
 

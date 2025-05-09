@@ -414,7 +414,7 @@ def get_xy_coords(
         y = hf["/data/y_coordinates"][:]
         projection_dset = hf["/data/projection"]
         crs_string = ""
-        # https://github.com/corteva/rioxarray/blob/5783693895b4b055909c5758a72a5d40a365ef11/rioxarray/rioxarray.py#L34 # noqa
+        # https://github.com/corteva/rioxarray/blob/5783693895b4b055909c5758a72a5d40a365ef11/rioxarray/rioxarray.py#L34
         for attr_name in "spatial_ref", "crs_wkt":
             if attr_name in projection_dset.attrs:
                 crs_string = projection_dset.attrs[attr_name]
@@ -553,9 +553,9 @@ def create_nodata_mask(
     else:
         try:
             dataset_name = get_dataset_name(opera_file_list[-1])
-        except CslcParseError:
+        except CslcParseError as e:
             msg = f"{opera_file_list[-1]} is not a CSLC file"
-            raise ValueError(msg)
+            raise ValueError(msg) from e
 
     try:
         test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"

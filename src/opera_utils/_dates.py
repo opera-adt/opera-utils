@@ -230,5 +230,5 @@ def sort_files_by_date(
     file_dates = sorted(file_date_tuples, key=operator.itemgetter(1))
 
     # Unpack the sorted pairs with new sorted values
-    file_list, dates = zip(*file_dates)  # type: ignore
+    file_list, dates = zip(*file_dates)
     return list(file_list), list(dates)
