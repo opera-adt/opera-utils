@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from enum import Enum
 from pathlib import Path
-from typing import Mapping, Sequence
 
 import h5py
 import numpy as np
@@ -60,7 +60,7 @@ def create_geometry_files(
     *,
     frame_id: int | None = None,
     burst_ids: Sequence[str] | None = None,
-    output_dir: PathOrStr = Path("."),
+    output_dir: PathOrStr = Path(),
     download_dir: PathOrStr | None = None,
     save_hdf5_files: bool = False,
     layers: Sequence[Layer | str] = DEFAULT_LAYERS,
@@ -97,12 +97,14 @@ def create_geometry_files(
     ------
     ValueError
         If neither `frame_id` nor `burst_ids` are provided.
+
     """
     if frame_id is not None:
         burst_ids = get_burst_ids_for_frame(frame_id=frame_id)
 
     if not burst_ids:
-        raise ValueError("Must provide frame_id or burst_ids")
+        msg = "Must provide frame_id or burst_ids"
+        raise ValueError(msg)
     logger.debug("Using burst IDs: %s", burst_ids)
 
     output_path = Path(output_dir)
@@ -207,7 +209,7 @@ def stitch_geometry_layers(
     local_hdf5_files: list[Path],
     layers: Sequence[Layer | str] = DEFAULT_LAYERS,
     strides: Mapping[str, int] = DEFAULT_STRIDES,
-    output_dir: PathOrStr = Path("."),
+    output_dir: PathOrStr = Path(),
     out_bounds: Bbox | None = None,
     out_bounds_epsg: int | None = None,
 ) -> list[Path]:
@@ -235,6 +237,7 @@ def stitch_geometry_layers(
     -------
     list[Path]
         List of output files with paths.
+
     """
     output_files: list[Path] = []
 

@@ -5,18 +5,19 @@ import itertools
 import operator
 import re
 from collections import defaultdict
-from typing import Iterable, overload
+from collections.abc import Iterable
+from typing import overload
 
 from ._types import DateOrDatetime, Filename, PathLikeT
 from ._utils import _get_path_from_gdal_str
 
 __all__ = [
-    "get_dates",
+    "DATETIME_FORMAT",
+    "DATE_FORMAT",
     "filter_by_date",
+    "get_dates",
     "group_by_date",
     "sort_files_by_date",
-    "DATE_FORMAT",
-    "DATETIME_FORMAT",
 ]
 
 DATE_FORMAT = "%Y%m%d"
@@ -48,6 +49,7 @@ def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.datet
     [datetime.datetime(2019, 12, 31, 0, 0), datetime.datetime(2019, 12, 31, 0, 0)]
     >>> get_dates("/not/a/date_named_file.tif")
     []
+
     """  # noqa: E501
     path = _get_path_from_gdal_str(filename)
     pattern = _date_format_to_regex(fmt)
@@ -89,6 +91,7 @@ def filter_by_date(files, dates, fmt=DATE_FORMAT):
     -------
     list[PathLikeT]
         Items in `files`
+
     """
     date_set = set(dates)
     out = []
@@ -124,6 +127,7 @@ def _date_format_to_regex(date_format: str) -> re.Pattern:
     >>> pat = _date_format_to_regex("%Y-%m-%d").pattern
     >>> pat == re.compile(r'\d{4}\-\d{2}\-\d{2}').pattern
     True
+
     """
     # Escape any special characters in the date format string
     date_format = re.escape(date_format)
@@ -177,6 +181,7 @@ def group_by_date(
             Path(...),
             ...]),
         }
+
     """
     # collapse into groups of dates
     # Use a `defaultdict` so we dont have to sort the files by date in advance,
@@ -188,10 +193,7 @@ def group_by_date(
     for dates, g in itertools.groupby(
         files, key=lambda x: tuple(get_dates(x, fmt=file_date_fmt))
     ):
-        if date_idx is None:
-            key = dates
-        else:
-            key = (dates[date_idx],)
+        key = dates if date_idx is None else (dates[date_idx],)
         grouped_images[key].extend(list(g))
     return grouped_images
 
@@ -221,12 +223,11 @@ def sort_files_by_date(
         list of files sorted by date.
     dates : list[list[datetime.date | datetime.datetime]]
         Sorted list, where each entry has all the dates from the corresponding file.
+
     """
     file_date_tuples = [(f, get_dates(f, fmt=file_date_fmt)) for f in files]
     # Get the second item in the tuple for the key
-    file_dates = sorted(
-        [fd_tuple for fd_tuple in file_date_tuples], key=operator.itemgetter(1)
-    )
+    file_dates = sorted(file_date_tuples, key=operator.itemgetter(1))
 
     # Unpack the sorted pairs with new sorted values
     file_list, dates = zip(*file_dates)  # type: ignore

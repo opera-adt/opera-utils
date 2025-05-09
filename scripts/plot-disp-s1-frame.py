@@ -14,6 +14,7 @@ Examples
 
     # Plot frame 11115 with states outlines (no satellite imagery), more zoom
     python scripts/plot-disp-s1-frame.py 11115 --no-use-satellite --pad-degrees 2
+
 """
 
 from pathlib import Path
@@ -53,6 +54,7 @@ def map_background(
         The created Figure.
     ax : matplotlib.axes.Axes
         The GeoAxes for further plotting.
+
     """
     fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
@@ -120,6 +122,7 @@ def plot_single_frame_on_background(
     -------
     matplotlib.figure.Figure
         The figure containing the plotted frame.
+
     """
     # Fetch all frames
     gdf_frames = opera_utils.get_frame_geodataframe()
@@ -168,7 +171,7 @@ def plot_single_frame_on_background(
         fontsize=10,
         fontweight="bold",
         color="white",
-        bbox=dict(boxstyle="round,pad=0.3", fc="red", ec="none", alpha=0.8),
+        bbox={"boxstyle": "round,pad=0.3", "fc": "red", "ec": "none", "alpha": 0.8},
         transform=ccrs.PlateCarree(),
     )
     ax.set_title(f"DISP-S1 Frame {frame_id}")

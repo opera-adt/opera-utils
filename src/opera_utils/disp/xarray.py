@@ -12,7 +12,9 @@ try:
     import xarray as xr
     from dask import delayed
 except ImportError:
-    warnings.warn("xarray and dask are required for xarray functionality.")
+    warnings.warn(
+        "xarray and dask are required for xarray functionality.", stacklevel=2
+    )
 
 
 def stack_to_dataarray(
@@ -41,6 +43,7 @@ def stack_to_dataarray(
     -------
     xr.DataArray
         Lazy 3-D array with dims (time, y, x).
+
     """
     # The shape is known from the frame database
     ny, nx = stack.shape[1:]
@@ -77,17 +80,17 @@ def stack_to_dataarray(
     da_out = xr.DataArray(
         data,
         dims=("time", "y", "x"),
-        coords=dict(
-            time=("time", t),
-            y=("y", y),
-            x=("x", x),
-        ),
+        coords={
+            "time": ("time", t),
+            "y": ("y", y),
+            "x": ("x", x),
+        },
         name=var,
-        attrs=dict(
-            crs=f"EPSG:{stack.epsg}",
-            transform=stack.products[0].transform,
+        attrs={
+            "crs": f"EPSG:{stack.epsg}",
+            "transform": stack.products[0].transform,
             # TODO: this might be some easy way to make this `rioxarray` compatible
-        ),
+        },
     )
     return da_out
 

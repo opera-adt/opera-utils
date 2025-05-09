@@ -5,6 +5,7 @@ Examples
 --------
 # defaults: https URLs, 4 download workers, outputs under ./work
 python disp_process_frame.py --frame-id 11116 --start-datetime 2018-01-01 --end-datetime 2020-01-01
+
 """
 
 from __future__ import annotations
@@ -81,6 +82,7 @@ def process_frame(
         Default is None.
     num_workers
         Number of parallel download and reference-rebasing workers.
+
     """
     work_dir = work_dir.resolve()
     nc_dir = work_dir / "ncs"
@@ -93,7 +95,8 @@ def process_frame(
         end_datetime=end_datetime,
     )
     if not products:
-        raise RuntimeError(f"No granules found for frame {frame_id}")
+        msg = f"No granules found for frame {frame_id}"
+        raise RuntimeError(msg)
     urls = [p.filename for p in products]
 
     # 2. download
@@ -116,12 +119,14 @@ def process_frame(
     try:
         from dolphin import ReferencePoint, timeseries, utils
     except ImportError as e:
-        raise ImportError("dolphin is required for velocity creation.") from e
+        msg = "dolphin is required for velocity creation."
+        raise ImportError(msg) from e
 
     utils.disable_gpu()
     disp_files = sorted(aligned_dir.glob("displacement*.tif"))
     if not disp_files:
-        raise RuntimeError("No displacement TIFFs produced by rebase step.")
+        msg = "No displacement TIFFs produced by rebase step."
+        raise RuntimeError(msg)
     vel_file = aligned_dir / "velocity.tif"
     mask_files = sorted(aligned_dir.glob("recommended_mask*20*.tif"))
     timeseries.create_velocity(

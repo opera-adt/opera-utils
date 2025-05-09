@@ -17,7 +17,7 @@ from opera_utils.credentials import (
     get_earthdata_username_password,
 )
 
-__all__ = ["open_h5", "open_file"]
+__all__ = ["open_file", "open_h5"]
 
 
 def open_file(
@@ -25,7 +25,7 @@ def open_file(
     earthdata_username: str | None = None,
     earthdata_password: str | None = None,
     asf_endpoint: str | ASFCredentialEndpoints = "OPERA",
-    fsspec_kwargs: dict[str, Any] = {"cache_type": "first"},
+    fsspec_kwargs: dict[str, Any] | None = None,
 ) -> fsspec.core.OpenFile:
     """Open a remote (or local) HDF5 file using fsspec.
 
@@ -77,6 +77,8 @@ def open_file(
         specified host.
 
     """
+    if fsspec_kwargs is None:
+        fsspec_kwargs = {"cache_type": "first"}
     if isinstance(asf_endpoint, str):
         assert asf_endpoint.upper() in {"OPERA", "OPERA_UAT", "SENTINEL1"}
         asf_endpoint = ASFCredentialEndpoints[asf_endpoint.upper()]
@@ -92,7 +94,8 @@ def open_file(
     elif parsed.scheme == "file" or not parsed.scheme:
         fs = fsspec.filesystem("file")
     else:
-        raise ValueError(f"Unrecognized scheme for {url_str}")
+        msg = f"Unrecognized scheme for {url_str}"
+        raise ValueError(msg)
 
     # Create the Open File-like object from fsspec
     byte_stream = fs.open(path=url_str, mode="rb", **fsspec_kwargs)
@@ -110,7 +113,7 @@ def open_h5(
     earthdata_username: str | None = None,
     earthdata_password: str | None = None,
     asf_endpoint: str | ASFCredentialEndpoints = "OPERA",
-    fsspec_kwargs: dict[str, Any] = {"cache_type": "first"},
+    fsspec_kwargs: dict[str, Any] | None = None,
 ) -> h5py.File:
     """Open a remote (or local) HDF5 file.
 
@@ -170,6 +173,8 @@ def open_h5(
         specified host.
 
     """
+    if fsspec_kwargs is None:
+        fsspec_kwargs = {"cache_type": "first"}
     byte_stream = open_file(
         url,
         earthdata_username,
@@ -178,7 +183,7 @@ def open_h5(
         fsspec_kwargs,
     )
     # h5py arguments used to set the "cloud-friendly" parameters
-    cloud_kwargs = dict(fs_page_size=page_size, rdcc_nbytes=rdcc_nbytes)
+    cloud_kwargs = {"fs_page_size": page_size, "rdcc_nbytes": rdcc_nbytes}
     return h5py.File(byte_stream, mode="r", **cloud_kwargs)
 
 
@@ -235,6 +240,7 @@ def get_s3_fs(
     -------
     s3fs.S3FileSystem
         An authenticated fsspec filesystem object for S3 access.
+
     """
     try:
         creds = AWSCredentials.from_env()

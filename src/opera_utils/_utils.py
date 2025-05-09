@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 
 import numpy as np
 from numpy.typing import DTypeLike
@@ -14,10 +14,10 @@ from ._helpers import reproject_bounds, reproject_coordinates
 from ._types import Bbox, PathOrStr
 
 __all__ = [
-    "format_nc_filename",
-    "scratch_directory",
     "create_yx_arrays",
+    "format_nc_filename",
     "get_snwe",
+    "scratch_directory",
     "transform_xy_to_latlon",
 ]
 
@@ -45,6 +45,7 @@ def format_nc_filename(filename: PathOrStr, ds_name: str | None = None) -> str:
     ------
     ValueError
         If `ds_name` is not provided for a .h5 or .nc file.
+
     """
     # If we've already formatted the filename, return it
     if str(filename).startswith("NETCDF:") or str(filename).startswith("HDF5:"):
@@ -55,7 +56,8 @@ def format_nc_filename(filename: PathOrStr, ds_name: str | None = None) -> str:
 
     # Now we're definitely dealing with an HDF5/NetCDF file
     if ds_name is None:
-        raise ValueError("Must provide dataset name for HDF5/NetCDF files")
+        msg = "Must provide dataset name for HDF5/NetCDF files"
+        raise ValueError(msg)
 
     return f'NETCDF:"{filename}":"//{ds_name.lstrip("/")}"'
 
@@ -92,6 +94,7 @@ def numpy_to_gdal_type(np_dtype: DTypeLike) -> int:
     TypeError
         If `np_dtype` is not a numpy dtype, or if the provided dtype is not
         supported by GDAL (for example, `np.dtype('>i4')`)
+
     """
     from osgeo import gdal_array, gdalconst
 
@@ -101,7 +104,8 @@ def numpy_to_gdal_type(np_dtype: DTypeLike) -> int:
         return gdalconst.GDT_Byte
     gdal_code = gdal_array.NumericTypeCodeToGDALTypeCode(np_dtype)
     if gdal_code is None:
-        raise TypeError(f"dtype {np_dtype} not supported by GDAL.")
+        msg = f"dtype {np_dtype} not supported by GDAL."
+        raise TypeError(msg)
     return gdal_code
 
 
@@ -144,6 +148,7 @@ def scratch_directory(
     pathlib.Path
         Scratch directory path. If `delete` was True, the directory will be removed from
         the file system upon exiting the context manager scope.
+
     """
     if dir_ is None:
         scratchdir = Path(tempfile.mkdtemp())
@@ -176,6 +181,7 @@ def get_snwe(epsg: int, bounds: Bbox) -> tuple[float, float, float, float]:
     -------
     tuple[float, float, float, float]
         Bounds in SNWE (lat/lon) format.
+
     """
     if epsg != 4326:
         bounds = reproject_bounds(bounds, epsg, 4326)
@@ -206,6 +212,7 @@ def create_yx_arrays(
     -------
     tuple[np.ndarray, np.ndarray]
         x and y coordinate arrays.
+
     """
     ysize, xsize = shape
     # Parse the geotransform
@@ -238,6 +245,7 @@ def transform_xy_to_latlon(
     -------
     tuple[np.ndarray, np.ndarray]
         Latitude and longitude arrays.
+
     """
     if epsg != 4326:
         longitude, latitude = reproject_coordinates(

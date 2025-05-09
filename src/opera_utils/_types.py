@@ -47,6 +47,7 @@ class Bbox(NamedTuple):
         Right coordinate (xmax)
     top : float
         Top coordinate (ymax)
+
     """
 
     left: float

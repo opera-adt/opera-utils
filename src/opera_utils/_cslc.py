@@ -5,10 +5,11 @@ import logging
 import re
 import subprocess
 import tempfile
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from os import fspath
 from pathlib import Path
-from typing import Any, Callable, Sequence, Union
+from typing import Any, Callable
 
 import h5py
 import numpy as np
@@ -27,25 +28,23 @@ from .constants import (
 
 __all__ = [
     "CslcParseError",
-    "parse_filename",
-    "get_zero_doppler_time",
-    "get_radar_wavelength",
-    "get_orbit_arrays",
-    "get_xy_coords",
-    "get_lonlat_grid",
+    "create_nodata_mask",
     "get_cslc_orbit",
     "get_cslc_polygon",
+    "get_lonlat_grid",
+    "get_orbit_arrays",
+    "get_radar_wavelength",
     "get_union_polygon",
-    "create_nodata_mask",
+    "get_xy_coords",
+    "get_zero_doppler_time",
     "make_nodata_mask",  # TODO: deprecate
+    "parse_filename",
 ]
 logger = logging.getLogger(__name__)
 
 
 class CslcParseError(ValueError):
     """Error raised for non-matching filename."""
-
-    pass
 
 
 def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
@@ -90,7 +89,8 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
     elif match := re.match(COMPASS_FILE_REGEX, name):
         return _parse_compass(match)
     else:
-        raise CslcParseError(f"Unable to parse {h5_filename}")
+        msg = f"Unable to parse {h5_filename}"
+        raise CslcParseError(msg)
 
 
 def _parse_compass(match: re.Match):
@@ -185,6 +185,7 @@ def get_zero_doppler_time(
     -------
     str
         Full acquisition time.
+
     """
 
     def get_dt(in_str):
@@ -227,6 +228,7 @@ def _get_dset_and_attrs(
         The value of the scalar
     attrs : dict
         Attributes.
+
     """
     with h5py.File(filename, "r") as hf:
         dset = hf[dset_name]
@@ -247,6 +249,7 @@ def get_radar_wavelength(filename: Filename) -> float:
     -------
     wavelength : float
         Radar wavelength in meters.
+
     """
     dset = "/metadata/processing_information/input_burst_metadata/wavelength"
     value = _get_dset_and_attrs(filename, dset)[0]
@@ -274,6 +277,7 @@ def get_orbit_arrays(
         - Velocity array (np.ndarray)
         - Time array (np.ndarray)
         - Reference datetime (datetime)
+
     """
     # Parse the filename to figure out if this is S1 vs NISAR
     parsed = parse_filename(h5file)
@@ -415,7 +419,8 @@ def get_xy_coords(
             if attr_name in projection_dset.attrs:
                 crs_string = projection_dset.attrs[attr_name]
         if not crs_string:
-            raise ValueError(f"Failed to parse CRS for {h5file}")
+            msg = f"Failed to parse CRS for {h5file}"
+            raise ValueError(msg)
         if isinstance(crs_string, bytes):
             crs_string = crs_string.decode("utf-8")
         crs = CRS.from_user_input(crs_string)
@@ -457,7 +462,7 @@ def get_lonlat_grid(
 
 def get_cslc_polygon(
     opera_file: Filename, buffer_degrees: float = 0.0
-) -> Union[geometry.Polygon, None]:
+) -> geometry.Polygon | None:
     """Get the union of the bounding polygons of the given files.
 
     Parameters
@@ -466,6 +471,7 @@ def get_cslc_polygon(
         list of COMPASS SLC filenames.
     buffer_degrees : float, optional
         Buffer the polygons by this many degrees, by default 0.0
+
     """
     if "NISAR" in str(opera_file):
         dset_name = NISAR_BOUNDING_POLYGON
@@ -490,12 +496,14 @@ def get_union_polygon(
         list of COMPASS SLC filenames.
     buffer_degrees : float, optional
         Buffer the polygons by this many degrees, by default 0.0
+
     """
     polygons = [get_cslc_polygon(f, buffer_degrees) for f in opera_file_list]
     polygons = [p for p in polygons if p is not None]
 
     if len(polygons) == 0:
-        raise ValueError("No polygons found in the given file list.")
+        msg = "No polygons found in the given file list."
+        raise ValueError(msg)
     # Union all the polygons
     return ops.unary_union(polygons)
 
@@ -526,6 +534,7 @@ def create_nodata_mask(
         This is to be more conservative to not mask possible valid pixels.
     overwrite : bool, optional
         Overwrite the output file if it already exists, by default False
+
     """
     from osgeo import gdal
 
@@ -545,14 +554,16 @@ def create_nodata_mask(
         try:
             dataset_name = get_dataset_name(opera_file_list[-1])
         except CslcParseError:
-            raise ValueError(f"{opera_file_list[-1]} is not a CSLC file")
+            msg = f"{opera_file_list[-1]} is not a CSLC file"
+            raise ValueError(msg)
 
     try:
         test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"
         # convert pixels to degrees lat/lon
         gt = _get_raster_gt(test_f)
     except RuntimeError as e:
-        raise ValueError(f"Unable to get geotransform from {test_f}") from e
+        msg = f"Unable to get geotransform from {test_f}"
+        raise ValueError(msg) from e
     # TODO: more robust way to get the pixel size... this is a hack
     # maybe just use pyproj to warp lat/lon to meters and back?
     dx_meters = gt[1]
@@ -601,6 +612,7 @@ def _get_raster_gt(filename: Filename) -> list[float]:
     -------
     List[float]
         6 floats representing a GDAL Geotransform.
+
     """
     from osgeo import gdal
 

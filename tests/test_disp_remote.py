@@ -21,8 +21,8 @@ def test_open_h5_disp_product():
     url = "https://datapool-test.asf.alaska.edu/DISP/OPERA-S1/OPERA_L3_DISP-S1_IW_F11115_VV_20160810T140735Z_20160903T140736Z_v1.1_20250215T012240Z.nc"
     dp = DispProduct(url)
     with open_h5(url, asf_endpoint="OPERA_UAT", rdcc_nbytes=1024) as hf:
-        assert "displacement" in hf.keys()
-        assert "phase_similarity" in hf.keys()
+        assert "displacement" in hf
+        assert "phase_similarity" in hf
         assert hf["displacement"].shape == dp.shape
         # Fetch real displacement value at one pixel
         d = hf["displacement"][4000, 4000]
@@ -89,7 +89,8 @@ def test_get_s3_fs_from_asf(monkeypatch):
 
     # Make from_env raise KeyError to simulate missing env vars
     def mock_from_env():
-        raise KeyError("No AWS credentials in environment")
+        msg = "No AWS credentials in environment"
+        raise KeyError(msg)
 
     monkeypatch.setattr(AWSCredentials, "from_env", mock_from_env)
 

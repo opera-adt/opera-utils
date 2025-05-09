@@ -6,9 +6,9 @@ import logging
 import math
 import subprocess
 import tempfile
+from collections.abc import Iterable, Mapping, Sequence
 from os import fspath
 from pathlib import Path
-from typing import Iterable, Mapping, Optional, Sequence
 
 import numpy as np
 from numpy.typing import DTypeLike
@@ -34,16 +34,16 @@ def merge_images(
     file_list: Sequence[PathOrStr],
     outfile: PathOrStr,
     target_aligned_pixels: bool = True,
-    out_bounds: Optional[Bbox] = None,
-    out_bounds_epsg: Optional[int] = None,
+    out_bounds: Bbox | None = None,
+    out_bounds_epsg: int | None = None,
     strides: Mapping[str, int] = {"x": 1, "y": 1},
     driver: str = "GTiff",
-    out_nodata: Optional[float] = 0,
-    out_dtype: Optional[DTypeLike] = None,
-    in_nodata: Optional[float] = None,
+    out_nodata: float | None = 0,
+    out_dtype: DTypeLike | None = None,
+    in_nodata: float | None = None,
     resample_alg: str = "nearest",
     overwrite=False,
-    options: Optional[Sequence[str]] = DEFAULT_TIFF_OPTIONS,
+    options: Sequence[str] | None = DEFAULT_TIFF_OPTIONS,
     create_only: bool = False,
 ) -> None:
     """Combine multiple SLC images on the same date into one image.
@@ -86,6 +86,7 @@ def merge_images(
         Driver-specific creation options passed to GDAL. Default is ["SUFFIX=ADD"]
     create_only : bool
         If True, creates an empty output file, does not write data. Default is False.
+
     """
     if strides is None:
         strides = {"x": 1, "y": 1}
@@ -211,6 +212,7 @@ def get_downsampled_vrts(
     -------
     list[PathOrStr]
         The warped filenames.
+
     """
     if not filenames:
         return []
@@ -242,7 +244,7 @@ def warp_to_projection(
     filenames: Sequence[PathOrStr],
     dirname: PathOrStr,
     projection: str,
-    res: Optional[tuple[float, float]] = None,
+    res: tuple[float, float] | None = None,
     resample_alg: str = "lanczos",
 ) -> list[Path]:
     """Warp a list of files to `projection`.
@@ -269,6 +271,7 @@ def warp_to_projection(
     -------
     list[PathOrStr]
         The warped filenames.
+
     """
     if projection is None:
         projection = _get_mode_projection(filenames)
@@ -317,15 +320,16 @@ def _get_resolution(filenames: Iterable[PathOrStr]) -> tuple[float, float]:
     gts = [gdal.Open(fspath(fn)).GetGeoTransform() for fn in filenames]
     res = [(dx, dy) for (_, dx, _, _, _, dy) in gts]
     if len(set(res)) > 1:
-        raise ValueError(f"The input files have different resolutions: {res}. ")
+        msg = f"The input files have different resolutions: {res}. "
+        raise ValueError(msg)
     return res[0]
 
 
 def get_combined_bounds_nodata(
     *filenames: PathOrStr,
     target_aligned_pixels: bool = False,
-    out_bounds: Optional[Bbox] = None,
-    out_bounds_epsg: Optional[int] = None,
+    out_bounds: Bbox | None = None,
+    out_bounds_epsg: int | None = None,
     strides: Mapping[str, int] = {"x": 1, "y": 1},
 ) -> tuple[Bbox, str | float | None]:
     """Get the bounds and nodata of the combined image.
@@ -358,6 +362,7 @@ def get_combined_bounds_nodata(
     ------
     ValueError:
         If the inputs files have different resolutions/projections/nodata values
+
     """
     # scan input files
     xs = []
@@ -384,11 +389,14 @@ def get_combined_bounds_nodata(
         nodatas.add(str(nd) if (nd is not None and np.isnan(nd)) else nd)
 
     if len(resolutions) > 1:
-        raise ValueError(f"The input files have different resolutions: {resolutions}. ")
+        msg = f"The input files have different resolutions: {resolutions}. "
+        raise ValueError(msg)
     if len(projs) > 1:
-        raise ValueError(f"The input files have different projections: {projs}. ")
+        msg = f"The input files have different projections: {projs}. "
+        raise ValueError(msg)
     if len(nodatas) > 1:
-        raise ValueError(f"The input files have different nodata values: {nodatas}. ")
+        msg = f"The input files have different nodata values: {nodatas}. "
+        raise ValueError(msg)
     res = (abs(dx) * strides["x"], abs(dy) * strides["y"])
 
     if out_bounds is not None:
@@ -403,7 +411,7 @@ def get_combined_bounds_nodata(
     if target_aligned_pixels:
         bounds = Bbox(*_align_bounds(bounds, res))
 
-    return bounds, list(nodatas)[0]
+    return bounds, next(iter(nodatas))
 
 
 def _align_bounds(bounds: Iterable[float], res: tuple[float, float]):
@@ -416,7 +424,7 @@ def _align_bounds(bounds: Iterable[float], res: tuple[float, float]):
     return (left, bottom, right, top)
 
 
-def get_transformed_bounds(filename: PathOrStr, epsg_code: Optional[int] = None):
+def get_transformed_bounds(filename: PathOrStr, epsg_code: int | None = None):
     """Get the bounds of a raster, possibly in a different CRS.
 
     Parameters
@@ -432,6 +440,7 @@ def get_transformed_bounds(filename: PathOrStr, epsg_code: Optional[int] = None)
     -------
     tuple
         The bounds of the raster as (left, bottom, right, top)
+
     """
     bounds = _io.get_raster_bounds(filename)
     if epsg_code is None:
@@ -446,8 +455,8 @@ def get_transformed_bounds(filename: PathOrStr, epsg_code: Optional[int] = None)
 
 def _copy_set_nodata(
     infile: PathOrStr,
-    outfile: Optional[PathOrStr] = None,
-    ext: Optional[str] = None,
+    outfile: PathOrStr | None = None,
+    ext: str | None = None,
     in_band: int = 1,
     out_nodata: float = 0,
     driver="GTiff",
@@ -483,9 +492,9 @@ def _copy_set_nodata(
 def warp_to_match(
     input_file: PathOrStr,
     match_file: PathOrStr,
-    output_file: Optional[PathOrStr] = None,
+    output_file: PathOrStr | None = None,
     resample_alg: str = "near",
-    output_format: Optional[str] = None,
+    output_format: str | None = None,
 ) -> Path:
     """Reproject `input_file` to align with the `match_file`.
 
@@ -514,6 +523,7 @@ def warp_to_match(
     Path
         Path to the output image.
         Same as `output_file` if provided, otherwise a path to the in-memory VRT.
+
     """
     bounds = _io.get_raster_bounds(match_file)
     crs_wkt = _io.get_raster_crs(match_file).to_wkt()

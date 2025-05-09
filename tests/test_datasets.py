@@ -10,7 +10,6 @@ def patch_VCRHTTPResponse_version_string():
 
     if not hasattr(VCRHTTPResponse, "version_string"):
         VCRHTTPResponse.version_string = None
-    yield
 
 
 @pytest.fixture(scope="module")

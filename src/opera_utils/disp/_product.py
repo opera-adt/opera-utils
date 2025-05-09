@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
 from math import nan
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 import pyproj
@@ -71,13 +71,15 @@ class DispProduct:
         ------
         ValueError
             If the filename format is invalid.
+
         """
 
         def _to_datetime(dt: str) -> datetime:
             return datetime.strptime(dt, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
 
         if not (match := DISP_FILE_REGEX.match(Path(name).name)):
-            raise ValueError(f"Invalid filename format: {name}")
+            msg = f"Invalid filename format: {name}"
+            raise ValueError(msg)
 
         data: dict[str, Any] = match.groupdict()
         data["reference_datetime"] = _to_datetime(data["reference_datetime"])
@@ -109,7 +111,7 @@ class DispProduct:
     @property
     def shape(self) -> tuple[int, int]:
         left, bottom, right, top = self._frame_bbox_result[1]
-        return (int(round((top - bottom) / 30)), int(round((right - left) / 30)))
+        return (round((top - bottom) / 30), round((right - left) / 30))
 
     @cached_property
     def _coordinates(self) -> tuple[np.ndarray, np.ndarray]:
@@ -131,6 +133,7 @@ class DispProduct:
         return Affine(30, 0, left, 0, -30, top)
 
     def get_rasterio_profile(self, chunks: tuple[int, int] = (256, 256)) -> dict:
+        """Generate a `profile` usable by `rasterio.open()`."""
         profile = {
             "driver": "GTiff",
             "interleave": "band",
@@ -160,7 +163,7 @@ class DispProduct:
     @classmethod
     def from_umm(
         cls, umm_data: dict[str, Any], url_type: UrlType = UrlType.HTTPS
-    ) -> "DispProduct":
+    ) -> DispProduct:
         """Construct a DispProduct instance from a raw dictionary.
 
         Parameters
@@ -180,6 +183,7 @@ class DispProduct:
         ------
         ValueError
             If required temporal extent data is missing.
+
         """
         url = _get_download_url(umm_data, protocol=url_type)
         product = DispProduct.from_filename(url)
@@ -199,9 +203,11 @@ class DispProductStack:
 
     def __post_init__(self) -> None:
         if len(self.products) == 0:
-            raise ValueError("At least one product is required")
-        if len(set(p.frame_id for p in self.products)) != 1:
-            raise ValueError("All products must have the same frame_id")
+            msg = "At least one product is required"
+            raise ValueError(msg)
+        if len({p.frame_id for p in self.products}) != 1:
+            msg = "All products must have the same frame_id"
+            raise ValueError(msg)
         # Check for duplicates
         if len(set(self.ifg_date_pairs)) != len(self.products):
             version_count = Counter(p.version for p in self.products)
@@ -259,7 +265,7 @@ class DispProductStack:
 
     @property
     def shape(self) -> tuple[int, int, int]:
-        return (len(self.products),) + self.products[0].shape
+        return (len(self.products), *self.products[0].shape)
 
     @property
     def x(self) -> np.ndarray:
@@ -270,9 +276,10 @@ class DispProductStack:
         return self.products[0].y
 
     def get_rasterio_profile(self, chunks: tuple[int, int] = (256, 256)) -> dict:
+        """Generate a `profile` usable by `rasterio.open()`."""
         return self.products[0].get_rasterio_profile(chunks)
 
-    def __getitem__(self, idx: int | slice) -> DispProduct | "DispProductStack":
+    def __getitem__(self, idx: int | slice) -> DispProduct | DispProductStack:
         if isinstance(idx, int):
             return self.products[idx]
         return self.__class__(self.products[idx])
@@ -306,15 +313,18 @@ def _get_download_url(
     ------
     ValueError
         If no URL with the specified protocol is found or if the protocol is invalid
+
     """
     if protocol not in ["https", "s3"]:
-        raise ValueError(f"Unknown protocol {protocol}; must be https or s3")
+        msg = f"Unknown protocol {protocol}; must be https or s3"
+        raise ValueError(msg)
 
     for url in umm_data["RelatedUrls"]:
         if url["Type"].startswith("GET DATA") and url["URL"].startswith(protocol):
             return url["URL"]
 
-    raise ValueError(f"No download URL found for granule {umm_data['GranuleUR']}")
+    msg = f"No download URL found for granule {umm_data['GranuleUR']}"
+    raise ValueError(msg)
 
 
 class OutOfBoundsError(ValueError):
@@ -337,6 +347,7 @@ def lonlat_to_rowcol(product: DispProduct, lon: float, lat: float) -> tuple[int,
     -------
     tuple[int, int]
         Row and column indices in the raster
+
     """
     # Create transformer from WGS84 to the target CRS (always UTM)
     epsg = product.epsg
@@ -353,10 +364,11 @@ def lonlat_to_rowcol(product: DispProduct, lon: float, lat: float) -> tuple[int,
     col, row = ~product.transform * (x, y)
 
     # Return to nearest, then check if out of bounds
-    row, col = int(round(row)), int(round(col))
+    row, col = round(row), round(col)
     if col < 0 or col >= product.shape[1] or row < 0 or row >= product.shape[0]:
-        raise OutOfBoundsError(
+        msg = (
             f"Coordinates {lon}, {lat} ({row = }, {col = }) are out of bounds for"
             f" {product}"
         )
+        raise OutOfBoundsError(msg)
     return row, col

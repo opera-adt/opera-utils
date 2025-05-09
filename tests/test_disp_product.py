@@ -46,7 +46,7 @@ MOCK_X_COORDS = np.arange(499815.0, 788325.0 + 30, 30)
 MOCK_Y_COORDS = np.arange(4114485.0, 3907575.0 - 30, -30)
 
 # Expected shape from BOUNDS
-EXPECTED_HEIGHT = int(round((BOUNDS.top - BOUNDS.bottom) / 30))
+EXPECTED_HEIGHT = round((BOUNDS.top - BOUNDS.bottom) / 30)
 EXPECTED_WIDTH = int(round(BOUNDS.right - BOUNDS.left) / 30)
 EXPECTED_SHAPE = (EXPECTED_HEIGHT, EXPECTED_WIDTH)
 

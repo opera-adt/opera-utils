@@ -24,7 +24,7 @@ def slc_stack():
     return data.astype(np.complex64)
 
 
-@pytest.fixture()
+@pytest.fixture
 def slc_date_list(slc_stack):
     start_date = datetime.datetime(2022, 1, 1)
     out = []
@@ -35,7 +35,7 @@ def slc_date_list(slc_stack):
     return out
 
 
-@pytest.fixture()
+@pytest.fixture
 def slc_file_list_nc(tmp_path, slc_stack, slc_date_list):
     """Save the slc stack as a series of NetCDF files."""
     d = tmp_path / "32615"
@@ -54,10 +54,9 @@ def slc_file_list_nc(tmp_path, slc_stack, slc_date_list):
     return file_list
 
 
-@pytest.fixture()
+@pytest.fixture
 def slc_file_list_nc_wgs84(tmp_path, slc_stack, slc_date_list):
     """Make one with lat/lon as the projection system."""
-
     d = tmp_path / "wgs84"
     d.mkdir()
     name_template = d / "{date}.nc"
@@ -73,7 +72,7 @@ def slc_file_list_nc_wgs84(tmp_path, slc_stack, slc_date_list):
     return file_list
 
 
-@pytest.fixture()
+@pytest.fixture
 def shifted_slc_files(tmp_path):
     """Make series of files offset in lat/lon."""
     shape = (5, 10, 10)
@@ -89,7 +88,7 @@ def shifted_slc_files(tmp_path):
     return file_list
 
 
-@pytest.fixture()
+@pytest.fixture
 def shifted_slc_bounds():
     return Bbox(-5.5, -4.5, 8.5, 9.5)
 

@@ -56,6 +56,7 @@ def rebase_timeseries(
     -------
     np.ndarray
         Continuous displacement time series with consistent reference date
+
     """
     if len(set(reference_dates)) == 1:
         return raw_data.copy()

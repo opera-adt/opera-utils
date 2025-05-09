@@ -3,8 +3,10 @@ from __future__ import annotations
 import itertools
 import logging
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Pattern, Union, overload
+from re import Pattern
+from typing import overload
 
 from ._types import Filename, PathLikeT
 from .constants import OPERA_BURST_RE
@@ -12,11 +14,11 @@ from .constants import OPERA_BURST_RE
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "normalize_burst_id",
+    "filter_by_burst_id",
     "get_burst_id",
     "group_by_burst",
+    "normalize_burst_id",
     "sort_by_burst_id",
-    "filter_by_burst_id",
 ]
 
 
@@ -26,7 +28,7 @@ def normalize_burst_id(burst_id_str: str) -> str:
 
 
 def get_burst_id(
-    filename: Filename, burst_id_fmt: Union[str, Pattern[str]] = OPERA_BURST_RE
+    filename: Filename, burst_id_fmt: str | Pattern[str] = OPERA_BURST_RE
 ) -> str:
     """Extract the burst id from a filename.
 
@@ -47,23 +49,25 @@ def get_burst_id(
     str
         burst id of the SLC acquisition, normalized to be in the format
             t087_185684_iw2
+
     """
     if not (m := re.search(burst_id_fmt, str(filename))):
-        raise ValueError(f"Could not parse burst id from {filename}")
+        msg = f"Could not parse burst id from {filename}"
+        raise ValueError(msg)
     return normalize_burst_id(m.group())
 
 
 @overload
 def group_by_burst(
     file_list: Iterable[str],
-    burst_id_fmt: Union[str, Pattern[str]] = OPERA_BURST_RE,
+    burst_id_fmt: str | Pattern[str] = OPERA_BURST_RE,
 ) -> dict[str, list[str]]: ...
 
 
 @overload
 def group_by_burst(
     file_list: Iterable[PathLikeT],
-    burst_id_fmt: Union[str, Pattern[str]] = OPERA_BURST_RE,
+    burst_id_fmt: str | Pattern[str] = OPERA_BURST_RE,
 ) -> dict[str, list[PathLikeT]]: ...
 
 
@@ -87,6 +91,7 @@ def group_by_burst(file_list, burst_id_fmt=OPERA_BURST_RE):
             't087_185678_iw2': ['inputs/t087_185678_iw2_20200101.h5',...,],
             't087_185678_iw3': ['inputs/t087_185678_iw3_20200101.h5',...,],
         }
+
     """
     if not file_list:
         return {}
@@ -127,6 +132,7 @@ def sort_by_burst_id(file_list, burst_id_fmt):
     -------
     list[Path] or list[str]
         sorted list of files
+
     """
     file_burst_tuples = sorted(
         [(f, get_burst_id(f, burst_id_fmt)) for f in file_list],
@@ -168,6 +174,7 @@ def filter_by_burst_id(files, burst_ids):
     -------
     list[PathLikeT] or list[str]
         filtered list of files
+
     """
     if isinstance(burst_ids, str):
         burst_ids = [burst_ids]

@@ -120,9 +120,8 @@ def idaho_slc_list() -> list[str]:
     p = Path(__file__).parent / "data" / "idaho_slc_file_list.txt.zip"
 
     # unzip the file and return the list of strings
-    with zipfile.ZipFile(p) as z:
-        with z.open(z.namelist()[0]) as f:
-            return f.read().decode().splitlines()
+    with zipfile.ZipFile(p) as z, z.open(z.namelist()[0]) as f:
+        return f.read().decode().splitlines()
 
 
 def test_get_missing_data_options_real(idaho_slc_list):

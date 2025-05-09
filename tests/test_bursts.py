@@ -29,7 +29,7 @@ def test_get_burst_id():
         == "t087_185678_iw2"
     )
     # Check the official naming convention
-    fn = "OPERA_L2_CSLC-S1_T087-185678-IW2_20180210T232711Z_20230101T100506Z_S1A_VV_v1.0.h5"  # noqa
+    fn = "OPERA_L2_CSLC-S1_T087-185678-IW2_20180210T232711Z_20230101T100506Z_S1A_VV_v1.0.h5"
     assert get_burst_id(fn) == "t087_185678_iw2"
 
 

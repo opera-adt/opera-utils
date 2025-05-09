@@ -233,7 +233,7 @@ def mock_dataset_files(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "filename,expected",
+    ("filename", "expected"),
     [
         ("test.json", {"key": "value"}),
         ("test.json.zip", {"key": "value"}),
@@ -383,23 +383,27 @@ class TestGeopandasIntegration:
 
     def test_get_frame_geodataframe(self, mock_dataset_files):
         """Test getting frame geometries as GeoDataFrame."""
-        with mock.patch(
-            "opera_utils.datasets.fetch_frame_geometries_simple",
-            return_value=mock_dataset_files["frame_geo"],
+        with (
+            mock.patch(
+                "opera_utils.datasets.fetch_frame_geometries_simple",
+                return_value=mock_dataset_files["frame_geo"],
+            ),
+            mock.patch("pyogrio.read_dataframe") as mock_read,
         ):
-            with mock.patch("pyogrio.read_dataframe") as mock_read:
-                burst_frame_db.get_frame_geodataframe()
-                mock_read.assert_called_once()
+            burst_frame_db.get_frame_geodataframe()
+            mock_read.assert_called_once()
 
     def test_get_burst_geodataframe(self, mock_dataset_files):
         """Test getting burst geometries as GeoDataFrame."""
-        with mock.patch(
-            "opera_utils.datasets.fetch_burst_id_geometries_simple",
-            return_value=mock_dataset_files["burst_geo"],
+        with (
+            mock.patch(
+                "opera_utils.datasets.fetch_burst_id_geometries_simple",
+                return_value=mock_dataset_files["burst_geo"],
+            ),
+            mock.patch("pyogrio.read_dataframe") as mock_read,
         ):
-            with mock.patch("pyogrio.read_dataframe") as mock_read:
-                burst_frame_db.get_burst_geodataframe()
-                mock_read.assert_called_once()
+            burst_frame_db.get_burst_geodataframe()
+            mock_read.assert_called_once()
 
     def test_get_intersecting_frames(self, mock_dataset_files):
         """Test getting intersecting frames."""

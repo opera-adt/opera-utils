@@ -63,9 +63,8 @@ class _HDF5GroupExplorer:
 
     def __getattr__(self, name):
         if name not in self._attr_cache:
-            raise AttributeError(
-                f"'{name}' not found in the group '{self.group_path}'."
-            )
+            msg = f"'{name}' not found in the group '{self.group_path}'."
+            raise AttributeError(msg)
         return self._attr_cache[name]
 
     def __dir__(self):
@@ -88,6 +87,7 @@ def create_explorer_widget(
     --------
     >>> hf = h5py.File("file.h5", "r") # doctest: +SKIP
     >>> create_explorer_widget(hf) # doctest: +SKIP
+
     """
     from io import BytesIO
 
@@ -133,7 +133,7 @@ def create_explorer_widget(
                 content += f"<br>Value: {item[()]}"
             html_widget = widgets.HTML(content)
 
-            if not item.ndim == 2:
+            if item.ndim != 2:
                 return html_widget
             # If the dataset is a 2D array, make a thumbnail
             # Handle the real or complex the same

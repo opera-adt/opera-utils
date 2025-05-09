@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional, Tuple
 
 import tyro
 
@@ -40,6 +39,7 @@ def frame_bbox(
         Default is False, meaning bounds are printed in UTM coordinates.
     bounds_only : bool
         Print only a JSON array of the bounds, not the EPSG code.
+
     """
     epsg, bounds = get_frame_bbox(frame_id=frame_id)
     if latlon:
@@ -49,14 +49,14 @@ def frame_bbox(
     if bounds_only:
         print(list(bounds))
     else:
-        obj = dict(epsg=epsg, bbox=bounds)
+        obj = {"epsg": epsg, "bbox": bounds}
         print(json.dumps(obj))
 
 
 def intersects(
     *,
-    bbox: Optional[Tuple[float, float, float, float]] = None,
-    point: Optional[Tuple[float, float]] = None,
+    bbox: tuple[float, float, float, float] | None = None,
+    point: tuple[float, float] | None = None,
     ids_only: bool = False,
 ) -> None:
     """Get the DISP-S1 frames that intersect with the given bounding box.
@@ -72,9 +72,11 @@ def intersects(
     ids_only : bool
         Print only the Frame IDs as newline-separate ints.
         By default False, which returns a GeoJSON string of Frame geometries.
+
     """
     if bbox is None and point is None:
-        raise ValueError("Either bbox or point must be provided")
+        msg = "Either bbox or point must be provided"
+        raise ValueError(msg)
 
     if point is not None:
         geom = Bbox(point[0], point[1], point[0], point[1])
@@ -102,7 +104,7 @@ def missing_data_options(
 
     option_1_bursts_1234_burst_ids_27_dates_10.txt
     """
-    with open(namelist, "r") as f:
+    with open(namelist) as f:
         file_list = [line.strip() for line in f.read().splitlines()]
 
     options = get_missing_data_options(file_list)[:max_options]

@@ -5,6 +5,7 @@ Examples
 $ python -m opera_utils.disp.search --frame-id 11115 --end-datetime 2016-10-01
 https://datapool.asf.alaska.edu/DISP/OPERA-S1/OPERA_L3_DISP-S1_IW_F11115_VV_20160810T140735Z_20160903T140736Z_v1.0_20250318T223016Z.nc
 https://datapool.asf.alaska.edu/DISP/OPERA-S1/OPERA_L3_DISP-S1_IW_F11115_VV_20160810T140735Z_20160927T140737Z_v1.0_20250318T223016Z.nc
+
 """
 
 from __future__ import annotations
@@ -51,6 +52,7 @@ def search(
     -------
     list[DispProduct]
         List of products matching the search criteria
+
     """
     edl_host = "uat.earthdata" if use_uat else "earthdata"
     search_url = f"https://cmr.{edl_host}.nasa.gov/search/granules.umm_json"

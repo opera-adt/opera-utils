@@ -195,7 +195,8 @@ def test_get_earthdata_username_password_netrc_error(monkeypatch):
 
     # netrc raises exception
     def mock_netrc_error():
-        raise FileNotFoundError("No .netrc file")
+        msg = "No .netrc file"
+        raise FileNotFoundError(msg)
 
     monkeypatch.setattr(netrc, "netrc", mock_netrc_error)
 

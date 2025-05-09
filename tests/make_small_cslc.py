@@ -35,7 +35,8 @@ if __name__ == "__main__":
     fn = sys.argv[1]
     out = fn.replace("*.h5", "_compressed.h5")
     if not Path(fn).exists():
-        raise ValueError(f"{fn} does not exist")
+        msg = f"{fn} does not exist"
+        raise ValueError(msg)
 
     with h5py.File(fn, "a") as hf:
         # Store x and y coordinates
@@ -52,7 +53,7 @@ if __name__ == "__main__":
                 # Add grid_mapping attribute to /data datasets
                 if dn in data_datasets:
                     ds = hf[dn]
-                    ds.attrs["grid_mapping"] = np.string_("projection")
+                    ds.attrs["grid_mapping"] = np.bytes_("projection")
                     ds.dims[1].attach_scale(x_ds)
                     ds.dims[0].attach_scale(y_ds)
 

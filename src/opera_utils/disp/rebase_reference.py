@@ -12,20 +12,21 @@ This script converts these files into a single continuous displacement time seri
 The current format is a stack of geotiff rasters.
 
 Usage:
-    python -m opera_utils.disp.rebase_reference single-reference-out/ OPERA_L3_DISP-S1_*.nc
+python -m opera_utils.disp.rebase_reference single-reference-out/ OPERA_L3_DISP-S1_*.nc
 """
 
 from __future__ import annotations
 
 import json
 import multiprocessing
+from collections.abc import Sequence
 from concurrent.futures import FIRST_EXCEPTION, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 from itertools import repeat
 from pathlib import Path
-from typing import Any, Final, Literal, Sequence
+from typing import Any, Final, Literal
 
 import h5py
 import numpy as np
@@ -324,6 +325,7 @@ class GeotiffStackWriter:
             Dictionary of metadata to save.
         namespace
             Namespace for metadata.
+
         """
         for f in self.files:
             with rio.open(f, "r+", **self.profile) as dst:
@@ -352,7 +354,8 @@ class GeotiffStackWriter:
                 for d in date_pairs
             ]
         else:
-            raise ValueError("Either date_list or date_pairs must be provided")
+            msg = "Either date_list or date_pairs must be provided"
+            raise ValueError(msg)
         output_dir.mkdir(exist_ok=True, parents=True)
         return cls(files=out_paths, **kwargs)
 
@@ -456,6 +459,7 @@ def find_reference_point(
     -------
     tuple[int, int]
         Reference point (row, column)
+
     """
     from scipy import ndimage
 
@@ -477,7 +481,8 @@ def find_reference_point(
         dists = np.sqrt((rows - r) ** 2 + (cols - c) ** 2)
         idx = np.argmin(dists)
         return rows[idx], cols[idx]
-    raise ValueError(f"No valid candidates found with quality above {min_quality}")
+    msg = f"No valid candidates found with quality above {min_quality}"
+    raise ValueError(msg)
 
 
 def main(
@@ -516,6 +521,7 @@ def main(
         Default is None.
     num_workers : int, optional
         Number of workers to use, by default 5
+
     """
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True, parents=True)

@@ -19,8 +19,6 @@ __all__ = [
 class EarthdataLoginFailure(Exception):
     """Exception raised when Earthdata Login credentials are not found."""
 
-    pass
-
 
 class ASFCredentialEndpoints(Enum):
     """Enumeration of ASF temporary credentials endpoints.
@@ -100,6 +98,7 @@ class AWSCredentials:
         ------
         KeyError
             If any of the required environment variables are not set.
+
         """
         return cls(
             access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
@@ -117,13 +116,15 @@ class AWSCredentials:
         ------
         ImportError
             If botocore is not installed.
+
         """
         import botocore.session
 
         session = botocore.session.get_session()
         credentials = session.get_credentials()
         if credentials is None:
-            raise ValueError("No credentials found in boto3 session.")
+            msg = "No credentials found in boto3 session."
+            raise ValueError(msg)
         frozen_credentials = credentials.get_frozen_credentials()
         return cls(
             access_key_id=frozen_credentials.access_key,
@@ -203,9 +204,11 @@ def get_earthdata_username_password(
     ------
     ValueError
         If no credentials are found.
+
     """
     if host not in set(ENDPOINT_TO_HOST.values()):
-        raise ValueError(f"Invalid host: {host}. Choices: {ENDPOINT_TO_HOST.values()}")
+        msg = f"Invalid host: {host}. Choices: {ENDPOINT_TO_HOST.values()}"
+        raise ValueError(msg)
 
     # Case 1: Use provided credentials if both are specified
     if earthdata_username and earthdata_password:
@@ -226,7 +229,8 @@ def get_earthdata_username_password(
         return username, password
 
     # No valid credentials found
-    raise EarthdataLoginFailure(
+    msg = (
         "No credentials found: neither valid parameters provided, .netrc file has a"
         f" '{host}' entry, nor environment variables set."
     )
+    raise EarthdataLoginFailure(msg)
