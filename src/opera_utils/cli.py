@@ -14,13 +14,12 @@ from opera_utils import (
     filter_by_date,
     get_missing_data_options,
 )
-from opera_utils.missing_data import print_plain, print_with_rich
+from opera_utils.missing_data import print_with_rich
 
 from ._types import Bbox
 from .burst_frame_db import get_frame_bbox
 
 
-# Define disp-s1 subcommands
 def frame_bbox(
     frame_id: int, /, latlon: bool = False, bounds_only: bool = False
 ) -> None:
@@ -44,7 +43,7 @@ def frame_bbox(
 
 
 def intersects(
-    *,  # keyword-only arguments
+    *,
     bbox: Optional[Tuple[float, float, float, float]] = None,
     point: Optional[Tuple[float, float]] = None,
     ids_only: bool = False,
@@ -84,10 +83,7 @@ def missing_data_options(
 
     options = get_missing_data_options(file_list)[:max_options]
 
-    try:
-        print_with_rich(options)
-    except ImportError:
-        print_plain(options)
+    print_with_rich(options)
     if not write_options:
         return
 
@@ -110,21 +106,6 @@ def missing_data_options(
             f.write("\n")
 
 
-# Define sub-commands for each top-level command
-def cmd(debug: bool = False) -> None:
-    """Tools for working with DISP-S1 data."""
-    tyro.extras.subcommand_cli_from_dict(
-        {
-            "frame-bbox": frame_bbox,
-            "intersects": intersects,
-            "missing-data-options": missing_data_options,
-        },
-        prog="opera-utils disp-s1",
-        description="Tools for working with DISP-S1 data.",
-    )
-
-
-# Main entry point
 def cli_app() -> None:
     """opera-utils command-line interface."""
     # Use subcommand_cli_from_dict to handle the top-level commands
