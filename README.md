@@ -24,17 +24,22 @@
 The `opera_utils` package is available on PyPI and conda-forge:
 
 ```bash
-pip install opera-utils
-```
-```bash
 # if mamba is not already installed: conda install -n base mamba
 mamba install -c conda-forge opera-utils
 ```
+
 (Note: [using `mamba`](https://mamba.readthedocs.io/en/latest/mamba-installation.html#mamba-install) is recommended for conda-forge packages, but miniconda can also be used.)
 
-While not required for all, some utilities use the GDAL package, which can be installed most easily on conda-forge:
 ```bash
-mamba env update --file environment-geo.yml
+pip install opera-utils
+```
+
+The `pip` dependency list for the base package is smaller; the optional depencies may be added with
+
+```bash
+pip install opera-utils[geopandas] # for just geopandas data frame support
+pip install opera-utils[remote] # For remote access to DISP files
+pip install opera-utils[all]  # all optional dependencies
 ```
 
 ## Example Usage
@@ -108,18 +113,11 @@ git clone https://github.com/opera-adt/opera-utils.git && cd opera-utils
 2. Install dependencies:
 ```bash
 mamba env create --name my-opera-env --file environment.yml
-mamba install gdal
 ```
 
 3. Install the source in editable mode:
 ```bash
 mamba activate my-opera-env
-python -m pip install -e .
-```
-
-The extra packages required for testing and building the documentation can be installed:
-```bash
-# Run "pip install -e" to install with extra development requirements
 python -m pip install -e ".[docs,test]"
 ```
 
@@ -131,6 +129,7 @@ pre-commit install
 This will set up the linters and formatters to run on any staged files before you commit them.
 
 After making functional changes, you can rerun the existing tests and any new ones you have added using:
+
 ```bash
-python -m pytest
+pytest
 ```
