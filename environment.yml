@@ -12,3 +12,14 @@ dependencies:
   - shapely>=1.8
   - typing_extensions>=4
   - tyro>=0.9
+  - asf_search>=6.7
+  - gdal>=3.8
+  - libgdal-netcdf
+  - rasterio>=1.3
+  - affine
+  - botocore
+  - aiohttp
+  - fsspec
+  - h5netcdf
+  - s3fs
+  - tqdm
