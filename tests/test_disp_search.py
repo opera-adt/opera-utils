@@ -85,7 +85,8 @@ class MockResponse:
 
     def raise_for_status(self):
         if self.status_code != 200:
-            raise Exception(f"Status code {self.status_code}")
+            msg = f"Status code {self.status_code}"
+            raise ValueError(msg)
 
 
 def test_search_with_mock_response(cmr_response_json):

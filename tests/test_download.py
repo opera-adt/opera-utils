@@ -13,14 +13,13 @@ def patch_VCRHTTPResponse_version_string():
 
     if not hasattr(VCRHTTPResponse, "version_string"):
         VCRHTTPResponse.version_string = None
-    yield
 
 
 @pytest.mark.filterwarnings(
     "ignore:Parsing dates involving a day of month without a year"
     " specified.*:DeprecationWarning"
 )
-@pytest.mark.vcr()
+@pytest.mark.vcr
 def test_download_filter():
     burst_ids = ["t087_185683_iw2", "t087_185682_iw2"]
     start, end = datetime(2022, 10, 1), datetime(2023, 3, 29)

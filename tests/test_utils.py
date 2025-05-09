@@ -53,7 +53,7 @@ def test_format_nc_filename():
         == "/usr/19990101/20200303_20210101.int"
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Must provide dataset name"):
         # Missing the subdataset name
         format_nc_filename("/usr/19990101/20200303_20210101.nc")
 

@@ -29,7 +29,7 @@ def test_get_burst_id():
         == "t087_185678_iw2"
     )
     # Check the official naming convention
-    fn = "OPERA_L2_CSLC-S1_T087-185678-IW2_20180210T232711Z_20230101T100506Z_S1A_VV_v1.0.h5"  # noqa
+    fn = "OPERA_L2_CSLC-S1_T087-185678-IW2_20180210T232711Z_20230101T100506Z_S1A_VV_v1.0.h5"
     assert get_burst_id(fn) == "t087_185678_iw2"
 
 
@@ -90,6 +90,7 @@ def test_group_by_burst_product_version():
 def test_group_by_burst_non_opera():
     with pytest.raises(ValueError, match="Could not parse burst id"):
         group_by_burst(["20200101.slc", "20200202.slc"])
+    with pytest.raises(ValueError, match="Could not parse burst id"):
         # A combination should still error
         group_by_burst(
             [

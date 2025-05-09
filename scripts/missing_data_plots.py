@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from datetime import datetime, timedelta
-from typing import Iterable, Optional, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -19,10 +19,10 @@ from opera_utils._types import PathOrStr
 
 
 def plot_burst_id_date_incidence(
-    slc_files: Optional[Iterable[str]] = None,
-    burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
+    slc_files: Iterable[str] | None = None,
+    burst_id_date_tuples: Iterable[tuple[str, datetime]] | None = None,
     ax=None,
-    output_file: Optional[PathOrStr] = None,
+    output_file: PathOrStr | None = None,
 ) -> tuple[plt.figure, plt.Axes]:
     """Plot a matrix of burst ID vs. datetime incidence.
 
@@ -46,6 +46,7 @@ def plot_burst_id_date_incidence(
         Matplotlib figure object of plot
     axes : matplotlib.pyploy.Axes
         Axes holding plot
+
     """
     burst_id_to_dates = opera_utils.missing_data.get_burst_id_to_dates(
         slc_files=slc_files, burst_id_date_tuples=burst_id_date_tuples
@@ -94,7 +95,7 @@ def _plot_incidence_per_date(
     colors: Sequence[str] = ["#a2cffe", "#fdae61"],
     cbar_labels: Sequence[str] = ["False", "True"],
 ):
-    """Make a scatterplot with fixed datetime xaxis and variable spacing between items."""
+    """Make a scatterplot with fixed datetime xaxis and variable y spacing."""
     # Define a color map with two colors: one for True, one for False
     date_nums = mdates.date2num(dates)
 
@@ -153,6 +154,7 @@ def _generate_fixed_spacing_dates(dates: Sequence[datetime]) -> list[datetime]:
     -------
     list[datetime]
         A list of datetime objects with fixed spacing.
+
     """
     date_list = list(dates)
     date_list.sort()

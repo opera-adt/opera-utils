@@ -122,7 +122,7 @@ def test_intersects_bbox(
     with monkeypatch.context() as m:
         # Use plausible coordinates
         bbox = ["--bbox", "-114", "31", "-113", "32"]
-        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects"] + bbox)
+        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects", *bbox])
 
         cli_app()
         s = capsys.readouterr()
@@ -134,7 +134,7 @@ def test_intersects_point(
 ):
     with monkeypatch.context() as m:
         point = ["--point", "-114.1", "31.5"]
-        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects"] + point)
+        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects", *point])
 
         cli_app()
         s = capsys.readouterr()
@@ -172,7 +172,7 @@ def test_intersects_ids_only(
 ):
     with monkeypatch.context() as m:
         bbox = ["--bbox", "-114.1", "31.5", "-113.1", "32.5", "--ids-only"]
-        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects"] + bbox)
+        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects", *bbox])
 
         cli_app()
         s = capsys.readouterr()
@@ -204,7 +204,7 @@ def test_intersects_point_geojson(
             "44324",
         }  # Use a set for order-independent comparison
 
-        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects"] + point)
+        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects", *point])
 
         cli_app()
         s = capsys.readouterr()
@@ -266,7 +266,7 @@ def test_intersects_point_ids_only(
             "44324",
         }  # Use a set for order-independent comparison
 
-        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects"] + point)
+        m.setattr(sys, "argv", ["opera-utils", "disp-s1-intersects", *point])
 
         cli_app()
         s = capsys.readouterr()
@@ -274,7 +274,7 @@ def test_intersects_point_ids_only(
         # Output should be newline-separated IDs
         # Remove leading/trailing whitespace and split into lines
         # Filter out empty lines just in case
-        actual_ids = set(line for line in s.out.strip().splitlines() if line)
+        actual_ids = {line for line in s.out.strip().splitlines() if line}
 
         assert (
             actual_ids == expected_ids

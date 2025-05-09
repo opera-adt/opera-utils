@@ -53,8 +53,6 @@ def mock_product():
     ):
         # Mock the bounds to avoid needing real geometry
         p = DispProduct.from_filename(FILE_1)
-        # Override shape for consistency with mock data if necessary
-        # p.shape = MOCK_DATA_SHAPE # This might conflict if lonlat_to_rowcol is not mocked
     return p
 
 
@@ -100,7 +98,6 @@ def mock_open_h5(monkeypatch):
         return mock_hf
 
     monkeypatch.setattr("opera_utils.disp._reader.open_h5", _mock_open_h5)
-    # Return the side effect function if needed for inspection, though patching is enough
     return _mock_open_h5
 
 
@@ -125,7 +122,8 @@ def mock_lonlat_to_rowcol(monkeypatch):
             return (3, 4)  # Ref point row/col for point referencing
         # Raise OutOfBoundsError for values outside the mock "valid" range
         if lat < 36.7 or lat > 37.1 or lon < -122.1 or lon > -121.7:
-            raise OutOfBoundsError("Mocked coordinates out of bounds")
+            msg = "Mocked coordinates out of bounds"
+            raise OutOfBoundsError(msg)
 
         # Return something plausible based on MOCK_DATA_SHAPE
         row = int(MOCK_DATA_SHAPE[0] * (37.0 - lat) / 0.2)
@@ -142,7 +140,7 @@ def mock_lonlat_to_rowcol(monkeypatch):
 @pytest.fixture
 def mock_rebase_timeseries(monkeypatch):
     """Mocks rebase_timeseries to just return the input."""
-    mock_rebase = MagicMock(side_effect=lambda data, dates: data)
+    mock_rebase = MagicMock(side_effect=lambda data, dates: data)  # noqa: ARG005
     monkeypatch.setattr("opera_utils.disp._reader.rebase_timeseries", mock_rebase)
     return mock_rebase
 
@@ -177,7 +175,7 @@ def mock_pool(monkeypatch):
     # Patch mp.get_context("spawn").Pool
     mock_context = MagicMock()
     mock_context.Pool.side_effect = MockPool
-    monkeypatch.setattr(mp, "get_context", lambda s: mock_context)
+    monkeypatch.setattr(mp, "get_context", lambda s: mock_context)  # noqa: ARG005
 
     # Return the dictionary to allow tests to inspect results
     return mock_imap_results
@@ -233,8 +231,6 @@ class TestReadLonLat:
         data = read_lonlat(mock_product, lon_slice, lat_slice, dset="velocity")
         expected_data = MOCK_HDF5_DATA_1[0 : MOCK_DATA_SHAPE[0], 0 : MOCK_DATA_SHAPE[1]]
         np.testing.assert_array_equal(data, expected_data)
-        # How to check the dset name used? The mock_open_h5 needs refinement
-        # to capture the dset name requested. For now, just check data.
 
 
 def test_get_border():
@@ -256,19 +252,18 @@ class TestReadStackLonLat:
 
     ref_lon = -121.85
     ref_lat = 36.85
-    expected_ref_slice = (slice(3, 4), slice(4, 5))  # Based on mock_lonlat_to_rowcol
+    # Based on mock_lonlat_to_rowcol
+    expected_ref_slice = (slice(3, 4), slice(4, 5))
 
     @pytest.fixture(autouse=True)
     def setup_mock_data(self, mock_open_h5):
         """Ensure mock_open_h5 uses consistent data for the stack."""
         # Pre-populate the mock data store used by mock_open_h5
-        mock_open_h5._mock_hf_dict = (
-            {  # Access internal state for setup (use with caution)
-                FILE_1: MOCK_HDF5_DATA_1,
-                FILE_2: MOCK_HDF5_DATA_2,
-                FILE_3: MOCK_HDF5_DATA_3,
-            }
-        )
+        mock_open_h5._mock_hf_dict = {
+            FILE_1: MOCK_HDF5_DATA_1,
+            FILE_2: MOCK_HDF5_DATA_2,
+            FILE_3: MOCK_HDF5_DATA_3,
+        }
 
     def test_read_stack_none_reference(self, mock_stack, mock_rebase_timeseries):
         """Test reading stack with no referencing."""
@@ -296,7 +291,7 @@ class TestReadStackLonLat:
         assert "_Netcdf4Coordinates" not in attrs
         assert "_FillValue" not in attrs
 
-    def test_read_stack_point_reference(self, mock_stack, mock_pool):
+    def test_read_stack_point_reference(self, mock_stack):
         """Test reading stack with point referencing."""
         data, attrs = read_stack_lonlat(
             mock_stack,

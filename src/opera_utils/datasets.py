@@ -3,9 +3,9 @@ from __future__ import annotations
 import pooch
 
 __all__ = [
-    "fetch_frame_geometries_simple",
     "fetch_burst_id_geometries_simple",
     "fetch_burst_to_frame_mapping_file",
+    "fetch_frame_geometries_simple",
     "fetch_frame_to_burst_mapping_file",
 ]
 

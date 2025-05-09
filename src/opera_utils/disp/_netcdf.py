@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import h5netcdf
 import numpy as np
@@ -31,7 +31,7 @@ def save_data(
     dataset_name: str,
     rows: slice | None = None,
     cols: slice | None = None,
-    attrs: Optional[dict[str, Any]] = None,
+    attrs: dict[str, Any] | None = None,
 ) -> None:
     """Save displacement data to a NetCDF file.
 
@@ -51,6 +51,7 @@ def save_data(
         The subset of columns of the full product frame used to make `data`.
     attrs : Optional[dict[str, Any]], optional
         Attributes to save with the dataset.
+
     """
     if attrs:
         long_name = attrs.get("long_name", dataset_name)
@@ -85,11 +86,12 @@ def _create_geo_dataset(
     long_name: str,
     description: str,
     fillvalue: float,
-    attrs: Optional[dict[str, Any]],
+    attrs: dict[str, Any] | None,
     grid_mapping_dset_name=GRID_MAPPING_DSET,
 ) -> h5netcdf.Variable:
     if data.ndim != 3:
-        raise ValueError("Data must be 3D")
+        msg = "Data must be 3D"
+        raise ValueError(msg)
     dimensions = ["time", "y", "x"]
     if attrs is None:
         attrs = {}

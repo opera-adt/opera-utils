@@ -48,6 +48,7 @@ def read_lonlat(
     -------
     np.ndarray
         Data within the specified longitude/latitude box
+
     """
     rows, cols = _get_rows_cols(lon_slice, lat_slice, product)
 
@@ -99,6 +100,7 @@ def read_stack_lonlat(
         3D array with dimensions (time, lat, lon) containing the requested data
     attrs : dict[str, str|float]
         Attributes for the dataset
+
     """
     if ref_lon is not None and ref_lat is not None:
         reference_method = ReferenceMethod.point
@@ -106,11 +108,11 @@ def read_stack_lonlat(
     if reference_method == ReferenceMethod.point and (
         ref_lon is None or ref_lat is None
     ):
-        raise ValueError(
-            "ref_lon and ref_lat must be provided when using point referencing"
-        )
+        msg = "ref_lon and ref_lat must be provided when using point referencing"
+        raise ValueError(msg)
     elif reference_method not in set(ReferenceMethod):
-        raise ValueError(f"Unknown reference_method: {reference_method}")
+        msg = f"Unknown reference_method: {reference_method}"
+        raise ValueError(msg)
 
     # Create a partial function with fixed parameters
     read_func = partial(read_lonlat, lon_slice=lons, lat_slice=lats, dset=dset)
@@ -177,7 +179,8 @@ def read_stack_lonlat(
     elif reference_method == ReferenceMethod.border:
         ref_values = _get_border(rebased_stack)
     else:
-        raise ValueError(f"Unknown {reference_method = }")
+        msg = f"Unknown {reference_method = }"
+        raise ValueError(msg)
 
     referenced_data = rebased_stack - ref_values
     return referenced_data, attrs
@@ -202,12 +205,14 @@ def _get_rows_cols(
 
     # Handle edge cases - ensure we have at least a 1x1 window
     if col_stop < col_start:
-        raise ValueError(f"Invalid column range: {col_start}, {col_stop}")
+        msg = f"Invalid column range: {col_start}, {col_stop}"
+        raise ValueError(msg)
     elif col_stop == col_start:
         col_stop += 1
 
     if row_stop < row_start:
-        raise ValueError(f"Invalid row range: {row_start}, {row_stop}")
+        msg = f"Invalid row range: {row_start}, {row_stop}"
+        raise ValueError(msg)
     elif row_stop == row_start:
         row_stop += 1
     return slice(row_start, row_stop), slice(col_start, col_stop)
