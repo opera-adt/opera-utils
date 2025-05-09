@@ -6,6 +6,10 @@ This project adheres to [Semantic Versioning](https://semver.org/) and follows t
 
 ## [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.19.0...HEAD)
 
+### Changed
+
+- Use `tyro` for CLI instead of `click`
+
 ## [0.19.0](https://github.com/opera-adt/opera-utils/compare/v0.18.1...v0.19.0) - 2025-04-11
 
 ### Added

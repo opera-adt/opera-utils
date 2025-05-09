@@ -313,21 +313,6 @@ def generate_burst_subset_options(
     )
 
 
-def print_plain(options: Iterable[BurstSubsetOption]) -> None:
-    """Print a summary of the burst options using plain text."""
-    header = f"|{'Option':<6}| {'# Dates':<10}| {'# Burst IDs':<14}|"
-    header += f" {'Selected Bursts':<15}| {'Excluded Bursts':<15}| "
-    print(header)
-    print("-" * len(header))
-
-    for idx, option in enumerate(options, start=1):
-        excluded = option.num_candidate_bursts - option.total_num_bursts
-        row = f"|{idx:<6}| {option.num_dates:<10}| {option.num_burst_ids:<14}|"
-        row += f" {option.total_num_bursts:<15}| {excluded:<15}|"
-        print(row)
-    print()
-
-
 def print_with_rich(options: Iterable[BurstSubsetOption]) -> None:
     """Print a summary of the burst options using `rich.Table`."""
     from rich.console import Console
