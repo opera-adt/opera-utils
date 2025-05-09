@@ -137,7 +137,7 @@ def sort_by_burst_id(file_list, burst_id_fmt):
     file_burst_tuples = sorted(
         [(f, get_burst_id(f, burst_id_fmt)) for f in file_list],
         # use the date or dates as the key
-        key=lambda f_b_tuple: f_b_tuple[1],  # type: ignore
+        key=lambda f_b_tuple: f_b_tuple[1],
     )
     # Unpack the sorted pairs with new sorted values
     out_file_list = [f for f, _ in file_burst_tuples]

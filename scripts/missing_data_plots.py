@@ -95,7 +95,7 @@ def _plot_incidence_per_date(
     colors: Sequence[str] = ["#a2cffe", "#fdae61"],
     cbar_labels: Sequence[str] = ["False", "True"],
 ):
-    """Make a scatterplot with fixed datetime xaxis and variable spacing between items."""
+    """Make a scatterplot with fixed datetime xaxis and variable y spacing."""
     # Define a color map with two colors: one for True, one for False
     date_nums = mdates.date2num(dates)
 
