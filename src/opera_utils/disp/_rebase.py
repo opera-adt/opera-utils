@@ -24,8 +24,8 @@ def rebase_timeseries(
 ) -> np.ndarray:
     """Adjust for moving reference dates to create a continuous time series.
 
-    DISP-S1 products have a reference date which changes over time. For example,
-    shortening to YYYY-MM-DD notation, the products may have (reference, secondary) dates
+    DISP-S1 products have a reference date which changes over time.
+    For example, shortening to YYYY-MM-DD notation, the products may be
 
         (2020-01-01, 2020-01-13)
         (2020-01-01, 2020-01-25)
@@ -35,8 +35,9 @@ def rebase_timeseries(
         ...
 
 
-    This function sums up the "crossover" values (the displacement values where the
-    reference date moves forward) so that the output is referenced to the first input time.
+    This function sums up the "crossover" values (the displacement image where the
+    reference date moves forward) so that the output is referenced to the first input
+    time.
 
     Parameters
     ----------
@@ -56,6 +57,7 @@ def rebase_timeseries(
     -------
     np.ndarray
         Continuous displacement time series with consistent reference date
+
     """
     if len(set(reference_dates)) == 1:
         return raw_data.copy()

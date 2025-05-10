@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-from typing import Union
 
 import h5py
 import numpy as np
@@ -21,7 +20,7 @@ def _add_complex_type(h5_root_group):
 def create_test_nc(
     outfile,
     epsg=32615,
-    subdir: Union[str, list[str]] = "/",
+    subdir: str | list[str] = "/",
     data=None,
     data_ds_name="data",
     shape=(21, 15),
@@ -102,7 +101,6 @@ def create_test_nc(
 
 def get_cli_args():
     """Command line parser."""
-
     parser = argparse.ArgumentParser(description="CF tester")
     parser.add_argument(
         "-o",

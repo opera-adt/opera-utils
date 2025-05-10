@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import groupby
-from typing import Any, Iterable, Mapping, Optional, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -16,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "BurstSubsetOption",
+    "get_burst_id_date_incidence",
     "get_burst_id_to_dates",
     "get_missing_data_options",
-    "get_burst_id_date_incidence",
 ]
 
 
@@ -48,8 +49,8 @@ class BurstSubsetOption:
 
 
 def get_missing_data_options(
-    slc_files: Optional[Iterable[str]] = None,
-    burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
+    slc_files: Iterable[str] | None = None,
+    burst_id_date_tuples: Iterable[tuple[str, datetime]] | None = None,
 ) -> list[BurstSubsetOption]:
     """Get a list of possible data subsets for a set of burst SLCs.
 
@@ -75,6 +76,7 @@ def get_missing_data_options(
         List of possible subsets of the given SLC data.
         The options will be sorted by the total number of bursts used, so
         that the first option is the one that uses the most data.
+
     """
     burst_id_to_dates = get_burst_id_to_dates(
         slc_files=slc_files, burst_id_date_tuples=burst_id_date_tuples
@@ -106,8 +108,8 @@ def get_missing_data_options(
 
 
 def get_burst_id_to_dates(
-    slc_files: Optional[Iterable[str]] = None,
-    burst_id_date_tuples: Optional[Iterable[tuple[str, datetime]]] = None,
+    slc_files: Iterable[str] | None = None,
+    burst_id_date_tuples: Iterable[tuple[str, datetime]] | None = None,
 ) -> dict[str, list[datetime]]:
     """Get a mapping of burst ID to list of dates.
 
@@ -127,13 +129,15 @@ def get_burst_id_to_dates(
     -------
     dict[str, list[datetime]]
         Mapping of burst ID to list of dates.
+
     """
     if slc_files is not None:
         return _burst_id_mapping_from_files(slc_files)
     elif burst_id_date_tuples is not None:
         return _burst_id_mapping_from_tuples(burst_id_date_tuples)
     else:
-        raise ValueError("Must provide either slc_files or burst_id_date_tuples")
+        msg = "Must provide either slc_files or burst_id_date_tuples"
+        raise ValueError(msg)
 
 
 def _duplicated_bursts(burst_id_to_dates: Mapping[str, Sequence[datetime]]):
@@ -162,6 +166,7 @@ def get_burst_id_date_incidence(
         Matrix of burst ID vs. datetime incidence.
         Rows correspond to burst IDs, columns correspond to dates.
         A value of True indicates that the burst ID was acquired on that datetime.
+
     """
     all_dates = sorted_deduped_values(burst_id_to_dates)
 
@@ -210,7 +215,9 @@ def _burst_id_mapping_from_files(
 
 
 def generate_burst_subset_options(
-    B: np.ndarray, burst_ids: Sequence[str], dates: Sequence[datetime]
+    B: np.ndarray,  # noqa: N803
+    burst_ids: Sequence[str],
+    dates: Sequence[datetime],
 ) -> list[BurstSubsetOption]:
     """Generate possible valid subsets of the given SLC data.
 
@@ -231,6 +238,7 @@ def generate_burst_subset_options(
         List of possible subsets of the given SLC data.
         The options will be sorted by the total number of bursts used, so
         that the first option is the one that uses the most data.
+
     """
     options = []
     num_candidate_bursts = B.sum()
@@ -311,21 +319,6 @@ def generate_burst_subset_options(
     return sorted(
         options, key=lambda x: (x.total_num_bursts, x.num_burst_ids), reverse=True
     )
-
-
-def print_plain(options: Iterable[BurstSubsetOption]) -> None:
-    """Print a summary of the burst options using plain text."""
-    header = f"|{'Option':<6}| {'# Dates':<10}| {'# Burst IDs':<14}|"
-    header += f" {'Selected Bursts':<15}| {'Excluded Bursts':<15}| "
-    print(header)
-    print("-" * len(header))
-
-    for idx, option in enumerate(options, start=1):
-        excluded = option.num_candidate_bursts - option.total_num_bursts
-        row = f"|{idx:<6}| {option.num_dates:<10}| {option.num_burst_ids:<14}|"
-        row += f" {option.total_num_bursts:<15}| {excluded:<15}|"
-        print(row)
-    print()
 
 
 def print_with_rich(options: Iterable[BurstSubsetOption]) -> None:

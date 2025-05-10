@@ -15,6 +15,7 @@ Examples
         --dset short_wavelength_displacement \
         --max-workers 20 \
         --end-datetime 2018-01-01
+
 """
 
 from datetime import datetime
@@ -79,9 +80,11 @@ def read_disp(
     -------
     np.ndarray
         3D array of displacement values [time, height, width]
+
     """
     if bbox is None and wkt is None:
-        raise ValueError("Must provide either lon, lat, or bbox")
+        msg = "Must provide either lon, lat, or bbox"
+        raise ValueError(msg)
     if ref_lon is not None and ref_lat is not None:
         reference_method = ReferenceMethod.point
 

@@ -24,7 +24,7 @@ repos:
         args: [--preview, --enable-unstable-feature, string_processing]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.7
+    rev: v0.11.8
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -36,11 +36,3 @@ repos:
       - id: mypy
         additional_dependencies:
         - types-requests
-
-  - repo: https://github.com/PyCQA/pydocstyle
-    rev: "6.3.0"
-    hooks:
-      - id: pydocstyle
-        # https://github.com/PyCQA/pydocstyle/pull/608#issuecomment-1381168417
-        additional_dependencies: ['.[toml]']
-        exclude: tests

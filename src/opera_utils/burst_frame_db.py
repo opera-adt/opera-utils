@@ -3,9 +3,12 @@ from __future__ import annotations
 import importlib.util
 import json
 import zipfile
+from collections.abc import Sequence
 from enum import Enum
+from functools import cache
+from os import fsdecode
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional, Sequence, Union, overload
+from typing import TYPE_CHECKING, Literal, Union, overload
 
 from . import datasets
 from ._types import Bbox, PathOrStr
@@ -33,7 +36,8 @@ class OrbitPass(str, Enum):
         return str(self.value)
 
 
-def read_zipped_json(filename: PathOrStr) -> dict:
+@cache
+def read_zipped_json(filename: Path | str) -> dict:
     """Read a zipped JSON file and returns its contents as a dictionary.
 
     Parameters
@@ -45,18 +49,19 @@ def read_zipped_json(filename: PathOrStr) -> dict:
     -------
     dict
         The contents of the zipped JSON file as a dictionary.
+
     """
     if Path(filename).suffix == ".zip":
         with zipfile.ZipFile(filename) as zf:
-            bytes = zf.read(str(Path(filename).name).replace(".zip", ""))
-            return json.loads(bytes.decode())
+            b = zf.read(str(Path(filename).name).replace(".zip", ""))
+            return json.loads(b.decode())
     else:
         with open(filename) as f:
             return json.load(f)
 
 
 def get_frame_to_burst_mapping(
-    frame_id: int, json_file: Optional[PathOrStr] = None
+    frame_id: int, json_file: PathOrStr | None = None
 ) -> dict:
     """Get the frame data for one frame ID.
 
@@ -67,35 +72,39 @@ def get_frame_to_burst_mapping(
     json_file : PathOrStr, optional
         The path to the JSON file containing the frame-to-burst mapping.
         If `None`, uses the zip file contained in `data/`
+
     Returns
     -------
     dict
         The frame data for the given frame ID.
+
     """
     if json_file is None:
         json_file = datasets.fetch_frame_to_burst_mapping_file()
-    js = read_zipped_json(json_file)
+    js = read_zipped_json(fsdecode(json_file))
     return js["data"][str(frame_id)]
 
 
 @overload
 def get_frame_geojson(
-    frame_ids: Optional[Sequence[int | str]] = None,
+    frame_ids: Sequence[int | str] | None = None,
     as_geodataframe: Literal[True] = True,
-) -> "geopandas.GeoDataFrame": ...
+    json_file: PathOrStr | None = None,
+) -> geopandas.GeoDataFrame: ...
 
 
 @overload
 def get_frame_geojson(
-    frame_ids: Optional[Sequence[int | str]] = None,
+    frame_ids: Sequence[int | str] | None = None,
     as_geodataframe: Literal[False] = False,
+    json_file: PathOrStr | None = None,
 ) -> dict: ...
 
 
 def get_frame_geojson(
-    frame_ids: Optional[Sequence[int | str]] = None,
+    frame_ids: Sequence[int | str] | None = None,
     as_geodataframe: bool = False,
-    json_file: Optional[PathOrStr] = None,
+    json_file: PathOrStr | None = None,
 ) -> GeojsonOrGdf:
     """Get the GeoJSON or GeoDataFrame for the frame geometries.
 
@@ -113,6 +122,7 @@ def get_frame_geojson(
     -------
     dict or geopandas.GeoDataFrame
         Frame geometries as GeoJSON or GeoDataFrame.
+
     """
     if as_geodataframe:
         return get_frame_geodataframe(frame_ids, json_file=json_file)
@@ -132,20 +142,20 @@ def get_frame_geojson(
 
 @overload
 def get_burst_id_geojson(
-    burst_ids: Optional[Sequence[str]] = None,
+    burst_ids: Sequence[str] | None = None,
     as_geodataframe: Literal[True] = True,
-) -> "geopandas.GeoDataFrame": ...
+) -> geopandas.GeoDataFrame: ...
 
 
 @overload
 def get_burst_id_geojson(
-    burst_ids: Optional[Sequence[str]] = None,
+    burst_ids: Sequence[str] | None = None,
     as_geodataframe: Literal[False] = False,
 ) -> dict: ...
 
 
 def get_burst_id_geojson(
-    burst_ids: Optional[Sequence[str]] = None,
+    burst_ids: Sequence[str] | None = None,
     as_geodataframe: bool = False,
 ) -> GeojsonOrGdf:
     """Get the GeoJSON or GeoDataFrame for the burst_id geometries.
@@ -161,6 +171,7 @@ def get_burst_id_geojson(
     -------
     dict or geopandas.GeoDataFrame
         Burst geometries as GeoJSON or GeoDataFrame.
+
     """
     if as_geodataframe:
         return get_burst_geodataframe(burst_ids)
@@ -183,9 +194,9 @@ def get_burst_id_geojson(
 
 
 def get_frame_geodataframe(
-    frame_ids: Optional[Sequence[int | str]] = None,
-    json_file: Optional[PathOrStr] = None,
-) -> "geopandas.GeoDataFrame":
+    frame_ids: Sequence[int | str] | None = None,
+    json_file: PathOrStr | None = None,
+) -> geopandas.GeoDataFrame:
     """Get frame geometries as a GeoDataFrame.
 
     Parameters
@@ -200,13 +211,13 @@ def get_frame_geodataframe(
     -------
     geopandas.GeoDataFrame
         Frame geometries as a GeoDataFrame.
+
     """
     try:
         from pyogrio import read_dataframe
     except ImportError as e:
-        raise ImportError(
-            "geopandas and pyogrio are required for GeoDataFrame support"
-        ) from e
+        msg = "geopandas and pyogrio are required for GeoDataFrame support"
+        raise ImportError(msg) from e
 
     if json_file is None:
         json_file = datasets.fetch_frame_geometries_simple()
@@ -217,9 +228,9 @@ def get_frame_geodataframe(
 
 
 def get_burst_geodataframe(
-    burst_ids: Optional[Sequence[str]] = None,
-    json_file: Optional[PathOrStr] = None,
-) -> "geopandas.GeoDataFrame":
+    burst_ids: Sequence[str] | None = None,
+    json_file: PathOrStr | None = None,
+) -> geopandas.GeoDataFrame:
     """Get burst geometries as a GeoDataFrame.
 
     Parameters
@@ -234,13 +245,13 @@ def get_burst_geodataframe(
     -------
     geopandas.GeoDataFrame
         Burst geometries as a GeoDataFrame.
+
     """
     try:
         from pyogrio import read_dataframe
     except ImportError as e:
-        raise ImportError(
-            "geopandas and pyogrio are required for GeoDataFrame support"
-        ) from e
+        msg = "geopandas and pyogrio are required for GeoDataFrame support"
+        raise ImportError(msg) from e
 
     if json_file is None:
         json_file = datasets.fetch_burst_id_geometries_simple()
@@ -257,7 +268,7 @@ def get_burst_geodataframe(
 
 
 def get_frame_bbox(
-    frame_id: int, json_file: Optional[PathOrStr] = None
+    frame_id: int, json_file: PathOrStr | None = None
 ) -> tuple[int, Bbox]:
     """Get the bounding box of a frame from a JSON file.
 
@@ -275,6 +286,7 @@ def get_frame_bbox(
         EPSG code for the bounds coordinates
     tuple[float, float, float, float]
         bounding box coordinates (xmin, ymin, xmax, ymax)
+
     """
     frame_dict = get_frame_to_burst_mapping(frame_id=frame_id, json_file=json_file)
     epsg = int(frame_dict["epsg"])
@@ -288,7 +300,7 @@ def get_frame_bbox(
 
 
 def get_burst_ids_for_frame(
-    frame_id: int, json_file: Optional[PathOrStr] = None
+    frame_id: int, json_file: PathOrStr | None = None
 ) -> list[str]:
     """Get the burst IDs for one frame ID.
 
@@ -304,13 +316,14 @@ def get_burst_ids_for_frame(
     -------
     list[str]
         The burst IDs for the given frame ID.
+
     """
     frame_data = get_frame_to_burst_mapping(frame_id, json_file)
     return frame_data["burst_ids"]
 
 
 def get_burst_to_frame_mapping(
-    burst_id: str, json_file: Optional[PathOrStr] = None
+    burst_id: str, json_file: PathOrStr | None = None
 ) -> dict:
     """Get the burst data for one burst ID.
 
@@ -326,15 +339,16 @@ def get_burst_to_frame_mapping(
     -------
     dict
         The burst data for the given burst ID.
+
     """
     if json_file is None:
         json_file = datasets.fetch_burst_to_frame_mapping_file()
-    js = read_zipped_json(json_file)
+    js = read_zipped_json(fsdecode(json_file))
     return js["data"][normalize_burst_id(burst_id)]
 
 
 def get_frame_ids_for_burst(
-    burst_id: str, json_file: Optional[PathOrStr] = None
+    burst_id: str, json_file: PathOrStr | None = None
 ) -> list[int]:
     """Get the frame IDs for one burst ID.
 
@@ -352,6 +366,7 @@ def get_frame_ids_for_burst(
         The frame IDs for the given burst ID.
         Most burst IDs have 1, but burst IDs in the overlap are in
         2 frames.
+
     """
     burst_data = get_burst_to_frame_mapping(burst_id, json_file)
     return burst_data["frame_ids"]
@@ -375,7 +390,8 @@ def get_intersecting_frames(bounds: Bbox) -> dict:
         import geopandas  # noqa: F401
         from shapely.geometry import box
     except ImportError as e:
-        raise ImportError("geopandas and shapely are required for this function") from e
+        msg = "geopandas and shapely are required for this function"
+        raise ImportError(msg) from e
 
     gdf = get_frame_geodataframe()
     frames = gdf[gdf.geometry.intersects(box(*bounds))]
@@ -384,7 +400,7 @@ def get_intersecting_frames(bounds: Bbox) -> dict:
 
 
 def get_frame_orbit_pass(
-    frame_ids: int | Sequence[int], json_file: Optional[PathOrStr] = None
+    frame_ids: int | Sequence[int], json_file: PathOrStr | None = None
 ) -> list[OrbitPass]:
     """Return the orbit pass direction for `frame_id`.
 
@@ -403,9 +419,13 @@ def get_frame_orbit_pass(
     -------
     OrbitPass
         The orbit direction for the requested frame_id.
+
     """
     frame_list = [frame_ids] if isinstance(frame_ids, int) else frame_ids
-    features = get_frame_geojson(frame_list, as_geodataframe=False)["features"]
+    features = get_frame_geojson(
+        frame_list, as_geodataframe=False, json_file=json_file
+    )["features"]
     if not features:
-        raise ValueError("No Frame {frame_id} found")
+        msg = "No Frame {frame_id} found"
+        raise ValueError(msg)
     return [OrbitPass(f["properties"]["orbit_pass"]) for f in features]

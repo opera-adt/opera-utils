@@ -25,6 +25,7 @@ def get_frame_coordinates(frame_id: int) -> tuple[np.ndarray, np.ndarray]:
     -------
     tuple[np.ndarray, np.ndarray]
         (x, y) arrays of UTM coordinates (in meters).
+
     """
     from opera_utils.burst_frame_db import get_frame_bbox
 
@@ -49,7 +50,7 @@ def _last_per_ministack(
         return get_dates(fname, fmt=DATETIME_FORMAT)[2]
 
     last_per_ministack = []
-    for d, cur_groupby in itertools.groupby(
+    for _d, cur_groupby in itertools.groupby(
         sorted(opera_file_list), key=_get_generation_time
     ):
         # cur_groupby is an iterable of all matching
@@ -90,8 +91,9 @@ def round_mantissa(z: np.ndarray, keep_bits=10) -> None:
         round_mantissa(z.imag, keep_bits)
         return
 
-    if not z.dtype.kind == "f" or z.dtype.itemsize > 8:
-        raise TypeError("Only float arrays (16-64bit) can be bit-rounded")
+    if z.dtype.kind != "f" or z.dtype.itemsize > 8:
+        msg = "Only float arrays (16-64bit) can be bit-rounded"
+        raise TypeError(msg)
 
     bits = max_bits[str(z.dtype)]
     # cast float to int type of same width (preserve endianness)
@@ -100,7 +102,8 @@ def round_mantissa(z: np.ndarray, keep_bits=10) -> None:
     if keep_bits == bits:
         return z
     if keep_bits > bits:
-        raise ValueError("keep_bits too large for given dtype")
+        msg = "keep_bits too large for given dtype"
+        raise ValueError(msg)
     b = z.view(a_int_dtype)
     maskbits = bits - keep_bits
     mask = (all_set >> maskbits) << maskbits

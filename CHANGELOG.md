@@ -6,20 +6,40 @@ This project adheres to [Semantic Versioning](https://semver.org/) and follows t
 
 ## [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.19.0...HEAD)
 
+## [0.20.0](https://github.com/opera-adt/opera-utils/compare/v0.19.0...v0.20.0)
+
+### Added
+
+- Add DISP-S1 product handling by @scottstanie in https://github.com/opera-adt/opera-utils/pull/106
+- Add `plot-disp-s1-frame.py` and `plot-intersecting-frames.py` scripts for visualization DISP-S1 Frames by @scottstanie in https://github.com/opera-adt/opera-utils/pull/110
+- Add `credentials` and `disp._remote` module with `open_h5` for https/s3 access by @scottstanie in https://github.com/opera-adt/opera-utils/pull/108
+
+### Changed
+- Make `disp-s1` and `disp-nisar` sub-commands, add `intersects` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/104
+- Use `tyro` for CLI instead of `click`
+- Make one single conda environment, let users `pip` install for smaller dependency footprint
+
+### Fixed
+
+- Add missing tests for `burst_frame_db` and `stitching` modules by @scottstanie in https://github.com/opera-adt/opera-utils/pull/105
+- Restrict `str` usage for `ASFCredentialEndpoints` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/109
+- Use `Enum` for `UrlType` instead of `Literal["s3", "https"]` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/111
+
+
 ## [0.19.0](https://github.com/opera-adt/opera-utils/compare/v0.18.1...v0.19.0) - 2025-04-11
 
 ### Added
-* Add DISP-S1 product handling: search with `opera_utils.disp.search`, read and parse files with `opera_utils.disp.DispProduct` and `DispProductStack`
-* Add `credentials` and `disp._remote` module with `open_h5` for https/s3 access
-* Add `plot-disp-s1-frame.py` and `plot-intersecting-frames.py` scripts for visualization DISP-S1 Frames
+- Add DISP-S1 product handling: search with `opera_utils.disp.search`, read and parse files with `opera_utils.disp.DispProduct` and `DispProductStack`
+- Add `credentials` and `disp._remote` module with `open_h5` for https/s3 access
+- Add `plot-disp-s1-frame.py` and `plot-intersecting-frames.py` scripts for visualization DISP-S1 Frames
 
 ### Changed
-* Make `disp-s1` and `disp-nisar` sub-commands, add `intersects`
+- Make `disp-s1` and `disp-nisar` sub-commands, add `intersects`
 
 ### Fixed
-* Add missing tests for `stitching` and `burst_frame_db` modules
-* Use `Enum` for `UrlType` instead of `Literal["s3", "https"]` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/111
-* Restrict `str` usage for `ASFCredentialEndpoints`
+- Add missing tests for `stitching` and `burst_frame_db` modules
+- Use `Enum` for `UrlType` instead of `Literal["s3", "https"]` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/111
+- Restrict `str` usage for `ASFCredentialEndpoints`
 
 
 ## [0.18.1](https://github.com/opera-adt/opera-utils/compare/v0.18.0...v0.18.1) - 2025-03-25

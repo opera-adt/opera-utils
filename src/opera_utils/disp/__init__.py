@@ -18,10 +18,10 @@ except ImportError:
 __all__ = [
     "DispProduct",
     "DispProductStack",
-    "open_h5",
     "open_file",
+    "open_h5",
     "reader",
     "rebase_timeseries",
-    "search",
     "save_data",
+    "search",
 ]

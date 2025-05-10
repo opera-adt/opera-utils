@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import h5netcdf
 import numpy as np
@@ -31,7 +31,7 @@ def save_data(
     dataset_name: str,
     rows: slice | None = None,
     cols: slice | None = None,
-    attrs: Optional[dict[str, Any]] = None,
+    attrs: dict[str, Any] | None = None,
 ) -> None:
     """Save displacement data to a NetCDF file.
 
@@ -51,6 +51,7 @@ def save_data(
         The subset of columns of the full product frame used to make `data`.
     attrs : Optional[dict[str, Any]], optional
         Attributes to save with the dataset.
+
     """
     if attrs:
         long_name = attrs.get("long_name", dataset_name)
@@ -63,7 +64,9 @@ def save_data(
         full_y, full_x = product_stack.y, product_stack.x
         y = full_y[rows] if rows is not None else full_y
         x = full_x[cols] if cols is not None else full_x
-        _create_dimension_variables(group=f, product=product_stack, y=y, x=x)
+        _create_dimension_variables(
+            group=f, datetimes=product_stack.secondary_dates, y=y, x=x
+        )
         _create_geo_dataset(
             group=f,
             name=dataset_name,
@@ -83,11 +86,12 @@ def _create_geo_dataset(
     long_name: str,
     description: str,
     fillvalue: float,
-    attrs: Optional[dict[str, Any]],
+    attrs: dict[str, Any] | None,
     grid_mapping_dset_name=GRID_MAPPING_DSET,
 ) -> h5netcdf.Variable:
     if data.ndim != 3:
-        raise ValueError("Data must be 3D")
+        msg = "Data must be 3D"
+        raise ValueError(msg)
     dimensions = ["time", "y", "x"]
     if attrs is None:
         attrs = {}
@@ -113,12 +117,12 @@ def _create_geo_dataset(
 
 
 def _create_dimension_variables(
-    group: h5netcdf.Group, product: DispProductStack, y: np.ndarray, x: np.ndarray
+    group: h5netcdf.Group, datetimes: Sequence[datetime], y: np.ndarray, x: np.ndarray
 ) -> tuple[h5netcdf.Variable, h5netcdf.Variable, h5netcdf.Variable]:
     """Create the y, x, and coordinate datasets."""
     ny = len(y)
     nx = len(x)
-    nt = product.shape[0]
+    nt = len(datetimes)
 
     if not group.dimensions:
         dims = {"y": ny, "x": nx, "time": nt}
@@ -134,7 +138,7 @@ def _create_dimension_variables(
         ds.attrs["units"] = "m"
 
     # Create the time coordinate dataset."""
-    times, calendar, units = _create_time_array(product.secondary_dates)
+    times, calendar, units = _create_time_array(datetimes)
     t_ds = group.create_variable("time", ("time",), data=times, dtype=float)
     t_ds.attrs["standard_name"] = "time"
     t_ds.attrs["long_name"] = "time"

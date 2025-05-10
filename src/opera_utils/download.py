@@ -5,10 +5,11 @@ import logging
 import netrc
 import urllib.parse
 import warnings
+from collections.abc import Sequence
 from enum import Enum
 from itertools import groupby
 from pathlib import Path
-from typing import Literal, Sequence, Union
+from typing import Literal, Union
 
 from packaging.version import parse
 from shapely.geometry import box
@@ -17,22 +18,24 @@ try:
     import asf_search as asf
     from asf_search.ASFSearchResults import ASFSearchResults
 except ImportError:
-    warnings.warn("Can't import `asf_search`. Unable to search/download data. ")
+    warnings.warn(
+        "Can't import `asf_search`. Unable to search/download data. ", stacklevel=2
+    )
 
 from ._types import PathOrStr
 from .bursts import normalize_burst_id
 from .missing_data import BurstSubsetOption, get_missing_data_options
 
 __all__ = [
-    "download_cslcs",
-    "search_cslcs",
-    "download_cslc_static_layers",
-    "search_cslc_static_layers",
-    "download_rtcs",
-    "download_rtc_static_layers",
-    "get_urls",
     "L2Product",
     "RTCStaticLayers",
+    "download_cslc_static_layers",
+    "download_cslcs",
+    "download_rtc_static_layers",
+    "download_rtcs",
+    "get_urls",
+    "search_cslc_static_layers",
+    "search_cslcs",
 ]
 
 logger = logging.getLogger("opera_utils")
@@ -87,6 +90,7 @@ def download_rtc_static_layers(
     -------
     list[Path]
         Locations to saved raster files.
+
     """
     selected_layers = [RTCStaticLayers(layer) for layer in layers]
 
@@ -125,9 +129,8 @@ def download_rtc_static_layers(
                 out_paths.append(out_path)
 
     if not out_paths:
-        raise ValueError(
-            f"No urls found for {normalized_burst_ids} and {selected_layers}"
-        )
+        msg = f"No urls found for {normalized_burst_ids} and {selected_layers}"
+        raise ValueError(msg)
 
     Path(output_dir).mkdir(exist_ok=True, parents=True)
     asf.download_urls(
@@ -156,6 +159,7 @@ def download_cslc_static_layers(
     -------
     list[Path]
         Locations to saved raster files.
+
     """
     return _download_for_burst_ids(
         burst_ids=burst_ids,
@@ -181,9 +185,11 @@ def search_l2(
     Parameters
     ----------
     start : datetime.datetime | str, optional
-        Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+        Start date of data acquisition.
+        Supports timestamps as well as natural language such as "3 weeks ago"
     end : datetime.datetime | str, optional
-        end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+        end: End date of data acquisition.
+        Supports timestamps as well as natural language such as "3 weeks ago"
     bounds : Sequence[float], optional
         Bounding box coordinates (min lon, min lat, max lon, max lat)
     aoi_polygon : str, optional
@@ -206,12 +212,14 @@ def search_l2(
         Search results from ASF.
     If `check_missing_data` is True, also returns list[BurstSubsetOption],
         indicating possible spatially-consistent subsets of CSLC bursts.
+
     """
     logger.info("Searching for OPERA CSLC products")
     # If they passed a bounding box, need a WKT polygon
     if bounds is not None:
         if aoi_polygon is not None:
-            raise ValueError("Can't pass both `bounds` and `aoi_polygon`")
+            msg = "Can't pass both `bounds` and `aoi_polygon`"
+            raise ValueError(msg)
         aoi = box(*bounds).wkt
     else:
         aoi = aoi_polygon
@@ -260,9 +268,11 @@ def download_cslcs(
     output_dir : Path | str
         Location to save output rasters to
     start: datetime.datetime | str, optional
-        Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+        Start date of data acquisition.
+        Supports timestamps as well as natural language such as "3 weeks ago"
     end: datetime.datetime | str, optional
-        end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+        end: End date of data acquisition.
+        Supports timestamps as well as natural language such as "3 weeks ago"
     max_jobs : int, optional
         Number of parallel downloads to run, by default 3
 
@@ -270,6 +280,7 @@ def download_cslcs(
     -------
     list[Path]
         Locations to saved raster files.
+
     """
     return _download_for_burst_ids(
         burst_ids=burst_ids,
@@ -297,9 +308,11 @@ def download_rtcs(
     output_dir : Path | str
         Location to save output rasters to
     start: datetime.datetime | str, optional
-        Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+        Start date of data acquisition.
+        Supports timestamps as well as natural language such as "3 weeks ago"
     end: datetime.datetime | str, optional
-        end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+        end: End date of data acquisition.
+        Supports timestamps as well as natural language such as "3 weeks ago"
     max_jobs : int, optional
         Number of parallel downloads to run, by default 3
 
@@ -307,6 +320,7 @@ def download_rtcs(
     -------
     list[Path]
         Locations to saved raster files.
+
     """
     return _download_for_burst_ids(
         burst_ids=burst_ids,
@@ -341,6 +355,7 @@ def search_cslc_static_layers(
     -------
     asf_search.ASFSearchResults.ASFSearchResults
         Search results from ASF.
+
     """
     return search_cslcs(
         bounds=bounds,
@@ -373,14 +388,17 @@ def _download_for_burst_ids(
     max_jobs : int, optional
         Number of parallel downloads to run, by default 3
     start: datetime.datetime | str, optional
-        Start date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+        Start date of data acquisition.
+        Supports timestamps as well as natural language such as "3 weeks ago"
     end: datetime.datetime | str, optional
-        end: End date of data acquisition. Supports timestamps as well as natural language such as "3 weeks ago"
+        end: End date of data acquisition.
+        Supports timestamps as well as natural language such as "3 weeks ago"
 
     Returns
     -------
     list[Path]
         Locations to saved raster files.
+
     """
     logger.info(
         f"Searching {len(burst_ids)} bursts, {product=} (Dates: {start} to {end})"
@@ -425,8 +443,10 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
     asf_search.ASFSearchResults.ASFSearchResults
         Filtered list of ASF search results with unique 'startTime',
         each having the latest 'pgeVersion'.
+
     """
-    # First, sort the results primarily by 'startTime' and secondarily by 'pgeVersion' in descending order
+    # First, sort the results primarily by 'startTime' and
+    # secondarily by 'pgeVersion' in descending order
     sorted_results = sorted(
         results,
         key=lambda r: (
@@ -466,18 +486,21 @@ def get_urls(
         out: list[str] = []
         for r in results:
             if "s3Urls" not in r.properties:
-                raise ValueError(f"No S3 URL for {r}")
+                msg = f"No S3 URL for {r}"
+                raise ValueError(msg)
 
             for url in r.properties["s3Urls"]:
                 if url.endswith(file_ext):
                     out.append(url)
                     break
             else:
-                raise ValueError(f"Failed to find HDF5 S3 url for {r}")
+                msg = f"Failed to find HDF5 S3 url for {r}"
+                raise ValueError(msg)
         return out
 
     else:
-        raise ValueError(f"type_ must be 'https' or 's3'. Got {type_}")
+        msg = f"type_ must be 'https' or 's3'. Got {type_}"
+        raise ValueError(msg)
 
 
 def _get_auth_session() -> asf.ASFSession:
@@ -485,6 +508,7 @@ def _get_auth_session() -> asf.ASFSession:
 
     auth = netrc.netrc().authenticators(host)
     if auth is None:
-        raise ValueError(f"No .netrc entry found for {host}")
+        msg = f"No .netrc entry found for {host}"
+        raise ValueError(msg)
     username, _, password = auth
     return asf.ASFSession().auth_with_creds(username, password)

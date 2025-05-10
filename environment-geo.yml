@@ -1,6 +1,0 @@
-channels:
-  - conda-forge
-dependencies:
-  - asf_search>=6.7
-  - gdal>=3.5
-  - rasterio>=1.3

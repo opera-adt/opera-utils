@@ -8,6 +8,7 @@ Examples
 --------
     python scripts/plot-intersecting-frames.py -104 31 -103 32  # interactive plot
     python scripts/plot-intersecting-frames.py -104 31 -103 32  --output frames.png
+
 """
 
 from pathlib import Path
@@ -35,9 +36,10 @@ def _get_track_colors(gdf: gpd.GeoDataFrame, cmap_name: str = "tab10") -> dict:
     -------
     dict
         A dictionary mapping track numbers to colors from the specified colormap.
+
     """
     track_numbers = [_get_track(idx) for idx in gdf.index]
-    unique_tracks = sorted(list(set(track_numbers)))
+    unique_tracks = sorted(set(track_numbers))
 
     # Create a color mapping for each unique track
     cmap = get_cmap(cmap_name)
@@ -114,7 +116,12 @@ def plot_frames_with_labels(
             color="black",
             weight="bold",
             rotation=rotation,
-            bbox=dict(boxstyle="round,pad=0.3", fc=color, ec="black", alpha=0.7),
+            bbox={
+                "boxstyle": "round,pad=0.3",
+                "fc": color,
+                "ec": "black",
+                "alpha": 0.7,
+            },
         )
 
     # Plot the bounding box

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from itertools import chain, combinations
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from ._types import Bbox
 
@@ -26,6 +27,7 @@ def powerset(iterable: Iterable[Any]) -> chain[tuple[Any, ...]]:
     --------
     >>> list(powerset([1,2,3]))
     [(), (1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
+
     """
     s = list(iterable)
     return flatten(combinations(s, r) for r in range(len(s) + 1))

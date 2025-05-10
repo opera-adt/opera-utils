@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from os import fspath
-from typing import Any, Optional, Union
+from typing import Any
 
 import numpy as np
 import rasterio as rio
@@ -20,11 +20,11 @@ __all__ = [
 
 def load_gdal(
     filename: Filename,
-    band: Optional[int] = None,
-    subsample_factor: Union[int, tuple[int, int]] = 1,
-    overview: Optional[int] = None,
-    rows: Optional[slice] = None,
-    cols: Optional[slice] = None,
+    band: int | None = None,
+    subsample_factor: int | tuple[int, int] = 1,
+    overview: int | None = None,
+    rows: slice | None = None,
+    cols: slice | None = None,
     masked: bool = False,
 ) -> ArrayLike:
     """Load a gdal file into a numpy array.
@@ -54,6 +54,7 @@ def load_gdal(
     arr : np.ndarray
         Array of shape (bands, y, x) or (y, x) if `band` is specified,
         where y = height // subsample_factor and x = width // subsample_factor.
+
     """
     ds = gdal.Open(fspath(filename))
     nrows, ncols = ds.RasterYSize, ds.RasterXSize
@@ -87,10 +88,11 @@ def load_gdal(
     col_stop = min(cols.stop, ncols)
     xsize, ysize = int(col_stop - cols.start), int(row_stop - rows.start)
     if xsize <= 0 or ysize <= 0:
-        raise IndexError(
+        msg = (
             f"Invalid row/col slices: {rows}, {cols} for file {filename} of size"
             f" {nrows}x{ncols}"
         )
+        raise IndexError(msg)
     nrows_out, ncols_out = (
         ysize // subsample_factor[0],
         xsize // subsample_factor[1],
@@ -119,7 +121,7 @@ def load_gdal(
         return np.ma.masked_equal(out, nd)
 
 
-def gdal_to_numpy_type(gdal_type: Union[str, int]) -> np.dtype:
+def gdal_to_numpy_type(gdal_type: str | int) -> np.dtype:
     """Convert gdal type to numpy type."""
     if isinstance(gdal_type, str):
         gdal_type = gdal.GetDataTypeByName(gdal_type)
@@ -140,6 +142,7 @@ def get_raster_nodata(filename: PathOrStr, band: int = 1) -> float | None:
     -------
     Optional[float]
         Nodata value, or None if not found.
+
     """
     nodatas = _get_dataset_attr(filename, "nodatavals")
     return nodatas[band - 1]
@@ -157,6 +160,7 @@ def get_raster_crs(filename: PathOrStr) -> CRS:
     -------
     CRS
         pyproj CRS for `filename`
+
     """
     return _get_dataset_attr(filename, "crs")
 
@@ -173,6 +177,7 @@ def get_raster_transform(filename: PathOrStr) -> Affine:
     -------
     List[float]
         6 floats representing a GDAL Geotransform.
+
     """
     return _get_dataset_attr(filename, "transform")
 
@@ -189,6 +194,7 @@ def get_raster_gt(filename: PathOrStr) -> list[float]:
     -------
     Affine
         Two dimensional affine transform for 2D linear mapping.
+
     """
     return get_raster_transform(filename).to_gdal()
 
@@ -207,6 +213,7 @@ def get_raster_dtype(filename: PathOrStr, band: int = 1) -> np.dtype:
     -------
     np.dtype
         Data type.
+
     """
     dtype_per_band = _get_dataset_attr(filename, "dtypes")
     return np.dtype(dtype_per_band[band - 1])
@@ -224,6 +231,7 @@ def get_raster_driver(filename: PathOrStr) -> str:
     -------
     str
         Driver name.
+
     """
     return _get_dataset_attr(filename, "driver")
 
