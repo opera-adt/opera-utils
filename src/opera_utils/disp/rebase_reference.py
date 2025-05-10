@@ -117,8 +117,6 @@ def rebase(
     nan_policy: str | NaNPolicy = NaNPolicy.propagate,
     reference_point: tuple[int, int] | None = None,
     reference_latlon: tuple[float, float] | None = None,
-    distributed_reference: bool = False,
-    distributed_reference_threshold: float = 0.90,
     keep_bits: int = 9,
     make_overviews: bool = True,
     tqdm_position: int = 0,
@@ -159,17 +157,6 @@ def rebase(
         in degrees.
         Takes precedence over reference_point if both are provided.
         Default is None.
-    distributed_reference : bool
-        Whether to use a distributed reference approach instead of a single point.
-        If True, for each date, the median value of all pixels with temporal coherence
-        above the `distributed_reference_threshold` will be subtracted from the data
-        to act as a "virtual reference point", assuming that the average of all points
-        has approximately zero displacement.
-        Default is False.
-    distributed_reference_threshold : float
-        Coherence threshold for selecting pixels to include in distributed reference calculation.
-        Only used when distributed_reference is True.
-        Default is 0.90.
     keep_bits : int
         Number of floating point mantissa bits to retain in the output rasters.
         Default is 9.
