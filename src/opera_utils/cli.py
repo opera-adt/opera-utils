@@ -139,12 +139,19 @@ def cli_app() -> None:
     logger = logging.getLogger("opera_utils")
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
+    cli_dict = {
+        "disp-s1-frame-bbox": frame_bbox,
+        "disp-s1-intersects": intersects,
+        "disp-s1-missing-data-options": missing_data_options,
+    }
+    try:
+        from opera_utils.disp._search import search
+
+        cli_dict["disp-s1-search"] = search
+    except ImportError:
+        pass
     tyro.extras.subcommand_cli_from_dict(
-        {
-            "disp-s1-frame-bbox": frame_bbox,
-            "disp-s1-intersects": intersects,
-            "disp-s1-missing-data-options": missing_data_options,
-        },
+        cli_dict,
         prog="opera-utils",
         description="opera-utils command-line interface.",
     )
