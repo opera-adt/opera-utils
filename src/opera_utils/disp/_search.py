@@ -30,6 +30,7 @@ def search(
     end_datetime: datetime | None = None,
     url_type: UrlType = UrlType.HTTPS,
     use_uat: bool = False,
+    print_urls: bool = False,
 ) -> list[DispProduct]:
     """Query the CMR for granules matching the given frame ID and product version.
 
@@ -47,6 +48,10 @@ def search(
         The protocol to use for downloading, either "s3" or "https".
     use_uat : bool
         Whether to use the UAT environment instead of main Earthdata endpoint.
+    print_urls : bool
+        If True, prints out the result urls to stdout in addition to returning
+        the `DispProduct` objects.
+        Default is False.
 
     Returns
     -------
@@ -115,4 +120,8 @@ def search(
         headers["CMR-Search-After"] = response.headers["CMR-Search-After"]
 
     # Return sorted list of products
-    return sorted(products, key=lambda g: (g.frame_id, g.secondary_datetime))
+    products = sorted(products, key=lambda g: (g.frame_id, g.secondary_datetime))
+    if print_urls:
+        for p in products:
+            print(p.filename)
+    return products

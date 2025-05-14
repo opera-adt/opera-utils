@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
+from functools import partial
 
 import tyro
 
@@ -139,12 +141,20 @@ def cli_app() -> None:
     logger = logging.getLogger("opera_utils")
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
+    cli_dict: dict[str, Callable] = {
+        "disp-s1-frame-bbox": frame_bbox,
+        "disp-s1-intersects": intersects,
+        "disp-s1-missing-data-options": missing_data_options,
+    }
+    try:
+        from opera_utils.disp._search import search
+
+        cli_dict["disp-s1-search"] = partial(search, print_urls=True)
+
+    except ImportError:
+        pass
     tyro.extras.subcommand_cli_from_dict(
-        {
-            "disp-s1-frame-bbox": frame_bbox,
-            "disp-s1-intersects": intersects,
-            "disp-s1-missing-data-options": missing_data_options,
-        },
+        cli_dict,
         prog="opera-utils",
         description="opera-utils command-line interface.",
     )
