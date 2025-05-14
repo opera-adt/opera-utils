@@ -17,12 +17,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         deps:
           - label: Latest
-            spec: >-
-              rasterio
-              gdal
-              libgdal-netcdf
-              libgdal-hdf5
-              asf_search
+            spec:
           - label: Minimum
             spec: >-
               python=3.9

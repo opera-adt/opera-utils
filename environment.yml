@@ -13,7 +13,7 @@ dependencies:
   - typing_extensions>=4
   - tyro>=0.9
   - asf_search>=6.7
-  - gdal>=3.8
+  - gdal>=3.7
   - libgdal-netcdf
   - rasterio>=1.3
   - affine
