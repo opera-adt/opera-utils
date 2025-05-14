@@ -116,7 +116,7 @@ def rebase(
     apply_ionospheric_corrections: bool = True,
     nan_policy: str | NaNPolicy = NaNPolicy.propagate,
     reference_point: tuple[int, int] | None = None,
-    reference_latlon: tuple[float, float] | None = None,
+    reference_lonlat: tuple[float, float] | None = None,
     keep_bits: int = 9,
     make_overviews: bool = True,
     tqdm_position: int = 0,
@@ -151,10 +151,9 @@ def rebase(
         The (row, column) of the reference point to use when rebasing /displacement.
         If None, finds a point with the highest harmonic mean of temporal coherence.
         Default is None.
-    reference_latlon : tuple[float, float] | None
+    reference_lonlat : tuple[float, float] | None
         Reference point to use when rebasing /displacement, specified as
-            (longitude, latitude)
-        in degrees.
+        (longitude, latitude) in degrees.
         Takes precedence over reference_point if both are provided.
         Default is None.
     keep_bits : int
@@ -183,8 +182,8 @@ def rebase(
     if all(Path(f).exists() for f in writer.files):
         return
 
-    if reference_latlon is not None:
-        reference_point = product_stack.lonlat_to_rowcol(*reference_latlon)
+    if reference_lonlat is not None:
+        reference_point = product_stack.lonlat_to_rowcol(*reference_lonlat)
 
     reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=np.nan)
     corrections_readers = []
