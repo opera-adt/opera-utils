@@ -3,8 +3,8 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.9
-  - pip>=21.3  # https://pip.pypa.io/en/stable/reference/build-system/pyproject-toml/#editable-installation
-  - git  # for pip install, due to setuptools_scm
+  - pip>=21.3
+  - git
   - h5py>=1.10
   - numpy>=1.20
   - pooch>=1.7
