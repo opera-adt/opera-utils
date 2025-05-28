@@ -24,7 +24,7 @@ except ImportError:
 
 from ._types import PathOrStr
 from .bursts import normalize_burst_id
-from .missing_data import BurstSubsetOption, get_missing_data_options
+from .missing_data import BurstSubsetOption, get_missing_data_options, print_with_rich
 
 __all__ = [
     "L2Product",
@@ -172,7 +172,7 @@ def download_cslc_static_layers(
 def search_l2(
     start: DatetimeInput | None = None,
     end: DatetimeInput | None = None,
-    bounds: Sequence[float] | None = None,
+    bounds: tuple[float, float, float, float] | None = None,
     aoi_polygon: str | None = None,
     track: int | None = None,
     burst_ids: Sequence[str] | None = None,
@@ -190,7 +190,7 @@ def search_l2(
     end : datetime.datetime | str, optional
         end: End date of data acquisition.
         Supports timestamps as well as natural language such as "3 weeks ago"
-    bounds : Sequence[float], optional
+    bounds : tuple[float, float, float, float], optional
         Bounding box coordinates (min lon, min lat, max lon, max lat)
     aoi_polygon : str, optional
         GeoJSON polygon string, alternative to `bounds`.
@@ -250,6 +250,75 @@ def search_l2(
 
 
 search_cslcs = search_l2
+
+
+def run_search_cli(
+    start: DatetimeInput | None = None,
+    end: DatetimeInput | None = None,
+    bounds: tuple[float, float, float, float] | None = None,
+    aoi_polygon: str | None = None,
+    track: int | None = None,
+    burst_ids: Sequence[str] | None = None,
+    disp_s1_frame_id: int | None = None,
+    exclude_months: Sequence[int] | None = None,
+    url_type: Literal["https", "s3"] = "https",
+    product: L2Product = L2Product.CSLC,
+    check_missing_data: bool = False,
+) -> list[str]:
+    if disp_s1_frame_id:
+        from .burst_frame_db import get_burst_ids_for_frame
+
+        burst_ids = get_burst_ids_for_frame(disp_s1_frame_id)
+
+    results = search_l2(
+        start=start,
+        end=end,
+        bounds=bounds,
+        aoi_polygon=aoi_polygon,
+        track=track,
+        burst_ids=burst_ids,
+        product=product,
+        check_missing_data=check_missing_data,
+        max_results=5_000,
+    )
+    if check_missing_data:
+        res, options = results
+    else:
+        res, options = results, None
+    if exclude_months is not None:
+        res = [
+            r
+            for r in res
+            if datetime.datetime.fromisoformat(r.properties["startTime"]).month
+            not in set(exclude_months)
+        ]
+
+    if check_missing_data:
+        res, options = results
+        logger.info("Filtering to top option:")
+        print_with_rich(options)
+        # Pick top one to print
+        urls = options[0].inputs
+        get_urls(res, type_=url_type)
+    else:
+        urls = get_urls(results, type_=url_type)
+
+    print("\n".join(urls))
+    return urls
+
+
+# Avoid duplicating rest of docstring
+old_doc = search_l2.__doc__
+assert old_doc is not None
+run_search_cli.__doc__ = old_doc.replace(
+    "\n    product: L2Product",
+    """
+    disp_s1_frame_id : int, optional
+        Use an OPERA DISP-S1 frame to get all burst IDs
+    url_type : str, choices = {"https", "s3"}
+        Type of access url to print. Default is https.
+    product: L2Product""",
+)
 
 
 def download_cslcs(
@@ -333,7 +402,7 @@ def download_rtcs(
 
 
 def search_cslc_static_layers(
-    bounds: Sequence[float] | None = None,
+    bounds: tuple[float, float, float, float] | None = None,
     aoi_polygon: str | None = None,
     track: int | None = None,
     burst_ids: Sequence[str] | None = None,
@@ -342,7 +411,7 @@ def search_cslc_static_layers(
 
     Parameters
     ----------
-    bounds : Sequence[float], optional
+    bounds : tuple[float, float, float, float], optional
         Bounding box coordinates (min lon, min lat, max lon, max lat)
     aoi_polygon : str, optional
         GeoJSON polygon string, alternative to `bounds`.
@@ -374,6 +443,7 @@ def _download_for_burst_ids(
     max_jobs: int = 3,
     start: DatetimeInput = None,
     end: DatetimeInput = None,
+    filter_for_missing_data: bool = False,
 ) -> list[Path]:
     """Download files for one product type fo static layers for a sequence of burst IDs.
 
@@ -387,12 +457,15 @@ def _download_for_burst_ids(
         Type of OPERA product to download.
     max_jobs : int, optional
         Number of parallel downloads to run, by default 3
-    start: datetime.datetime | str, optional
+    start : datetime.datetime | str, optional
         Start date of data acquisition.
         Supports timestamps as well as natural language such as "3 weeks ago"
-    end: datetime.datetime | str, optional
+    end : datetime.datetime | str, optional
         end: End date of data acquisition.
         Supports timestamps as well as natural language such as "3 weeks ago"
+    filter_for_missing_data : bool
+        If True, runs `opera_utils.missing_data.get_missing_data_options` on
+        search results, and only downloads the urls from the first option.
 
     Returns
     -------
@@ -420,6 +493,13 @@ def _download_for_burst_ids(
     logger.info(msg)
     session = _get_auth_session()
     urls = get_urls(results)
+    if filter_for_missing_data:
+        missing_data_options = get_missing_data_options(slc_files=urls)
+        logger.info(
+            f"Filtering to top option from {len(missing_data_options)} options:"
+        )
+        print_with_rich(missing_data_options)
+        urls = missing_data_options[0].inputs
     Path(output_dir).mkdir(exist_ok=True, parents=True)
     asf.download_urls(
         urls=urls, path=str(output_dir), session=session, processes=max_jobs
@@ -475,7 +555,7 @@ def filter_results_by_date_and_version(results: ASFSearchResults) -> ASFSearchRe
 
 
 def get_urls(
-    results: asf.ASFSearchResults,
+    results: ASFSearchResults,
     type_: Literal["https", "s3"] = "https",
     file_ext: str = ".h5",
 ) -> list[str]:
