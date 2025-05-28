@@ -11,6 +11,7 @@ import tyro
 
 from opera_utils import (
     burst_frame_db,
+    download,
     filter_by_burst_id,
     filter_by_date,
     get_missing_data_options,
@@ -70,7 +71,7 @@ def intersects(
         The four numbers are (west, south, east, north).
     point : tuple[float, float], optional
         Point as (longitude, latitude), in degrees, to search for intersection.
-        Mututally exclusive with `bbox`.
+        Mutually exclusive with `bbox`.
     ids_only : bool
         Print only the Frame IDs as newline-separate ints.
         By default False, which returns a GeoJSON string of Frame geometries.
@@ -142,6 +143,7 @@ def cli_app() -> None:
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
     cli_dict: dict[str, Callable] = {
+        "search-l2": download.run_search_cli,
         "disp-s1-frame-bbox": frame_bbox,
         "disp-s1-intersects": intersects,
         "disp-s1-missing-data-options": missing_data_options,

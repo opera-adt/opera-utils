@@ -321,12 +321,14 @@ def generate_burst_subset_options(
     )
 
 
-def print_with_rich(options: Iterable[BurstSubsetOption]) -> None:
+def print_with_rich(
+    options: Iterable[BurstSubsetOption], use_stderr: bool = True
+) -> None:
     """Print a summary of the burst options using `rich.Table`."""
     from rich.console import Console
     from rich.table import Table
 
-    console = Console()
+    console = Console(stderr=use_stderr)
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Option", style="dim", width=6)
     table.add_column("# Dates", style="dim", width=10)
