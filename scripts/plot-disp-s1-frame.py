@@ -25,12 +25,14 @@ Examples
 
 """
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
 
 import cartopy.crs as ccrs
 import cartopy.io.shapereader as shpreader
 import matplotlib.pyplot as plt
+from cartopy.mpl.geoaxes import GeoAxes
 from shapely.ops import unary_union
 
 import opera_utils
@@ -65,7 +67,7 @@ def map_background(
 
     """
     fig = plt.figure(figsize=figsize)
-    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+    ax: GeoAxes = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
 
     west, south, east, north = bbox
     ax.set_extent([west, east, south, north], crs=ccrs.PlateCarree())
@@ -100,8 +102,8 @@ def map_background(
     return fig, ax
 
 
-def plot_single_frame_on_background(
-    frame_id: int,
+def plot_frames_on_background(
+    frame_ids: Sequence[int],
     /,
     output: Optional[Path] = None,
     use_satellite: bool = True,
@@ -112,13 +114,13 @@ def plot_single_frame_on_background(
 
     Parameters
     ----------
-    frame_id : int
-        Unique frame identifier to plot.
+    frame_ids : Sequence[int]
+        DISP-S1 frame IDs to plot.
     output : Path or None, optional
-        If provided, path to save the resulting plot. If None, an interactive
-        window will be shown.
+        If provided, path to save the resulting plot.
+        If None, an interactive window will be shown.
     use_satellite : bool, optional
-        If True, fetch satellite tiles as background
+        If True, fetch satellite tiles as background.
         If False, show states as plain background.
         By default True.
     pad_degrees : float, optional
@@ -136,11 +138,12 @@ def plot_single_frame_on_background(
     gdf_frames = opera_utils.get_frame_geodataframe()
 
     # Filter for the one we want
-    gdf_this = gdf_frames.loc[[frame_id]]
-    geometry = gdf_this.geometry.values[0]
+    gdf_this = gdf_frames.loc[list(frame_ids)]
+    # If the geometry can be multi-part, unify them for plotting
+    geometry_union = unary_union(gdf_this.geometry.values)
 
     # Get bounding box with a small padding around the polygon
-    minx, miny, maxx, maxy = geometry.bounds
+    minx, miny, maxx, maxy = geometry_union.bounds
     bbox = (
         minx - pad_degrees,
         miny - pad_degrees,
@@ -157,32 +160,31 @@ def plot_single_frame_on_background(
     )
 
     # Plot the frame polygon
-    # If the geometry can be multi-part, unify them for plotting
-    geometry_union = unary_union(geometry)
-    if geometry_union.geom_type == "Polygon":
-        xs, ys = geometry_union.exterior.xy
-        ax.plot(xs, ys, color="red", linewidth=2)
-    else:
-        # If multipolygon, plot each
-        for part in geometry_union.geoms:
-            xs, ys = part.exterior.xy
+    for frame_id, cur_geom in zip(frame_ids, gdf_this.geometry.values, strict=True):
+        if cur_geom.geom_type == "Polygon":
+            xs, ys = cur_geom.exterior.xy
             ax.plot(xs, ys, color="red", linewidth=2)
+        else:
+            # If multipolygon, plot each
+            for part in cur_geom.geoms:
+                xs, ys = part.exterior.xy
+                ax.plot(xs, ys, color="red", linewidth=2)
 
-    # Add an annotation in the centroid
-    centroid = geometry_union.centroid
-    ax.text(
-        centroid.x,
-        centroid.y,
-        f"Frame {frame_id}",
-        ha="center",
-        va="center",
-        fontsize=10,
-        fontweight="bold",
-        color="white",
-        bbox={"boxstyle": "round,pad=0.3", "fc": "red", "ec": "none", "alpha": 0.8},
-        transform=ccrs.PlateCarree(),
-    )
-    ax.set_title(f"DISP-S1 Frame {frame_id}")
+        # Add an annotation in the centroid
+        centroid = cur_geom.centroid
+        ax.text(
+            centroid.x,
+            centroid.y,
+            f"Frame {frame_id}",
+            ha="center",
+            va="center",
+            fontsize=10,
+            fontweight="bold",
+            color="white",
+            bbox={"boxstyle": "round,pad=0.3", "fc": "red", "ec": "none", "alpha": 0.8},
+            transform=ccrs.PlateCarree(),
+        )
+    ax.set_title(f"DISP-S1 Frame {','.join(map(str, frame_ids))}")
 
     if output:
         fig.savefig(output, bbox_inches="tight", dpi=150)
@@ -195,4 +197,4 @@ def plot_single_frame_on_background(
 if __name__ == "__main__":
     import tyro
 
-    tyro.cli(plot_single_frame_on_background)
+    tyro.cli(plot_frames_on_background)
