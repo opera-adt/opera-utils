@@ -86,6 +86,8 @@ class DispProduct:
         data["secondary_datetime"] = _to_datetime(data["secondary_datetime"])
         data["generation_datetime"] = _to_datetime(data["generation_datetime"])
         data["frame_id"] = int(data["frame_id"])
+        if Path(name).exists():
+            data["size_in_bytes"] = Path(name).stat().st_size
         return cls(filename=name, **data)
 
     @cached_property
