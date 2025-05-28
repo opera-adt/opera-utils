@@ -20,6 +20,7 @@ from ._types import Filename
 from .bursts import normalize_burst_id
 from .constants import (
     COMPASS_FILE_REGEX,
+    COMPRESSED_CSLC_S1_FILE_REGEX,
     CSLC_S1_FILE_REGEX,
     NISAR_BOUNDING_POLYGON,
     NISAR_FILE_REGEX,
@@ -82,7 +83,9 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
     name = Path(h5_filename).name
     match: re.Match | None = None
 
-    if match := re.match(CSLC_S1_FILE_REGEX, name):
+    if (match := re.match(CSLC_S1_FILE_REGEX, name)) or (
+        match := re.match(COMPRESSED_CSLC_S1_FILE_REGEX, name)
+    ):
         return _parse_cslc_product(match)
     elif match := re.match(NISAR_FILE_REGEX, name):
         return _parse_gslc_product(match)
