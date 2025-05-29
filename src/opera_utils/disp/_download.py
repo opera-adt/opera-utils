@@ -48,8 +48,8 @@ def process_file(
     filename = url.split("/")[-1]
     outname = f"{output_dir}/{Path(url).name}"
     outpath = Path(outname)
-    Y0, Y1 = (cols.start, cols.stop) if cols is not None else (None, None)  # type: ignore[union-attr]
-    X0, X1 = (rows.start, rows.stop) if rows is not None else (None, None)  # type: ignore[union-attr]
+    X0, X1 = (cols.start, cols.stop) if cols is not None else (None, None)  # type: ignore[union-attr]
+    Y0, Y1 = (rows.start, rows.stop) if rows is not None else (None, None)  # type: ignore[union-attr]
 
     if outpath.exists():
         logger.info(f"Skipped (exists): {filename}")
