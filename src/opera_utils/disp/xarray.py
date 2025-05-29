@@ -71,7 +71,8 @@ def stack_to_dataarray(
         file_array = da.block(delayed_blocks)
         delayed_rows.append(file_array)
 
-    t = stack.secondary_dates
+    with warnings.catch_warnings(category=UserWarning):
+        t = np.stack([np.datetime64(d) for d in stack.secondary_dates])
     # Note: the coordinates are also known from the frame database
     y = stack.y  # 1-D north-to-south
     x = stack.x  # 1-D west-to-east
@@ -92,6 +93,10 @@ def stack_to_dataarray(
             # TODO: this might be some easy way to make this `rioxarray` compatible
         },
     )
+    da_out.time.attrs = {
+        "long_name": "Time corresponding to beginning of secondary acquisition",
+        "standard_name": "time",
+    }
     return da_out
 
 
