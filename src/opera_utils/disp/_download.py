@@ -81,7 +81,9 @@ def process_file(
     return outpath
 
 
-def _run(args):
+def _run_file(
+    args: tuple[str, slice | None, slice | None, Path, requests.Session | None],
+):
     return process_file(*args)
 
 
@@ -136,9 +138,12 @@ def run_download(
         List of paths to the downloaded and subsetted products
 
     """
-    session = requests.session()
-    username, password = get_earthdata_username_password()
-    session.auth = (username, password)
+    if num_workers == 1:
+        session = requests.session()
+        username, password = get_earthdata_username_password()
+        session.auth = (username, password)
+    else:
+        session = None
 
     results = search(
         frame_id=frame_id,
@@ -174,7 +179,5 @@ def run_download(
     output_dir.mkdir(exist_ok=True, parents=True)
 
     if num_workers == 1:
-        return [_run(job) for job in tqdm(jobs)]
-    return process_map(_run, jobs, max_workers=num_workers)
-    # with mp.Pool(num_workers) as pool:
-    #     return list(pool.map(_run, jobs))
+        return [_run_file(job) for job in tqdm(jobs)]
+    return process_map(_run_file, jobs, max_workers=num_workers)
