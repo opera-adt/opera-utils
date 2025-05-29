@@ -137,6 +137,13 @@ def run_download(
         List of paths to the downloaded and subsetted products
 
     """
+    if wkt is not None and bbox is not None:
+        msg = "Can't provide both `bbox` and `wkt`"
+        raise ValueError(msg)
+    if wkt is not None:
+        poly = from_wkt(wkt)
+        bbox = poly.bounds
+
     if num_workers == 1:
         session = requests.session()
         username, password = get_earthdata_username_password()
@@ -155,9 +162,6 @@ def run_download(
     logger.info(f"Found {n_urls} urls for Frame {frame_id}")
 
     dps = DispProductStack(results)
-    if wkt is not None:
-        poly = from_wkt(wkt)
-        bbox = poly.bounds
 
     if bbox is not None:
         p = dps.products[0]
@@ -168,7 +172,6 @@ def run_download(
         cols = slice(col_start, col_stop)
     else:
         rows, cols = None, None
-
     logger.info(f"Subsetting to Rows: {rows}, cols: {cols}")
 
     jobs = [
