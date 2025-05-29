@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 import numpy as np
+from numpy.typing import NDArray
 
 from opera_utils._dates import DATETIME_FORMAT, get_dates
 
@@ -111,3 +112,12 @@ def round_mantissa(z: np.ndarray, keep_bits=10) -> None:
     b += ((b >> maskbits) & 1) + half_quantum1
     b &= mask
     return b.view(z.dtype)
+
+
+def _get_border(data_arrays: NDArray[np.floating]) -> NDArray[np.floating]:
+    top_row = data_arrays[:, 0, :]
+    bottom_row = data_arrays[:, -1, :]
+    left_col = data_arrays[:, :, 0]
+    right_col = data_arrays[:, :, -1]
+    all_pixels = np.hstack([top_row, bottom_row, left_col, right_col])
+    return np.nanmedian(all_pixels, axis=1)[:, np.newaxis, np.newaxis]
