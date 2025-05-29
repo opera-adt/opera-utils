@@ -60,10 +60,14 @@ def create_rebased_stack(
     # Add initial reference epoch of zeros
     initial_epoch = _create_initial_epoch(df, rebased_stacks[0])
     # Combine and rechunk
-    combined = xr.concat([initial_epoch, *rebased_stacks], dim="time").chunk(chunks)
+    ds_combined = xr.concat([initial_epoch, *rebased_stacks], dim="time").chunk(chunks)
+    try:
+        ds_combined.rio.write_crs(f"EPSG:{dps.epsg}", inplace=True)
+    except AttributeError as e:
+        logger.warning("Could not write CRS to dataset: %s", e)
 
     logger.info(f"Successfully combined {len(rebased_stacks)} substacks")
-    return combined
+    return ds_combined
 
 
 def _get_chunks(chunks: dict[str, int] | None, dps: DispProductStack) -> dict[str, int]:
