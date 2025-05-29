@@ -66,7 +66,6 @@ def process_file(
         with open(temp_path, "wb") as f:
             f.write(response.content)
 
-        # with h5py.File(temp_path, "r") as h5f:
         # Open and slice root data
         ds = xr.open_dataset(temp_path, engine="h5netcdf")
         subset = ds.isel(y=slice(Y0, Y1), x=slice(X0, X1))

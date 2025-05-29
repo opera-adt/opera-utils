@@ -1,112 +1,122 @@
 from __future__ import annotations
 
-import warnings
+import logging
+from collections.abc import Sequence
 
-import dask.array as da
 import numpy as np
+import pandas as pd
+import xarray as xr
 
-from ._product import DispProduct, DispProductStack
-from ._remote import open_h5
+from ._product import DispProductStack
 
-try:
-    import xarray as xr
-    from dask import delayed
-except ImportError:
-    warnings.warn(
-        "xarray and dask are required for xarray functionality.", stacklevel=2
-    )
+logger = logging.getLogger("opera_utils")
+
+DEFAULT_CHUNKS: dict[str, int] = {"time": 10, "x": 1024, "y": 1024}
 
 
-def stack_to_dataarray(
-    stack: DispProductStack,
-    var: str = "displacement",
-    chunks: tuple[int, int] = (1024, 1024),
-    dtype=np.float32,
-) -> xr.DataArray:
-    """Convert a `DispProductStack` to an xarray.DataArray backed by a dask array.
+def create_rebased_stack(
+    dps: DispProductStack,
+    chunks: dict[str, int] | None = None,
+    data_vars: Sequence[str] = ["displacement", "short_wavelength_displacement"],
+) -> xr.Dataset:
+    """Rebase and stack displacement products with different reference dates.
+
+    This function combines displacement products that may have different reference
+    dates by accumulating displacements when the reference date changes.
+    When a new reference date is encountered, the displacement values from the
+    previous stack's final epoch are added to all epochs in the new stack.
 
     Parameters
     ----------
-    stack : DispProductStack
-        Ordered list of DISP products from one frame.
-    var : str
-        Name of the dataset inside each NetCDF file.
-        Default is "displacement".
-    chunks : (int, int)
-        Chunk size for (y, x) dimensions.
-        Default is (1024, 1024).
-        Note that `time` is chunked as 1 file per chunk.
-    dtype : NumPy dtype, default float32
-        Expected dtype of `var` in the files.
+    dps : DispProductStack
+        Stack of displacement products to combine.
+    chunks : Dict[str, int], optional
+        Chunking configuration for xarray. Defaults to DEFAULT_CHUNKS.
+    data_vars : Sequence[str], optional
+        Data variables to process for rebasing.
+        Defaults to ["displacement", "short_wavelength_displacement"].
 
     Returns
     -------
-    xr.DataArray
-        Lazy 3-D array with dims (time, y, x).
+    xr.Dataset
+        Stacked displacement dataset with rebased displacements.
 
     """
-    # The shape is known from the frame database
-    ny, nx = stack.shape[1:]
+    logger.info("Starting displacement stack rebasing")
 
-    # Build slices that cover the 2-D grid with (chunks[0] x chunks[1]) blocks
-    y_slices = [slice(i, min(i + chunks[0], ny)) for i in range(0, ny, chunks[0])]
-    x_slices = [slice(j, min(j + chunks[1], nx)) for j in range(0, nx, chunks[1])]
+    chunks = _get_chunks(chunks, dps)
+    logger.info(f"Using chunk configuration: {chunks}")
 
-    # Construct one delayed array per file
-    delayed_rows = []
-    for prod in stack.products:
-        # For each file build a 2-D dask array of blocks
-        delayed_blocks = [
-            [
-                da.from_delayed(
-                    delayed(_load_block)(prod, var, (rs, cs)),
-                    shape=(rs.stop - rs.start, cs.stop - cs.start),
-                    dtype=dtype,
-                )
-                for cs in x_slices
-            ]
-            for rs in y_slices
-        ]
-
-        file_array = da.block(delayed_blocks)
-        delayed_rows.append(file_array)
-
-    with warnings.catch_warnings(category=UserWarning):
-        t = np.stack([np.datetime64(d) for d in stack.secondary_dates])
-    # Note: the coordinates are also known from the frame database
-    y = stack.y  # 1-D north-to-south
-    x = stack.x  # 1-D west-to-east
-
-    data = da.stack(delayed_rows, axis=0)
-    da_out = xr.DataArray(
-        data,
-        dims=("time", "y", "x"),
-        coords={
-            "time": ("time", t),
-            "y": ("y", y),
-            "x": ("x", x),
-        },
-        name=var,
-        attrs={
-            "crs": f"EPSG:{stack.epsg}",
-            "transform": stack.products[0].transform,
-            # TODO: this might be some easy way to make this `rioxarray` compatible
-        },
+    # Get dataframe and group by reference dates
+    df = dps.to_dataframe()
+    substacks = df.groupby(["reference_datetime", "secondary_datetime"]).apply(
+        lambda x: x, include_groups=False
     )
-    da_out.time.attrs = {
-        "long_name": "Time corresponding to beginning of secondary acquisition",
-        "standard_name": "time",
-    }
-    return da_out
+    reference_dates = pd.Series(df.reference_datetime.unique())
+
+    # Process each reference date's substack, create the stacked dataset
+    rebased_stacks = _accumulate_displacements(substacks, reference_dates, data_vars)
+
+    # Add initial reference epoch of zeros
+    initial_epoch = _create_initial_epoch(df, rebased_stacks[0])
+    # Combine and rechunk
+    combined = xr.concat([initial_epoch, *rebased_stacks], dim="time").chunk(chunks)
+
+    logger.info(f"Successfully combined {len(rebased_stacks)} substacks")
+    return combined
 
 
-def _load_block(
-    product: DispProduct, var: str, block_slices: tuple[slice, slice]
-) -> np.ndarray:
-    """Read a (row, col) window from one file and returns a NumPy 2-D array.
+def _get_chunks(chunks: dict[str, int] | None, dps: DispProductStack) -> dict[str, int]:
+    """Ensure chunks are smaller than the downloaded size."""
+    chunks = {**DEFAULT_CHUNKS, **(chunks or {})}
+    with xr.open_dataset(dps.products[0].filename) as ds:
+        data_shape = ds["displacement"].shape
+        chunks["x"] = min(chunks["x"], data_shape[1])
+        chunks["y"] = min(chunks["y"], data_shape[0])
+    chunks["time"] = min(chunks["time"], len(dps.products))
+    return chunks
 
-    Low-level helper called by dask.
-    """
-    rslice, cslice = block_slices
-    with open_h5(product) as hf:
-        return hf[var][rslice, cslice]
+
+def _accumulate_displacements(
+    substacks: pd.DataFrame,
+    reference_dates: pd.Series,
+    data_vars: Sequence[str] = ["displacement", "short_wavelength_displacement"],
+) -> list[xr.Dataset]:
+    """Open each substack, process into cumulative displacement."""
+    rebased_stacks: list[xr.Dataset] = []
+
+    for idx, ref_date in enumerate(reference_dates):
+        logger.debug(f"Processing ministack for reference date: {ref_date}")
+
+        # Get files for this reference date
+        substack_df = substacks.loc[ref_date]
+        stack_files = substack_df.sort_index().filename.to_list()
+
+        # Open the current ministack's files
+        stack = xr.open_mfdataset(stack_files, engine="h5netcdf")
+
+        # Append first epoch of new ministack to last epochs of previous
+        if idx > 0:
+            for ds_name in data_vars:
+                stack[ds_name] += rebased_stacks[-1].isel(time=-1)[ds_name]
+
+        rebased_stacks.append(stack)
+
+    return rebased_stacks
+
+
+def _create_initial_epoch(df: pd.DataFrame, first_stack: xr.Dataset) -> xr.Dataset:
+    """Create initial reference epoch with zero displacement."""
+    # Get earliest date from the dataframe
+    first_epoch = df.reference_datetime.min()
+    first_epoch_dt64 = np.datetime64(first_epoch.to_pydatetime())
+
+    # Create zero-valued dataset matching spatial structure
+    initial_ds = xr.full_like(first_stack.isel(time=0), 0)
+    initial_ds["time"] = first_epoch_dt64
+    initial_ds["reference_time"] = initial_ds["time"]
+
+    # Expand time dimension
+    initial_ds = initial_ds.expand_dims("time")
+
+    return initial_ds
