@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from collections import Counter
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from functools import cached_property
@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import pyproj
 from affine import Affine
 from typing_extensions import Self
@@ -292,6 +293,10 @@ class DispProductStack:
     def lonlat_to_rowcol(self: Self, lon: float, lat: float):
         """Convert the longitude and latitude (in degrees) row/column indices."""
         return lonlat_to_rowcol(self.products[0], lon, lat)
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Create a DataFrame holding the product stack metadata."""
+        return pd.DataFrame([asdict(p) for p in self.products])
 
 
 def _get_download_url(

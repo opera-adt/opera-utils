@@ -249,3 +249,24 @@ class TestDispProductStack:
             stack.get_rasterio_profile()
             == DispProduct.from_filename(VALID_FILES[0]).get_rasterio_profile()
         )
+
+    def test_to_dataframe(self):
+        """Test that to_dataframe returns a DataFrame with the correct data."""
+        import pandas as pd
+
+        stack = DispProductStack.from_file_list(VALID_FILES)
+        df = stack.to_dataframe()
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == len(VALID_FILES)
+        assert all(df["frame_id"] == FRAME_ID)
+        assert all(df["reference_datetime"] == EXPECTED_REF_DATES)
+        assert all(df["secondary_datetime"] == EXPECTED_SEC_DATES)
+        assert all(df["version"] == "1.0")
+        assert all(
+            df["generation_datetime"]
+            == datetime(2025, 3, 18, 22, 27, 53, tzinfo=timezone.utc)
+        )
+        assert all(df["polarization"] == "VV")
+        assert all(df["sensor"] == "S1")
+        assert all(df["acquisition_mode"] == "IW")
+        assert all(df["size_in_bytes"] == [Path(f).stat().st_size for f in VALID_FILES])
