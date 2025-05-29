@@ -149,8 +149,10 @@ def cli_app() -> None:
         "disp-s1-missing-data-options": missing_data_options,
     }
     try:
+        from opera_utils.disp._download import run_download
         from opera_utils.disp._search import search
 
+        cli_dict["disp-s1-download"] = run_download
         cli_dict["disp-s1-search"] = partial(search, print_urls=True)
 
     except ImportError:

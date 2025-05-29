@@ -58,7 +58,17 @@ opera-utils = "opera_utils.cli:cli_app"
 # For geopandas functionality with burst/frame databases:
 geopandas = ["geopandas", "pyogrio"]
 # Access remote hdf5 files over S3 or HTTPS:
-remote = ["affine", "botocore", "aiohttp", "fsspec", "h5netcdf", "s3fs", "tqdm"]
+remote = [
+  "affine",
+  "botocore",
+  "aiohttp",
+  "fsspec",
+  "h5netcdf",
+  "s3fs",
+  "tqdm",
+  "xarray",
+]
+disp = ["remote"] # Alias for remote dependencies
 all = ["opera-utils[remote,geopandas]"]
 
 test = [
@@ -97,49 +107,49 @@ unsafe-fixes = true
 
 [tool.ruff.lint]
 select = [
-  "A",   # flake8-builtins
-  "ARG", # flake8-unused-arguments
-  "B",   # flake8-bugbear
-  "C4",  # flake8-comprehensions
-  "D",   # pydocstyle
-  "E",   # pycodestyle (errors)
-  "W",   # pycodestyle (warnings)
-  "EM",  # flake8-errmsg
-  "EXE", # flake8-executable
-  "F",   # Pyflakes
-  "I",   # isort
-  "ISC", # flake8-implicit-str-concat
-  "N",   # pep8-naming
+  "A",      # flake8-builtins
+  "ARG",    # flake8-unused-arguments
+  "B",      # flake8-bugbear
+  "C4",     # flake8-comprehensions
+  "D",      # pydocstyle
+  "E",      # pycodestyle (errors)
+  "W",      # pycodestyle (warnings)
+  "EM",     # flake8-errmsg
+  "EXE",    # flake8-executable
+  "F",      # Pyflakes
+  "I",      # isort
+  "ISC",    # flake8-implicit-str-concat
+  "N",      # pep8-naming
   "NPY201", # numpy 2.0 depgrcations
-  "PGH", # pygrep-hooks
-  "PIE", # flake8-pie
-  "PL",  # Pylint
-  "PT",  # flake8-pytest-style
-  "PTH", # flake8-use-pathlib
-  "PYI", # flake8-pyi
-  "RUF", # Ruff-specific rules
-  "SIM", # flake8-simplify
-  "TRY", # tryceratops
-  "UP",  # pyupgrade  <- not working with Pydantic lower python versions
-  "YTT", # flake8-2020
+  "PGH",    # pygrep-hooks
+  "PIE",    # flake8-pie
+  "PL",     # Pylint
+  "PT",     # flake8-pytest-style
+  "PTH",    # flake8-use-pathlib
+  "PYI",    # flake8-pyi
+  "RUF",    # Ruff-specific rules
+  "SIM",    # flake8-simplify
+  "TRY",    # tryceratops
+  "UP",     # pyupgrade  <- not working with Pydantic lower python versions
+  "YTT",    # flake8-2020
 ]
 
 ignore = [
- "PTH123", # `open()` should be replaced by `Path.open()`
- "PLR",    # Pylint Refactor
- "D100",   # Missing docstring in public module
- "D104",   # Missing docstring in public package
- "D105",   # Missing docstring in magic method
- "D102",   # D102: Missing docstring in public method (TODO: remove this ignore)
- "D203",   # 1 blank line required before class docstring
- "N806",   # Variable _ in function should be lowercase
- "SIM108", # Use ternary operator
+  "PTH123", # `open()` should be replaced by `Path.open()`
+  "PLR",    # Pylint Refactor
+  "D100",   # Missing docstring in public module
+  "D104",   # Missing docstring in public package
+  "D105",   # Missing docstring in magic method
+  "D102",   # D102: Missing docstring in public method (TODO: remove this ignore)
+  "D203",   # 1 blank line required before class docstring
+  "N806",   # Variable _ in function should be lowercase
+  "SIM108", # Use ternary operator
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401", "F403"]
 "tests/**" = ["D", "N", "PTH", "ARG001", "PLR2004", "E501"]
-"src/opera_utils/datasets.py" = ["E501"] # Line too long
+"src/opera_utils/datasets.py" = ["E501"]                    # Line too long
 "scripts/*" = ["F401"]
 
 [tool.black]
