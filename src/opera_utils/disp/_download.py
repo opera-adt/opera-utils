@@ -75,6 +75,15 @@ def process_file(
         ds_corr = xr.open_dataset(temp_path, engine="h5netcdf", group="corrections")
         corr_subset = ds_corr.isel(y=slice(Y0, Y1), x=slice(X0, X1))
         corr_subset.to_netcdf(outpath, mode="a", group="corrections")
+        # Add the top-level /identification and /metadata too
+        for group in "metadata", "identification":
+            # Note: we can't use xarray here, due to the np.bytes_ datasets:
+            # See https://github.com/pydata/xarray/issues/10389
+            import h5py
+
+            with h5py.File(temp_path) as hf, h5py.File(outpath, "a") as dest_hf:
+                # dest_group = hf.require_group(group)
+                hf.copy(group, dest_hf, name=group)
 
         logger.debug(f"Done: {filename}")
     return outpath
