@@ -82,7 +82,6 @@ def process_file(
             import h5py
 
             with h5py.File(temp_path) as hf, h5py.File(outpath, "a") as dest_hf:
-                # dest_group = hf.require_group(group)
                 hf.copy(group, dest_hf, name=group)
 
         logger.debug(f"Done: {filename}")
