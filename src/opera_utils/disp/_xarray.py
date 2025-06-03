@@ -117,7 +117,7 @@ def _create_initial_epoch(df: pd.DataFrame, first_stack: xr.Dataset) -> xr.Datas
     """Create initial reference epoch with zero displacement."""
     # Get earliest date from the dataframe
     first_epoch = df.reference_datetime.min()
-    first_epoch_dt64 = np.datetime64(first_epoch.to_pydatetime())
+    first_epoch_dt64 = np.datetime64(first_epoch.to_pydatetime(), "ns")
 
     # Create zero-valued dataset matching spatial structure
     initial_ds = xr.full_like(first_stack.isel(time=0), 0)
