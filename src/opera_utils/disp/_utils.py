@@ -61,7 +61,7 @@ def _last_per_ministack(
     return last_per_ministack
 
 
-def round_mantissa(z: np.ndarray, keep_bits=10) -> None:
+def round_mantissa(z: np.ndarray, keep_bits=10) -> np.ndarray:
     """Zero out mantissa bits of elements of array in place.
 
     Drops a specified number of bits from the floating point mantissa,
@@ -75,6 +75,11 @@ def round_mantissa(z: np.ndarray, keep_bits=10) -> None:
         Number of bits to preserve in mantissa. Defaults to 10.
         Lower numbers will truncate the mantissa more and enable
         more compression.
+
+    Returns
+    -------
+    np.ndarray
+        View of input `z` array with rounded mantissa.
 
     References
     ----------

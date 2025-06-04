@@ -7,6 +7,7 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import tyro
 import xarray as xr
@@ -18,7 +19,9 @@ from ._enums import (
     SAME_PER_MINISTACK_DATASETS,
     UNIQUE_PER_DATE_DATASETS,
     CorrectionDataset,
+    QualityDataset,
 )
+from ._utils import _ensure_chunks, round_mantissa
 
 
 def reformat_stack(
@@ -28,6 +31,9 @@ def reformat_stack(
     drop_vars: Sequence[str] | None = None,
     apply_solid_earth_corrections: bool = True,
     apply_ionospheric_corrections: bool = False,
+    quality_dataset: QualityDataset | None = QualityDataset.RECOMMENDED_MASK,
+    quality_threshold: float = 0.5,
+    do_round: bool = True,
 ) -> None:
     """Reformat NetCDF DISP-S1 files into one NetCDF/Zarr stack.
 
@@ -54,6 +60,15 @@ def reformat_stack(
     apply_ionospheric_corrections : bool
         Apply ionospheric delay correction to the data.
         Default is False.
+    quality_dataset : QualityDataset | None
+        Name of the quality dataset to use as a mask when accumulating
+        displacement for re-referencing.
+        If None, no masking is performed.
+    quality_threshold : float
+        Threshold for the quality dataset to use as a mask.
+        Default is 0.5.
+    do_round : bool
+        If True, rounds mantissa bits of floating point rasters to compress the data.
 
     """
     start_time = time.time()
@@ -117,7 +132,14 @@ def reformat_stack(
     else:
         ds_corrections = None
     _write_rebased_stack(
-        ds, df, output_name, out_chunks, out_format, ds_corrections=ds_corrections
+        ds,
+        df,
+        output_name,
+        out_chunks,
+        out_format,
+        ds_corrections=ds_corrections,
+        quality_dataset=quality_dataset,
+        quality_threshold=quality_threshold,
     )
     print(f"Wrote displacement: {time.time() - start_time:.1f}s")
 
@@ -128,6 +150,11 @@ def reformat_stack(
     ds_remaining = ds[UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS].chunk(
         out_chunk_dict
     )
+    for var in ds_remaining.data_vars:
+        # Round, if it's a float32
+        d = ds_remaining[var]
+        if do_round and np.issubdtype(d.dtype, np.floating):
+            d.data = round_mantissa(d.data, keep_bits=7)
     print(f"Writing remaining variables: {ds_remaining.data_vars}")
     # Now here, we'll use the virtual dataset feature of HDF5 if we're writing NetCDF
     if out_format == "zarr":
@@ -154,17 +181,29 @@ def _write_rebased_stack(
     out_chunks: tuple[int, int, int],
     out_format: str = "zarr",
     ds_corrections: xr.Dataset | None = None,
+    quality_dataset: QualityDataset | None = None,
+    quality_threshold: float = 0.5,
+    do_round: bool = True,
 ) -> None:
     da_displacement = ds.displacement
     process_chunk_size: tuple[int, int] = (512, 512)
+
+    process_chunks = {
+        "time": -1,
+        "y": process_chunk_size[0],
+        "x": process_chunk_size[1],
+    }
+    process_chunks = _ensure_chunks(process_chunks, da_displacement.shape)
     if ds_corrections:
-        ds_corrections = ds_corrections.chunk(
-            {"time": -1, "y": process_chunk_size[0], "x": process_chunk_size[1]}
-        )
+        ds_corrections = ds_corrections.chunk(process_chunks)
         for var in ds_corrections.data_vars:
             if ds_corrections[var].shape != da_displacement.shape:
                 continue
             da_displacement = da_displacement - ds_corrections[var]
+
+    if quality_dataset is not None:
+        quality_da = ds[quality_dataset].chunk(process_chunks)
+        da_displacement = da_displacement.where(quality_da > quality_threshold)
 
     da_disp = disp.create_rebased_displacement(
         da_displacement,
@@ -173,6 +212,8 @@ def _write_rebased_stack(
         process_chunk_size=process_chunk_size,
     )
     da_disp = da_disp.assign_coords(spatial_ref=ds.spatial_ref)
+    if do_round and np.issubdtype(da_disp.dtype, np.floating):
+        da_disp.data = round_mantissa(da_disp.data, keep_bits=10)
     ds_disp = da_disp.to_dataset(name="displacement")
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_disp, out_chunks)
