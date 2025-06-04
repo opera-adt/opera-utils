@@ -121,3 +121,14 @@ def _get_border(data_arrays: NDArray[np.floating]) -> NDArray[np.floating]:
     right_col = data_arrays[:, :, -1]
     all_pixels = np.hstack([top_row, bottom_row, left_col, right_col])
     return np.nanmedian(all_pixels, axis=1)[:, np.newaxis, np.newaxis]
+
+
+def _ensure_chunks(
+    requested_chunks: dict[str, int] | None, data_shape: tuple[int, int, int]
+) -> dict[str, int]:
+    """Ensure requested_chunks are smaller than the downloaded size."""
+    chunks = {**(requested_chunks or {})}
+    chunks["time"] = min(chunks["time"], data_shape[0])
+    chunks["y"] = min(chunks["y"], data_shape[1])
+    chunks["x"] = min(chunks["x"], data_shape[2])
+    return chunks

@@ -2,27 +2,27 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from datetime import datetime
 
-import numpy as np
 import pandas as pd
 import xarray as xr
 
-from ._product import DispProductStack
+from ._rebase import rebase_timeseries
+from ._utils import _ensure_chunks
 
 logger = logging.getLogger("opera_utils")
 
-DEFAULT_CHUNKS: dict[str, int] = {"time": 10, "x": 1024, "y": 1024}
-
 __all__ = [
-    "create_rebased_stack",
+    "create_rebased_displacement",
 ]
 
 
-def create_rebased_stack(
-    dps: DispProductStack,
-    chunks: dict[str, int] | None = None,
-    data_vars: Sequence[str] = ["displacement", "short_wavelength_displacement"],
-) -> xr.Dataset:
+def create_rebased_displacement(
+    da_displacement: xr.DataArray,
+    reference_datetimes: Sequence[datetime | pd.DatetimeIndex],
+    process_chunk_size: tuple[int, int] = (512, 512),
+    add_reference_time: bool = False,
+) -> xr.DataArray:
     """Rebase and stack displacement products with different reference dates.
 
     This function combines displacement products that may have different reference
@@ -32,99 +32,47 @@ def create_rebased_stack(
 
     Parameters
     ----------
-    dps : DispProductStack
-        Stack of displacement products to combine.
-    chunks : Dict[str, int], optional
-        Chunking configuration for xarray. Defaults to DEFAULT_CHUNKS.
-    data_vars : Sequence[str], optional
-        Data variables to process for rebasing.
-        Defaults to ["displacement", "short_wavelength_displacement"].
+    da_displacement : xr.DataArray
+        Displacement dataarray to rebase.
+    reference_datetimes : Sequence[datetime | pd.DatetimeIndex]
+        Reference datetime for each epoch.
+        Must be same length as `da_displacement.time`.
+    process_chunk_size : tuple[int, int], optional
+        Chunk size for processing. Defaults to (512, 512).
+    add_reference_time : bool, optional
+        Whether to add a zero array for the reference time.
+        Defaults to False.
 
     Returns
     -------
-    xr.Dataset
-        Stacked displacement dataset with rebased displacements.
+    xr.DataArray
+        Stacked displacement dataarray with rebased displacements.
 
     """
     logger.info("Starting displacement stack rebasing")
 
-    chunks = _get_chunks(chunks, dps)
-    logger.info(f"Using chunk configuration: {chunks}")
+    process_chunks = {
+        "time": -1,
+        "y": process_chunk_size[0],
+        "x": process_chunk_size[1],
+    }
+    process_chunks = _ensure_chunks(process_chunks, da_displacement.shape)
 
-    # Get dataframe and group by reference dates
-    df = dps.to_dataframe()
-    substacks = df.groupby(["reference_datetime", "secondary_datetime"]).apply(
-        lambda x: x, include_groups=False
-    )
-    reference_dates = pd.Series(df.reference_datetime.unique())
+    # Make the map_blocks-compatible function to accumulate the displacement
 
-    # Process each reference date's substack, create the stacked dataset
-    rebased_stacks = _accumulate_displacements(substacks, reference_dates, data_vars)
+    def process_block(arr: xr.DataArray) -> xr.DataArray:
+        out = rebase_timeseries(arr.data, reference_datetimes)
+        return xr.DataArray(out, coords=arr.coords, dims=arr.dims)
 
-    # Add initial reference epoch of zeros
-    initial_epoch = _create_initial_epoch(df, rebased_stacks[0])
-    # Combine and rechunk
-    ds_combined = xr.concat([initial_epoch, *rebased_stacks], dim="time").chunk(chunks)
-    try:
-        ds_combined.rio.write_crs(f"EPSG:{dps.epsg}", inplace=True)
-    except AttributeError as e:
-        logger.warning("Could not write CRS to dataset: %s", e)
+    # Process the dataset
+    # da = xr.open_mfdataset(dps.filenames).displacement
+    rebased_da = da_displacement.chunk(process_chunks).map_blocks(process_block)
+    if add_reference_time:
+        # Add initial reference epoch of zeros, and rechunk
+        rebased_da = xr.concat(
+            [xr.full_like(rebased_da[0], 0), rebased_da], dim="time"
+        ).transpose(
+            "time", "y", "x"
+        )  # Ensure correct dimension order
 
-    logger.info(f"Successfully combined {len(rebased_stacks)} substacks")
-    return ds_combined
-
-
-def _get_chunks(chunks: dict[str, int] | None, dps: DispProductStack) -> dict[str, int]:
-    """Ensure chunks are smaller than the downloaded size."""
-    chunks = {**DEFAULT_CHUNKS, **(chunks or {})}
-    with xr.open_dataset(dps.products[0].filename) as ds:
-        data_shape = ds["displacement"].shape
-        chunks["x"] = min(chunks["x"], data_shape[1])
-        chunks["y"] = min(chunks["y"], data_shape[0])
-    chunks["time"] = min(chunks["time"], len(dps.products))
-    return chunks
-
-
-def _accumulate_displacements(
-    substacks: pd.DataFrame,
-    reference_dates: pd.Series,
-    data_vars: Sequence[str] = ["displacement", "short_wavelength_displacement"],
-) -> list[xr.Dataset]:
-    """Open each substack, process into cumulative displacement."""
-    rebased_stacks: list[xr.Dataset] = []
-
-    for idx, ref_date in enumerate(reference_dates):
-        logger.debug(f"Processing ministack for reference date: {ref_date}")
-
-        # Get files for this reference date
-        substack_df = substacks.loc[ref_date]
-        stack_files = substack_df.sort_index().filename.to_list()
-
-        # Open the current ministack's files
-        stack = xr.open_mfdataset(stack_files, engine="h5netcdf")
-
-        # Append first epoch of new ministack to last epochs of previous
-        if idx > 0:
-            for ds_name in data_vars:
-                stack[ds_name] += rebased_stacks[-1].isel(time=-1)[ds_name]
-
-        rebased_stacks.append(stack)
-
-    return rebased_stacks
-
-
-def _create_initial_epoch(df: pd.DataFrame, first_stack: xr.Dataset) -> xr.Dataset:
-    """Create initial reference epoch with zero displacement."""
-    # Get earliest date from the dataframe
-    first_epoch = df.reference_datetime.min()
-    first_epoch_dt64 = np.datetime64(first_epoch.to_pydatetime(), "ns")
-
-    # Create zero-valued dataset matching spatial structure
-    initial_ds = xr.full_like(first_stack.isel(time=0), 0)
-    initial_ds["time"] = first_epoch_dt64
-    initial_ds["reference_time"] = initial_ds["time"]
-
-    # Expand time dimension
-    initial_ds = initial_ds.expand_dims("time")
-
-    return initial_ds
+    return rebased_da
