@@ -57,8 +57,8 @@ opera-utils = "opera_utils.cli:cli_app"
 [project.optional-dependencies]
 # For geopandas functionality with burst/frame databases:
 geopandas = ["geopandas", "pyogrio"]
-# Access remote hdf5 files over S3 or HTTPS:
-remote = [
+# Work with DISP data - downloads and subsetting
+disp = [
   "affine",
   "botocore",
   "aiohttp",
@@ -67,9 +67,9 @@ remote = [
   "s3fs",
   "tqdm",
   "xarray",
+  "zarr>=3",
 ]
-disp = ["remote"] # Alias for remote dependencies
-all = ["opera-utils[remote,geopandas]"]
+all = ["opera-utils[disp,geopandas]"]
 
 test = [
   "asf_search",
