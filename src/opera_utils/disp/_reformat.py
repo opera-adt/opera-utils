@@ -14,7 +14,11 @@ from zarr.codecs import BloscCodec
 
 from opera_utils import disp
 
-from ._enums import SAME_PER_MINISTACK_DATASETS, UNIQUE_PER_DATE_DATASETS
+from ._enums import (
+    SAME_PER_MINISTACK_DATASETS,
+    UNIQUE_PER_DATE_DATASETS,
+    CorrectionDataset,
+)
 
 
 def reformat_stack(
@@ -22,13 +26,19 @@ def reformat_stack(
     output_name: str,
     out_chunks: tuple[int, int, int] = (5, 256, 256),
     drop_vars: Sequence[str] | None = None,
+    apply_solid_earth_corrections: bool = True,
+    apply_ionospheric_corrections: bool = False,
 ) -> None:
-    """Reformat NetCDF displacement files to Zarr format with compression.
+    """Reformat NetCDF DISP-S1 files into one NetCDF/Zarr stack.
+
+    This function reformats a set of input DISP-S1 files, adjusts
+    the `displacement` layer to be rebased to the first reference time,
+    and creates a single NetCDF/Zarr stack for quicker browsing access.
 
     Parameters
     ----------
     input_files : Sequence[Path]
-        Input NetCDF files.
+        Input DISP-S1 NetCDF files.
     output_name : str
         Name of the output file.
         Must end in ".nc" or ".zarr".
@@ -38,6 +48,12 @@ def reformat_stack(
     drop_vars : list of str, optional
         list of variable names to drop from the dataset before saving.
         Example: ["estimated_phase_quality"]
+    apply_solid_earth_corrections : bool
+        Apply solid earth tide correction to the data.
+        Default is True.
+    apply_ionospheric_corrections : bool
+        Apply ionospheric delay correction to the data.
+        Default is False.
 
     """
     start_time = time.time()
@@ -51,6 +67,11 @@ def reformat_stack(
         msg = "Only .nc and .zarr output formats are supported"
         raise ValueError(msg)
 
+    corrections: list[CorrectionDataset] = []
+    if apply_solid_earth_corrections:
+        corrections.append(CorrectionDataset.SOLID_EARTH_TIDE)
+    if apply_ionospheric_corrections:
+        corrections.append(CorrectionDataset.IONOSPHERIC_DELAY)
     # Set default chunks if none provided
     out_chunk_dict = dict(zip(["time", "y", "x"], out_chunks))
     dps = disp.DispProductStack.from_file_list(input_files)
@@ -59,7 +80,8 @@ def reformat_stack(
     # #####################
     # Write minimal dataset
     # #####################
-    ds = xr.open_mfdataset(dps.filenames)
+    ds = xr.open_mfdataset(dps.filenames, engine="h5netcdf")
+
     # Drop specified variables if requested
     if drop_vars:
         print(f"Dropping variables: {drop_vars}")
@@ -87,12 +109,22 @@ def reformat_stack(
     # Rebase displacement array
     # #########################
     print(f"Creating rebased stack with chunks: {out_chunk_dict}")
-    _write_rebased_stack(ds, df, output_name, out_chunks, out_format)
+    if corrections:
+        correction_names = [str(c).split("/")[-1] for c in corrections]
+        ds_corrections = xr.open_mfdataset(
+            dps.filenames, engine="h5netcdf", group="corrections"
+        )[correction_names]
+    else:
+        ds_corrections = None
+    _write_rebased_stack(
+        ds, df, output_name, out_chunks, out_format, ds_corrections=ds_corrections
+    )
     print(f"Wrote displacement: {time.time() - start_time:.1f}s")
 
     # #########################
     # Write remaining variables
     # #########################
+
     ds_remaining = ds[UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS].chunk(
         out_chunk_dict
     )
@@ -121,11 +153,24 @@ def _write_rebased_stack(
     output_name: Path | str,
     out_chunks: tuple[int, int, int],
     out_format: str = "zarr",
+    ds_corrections: xr.Dataset | None = None,
 ) -> None:
+    da_displacement = ds.displacement
+    process_chunk_size: tuple[int, int] = (512, 512)
+    if ds_corrections:
+        ds_corrections = ds_corrections.chunk(
+            {"time": -1, "y": process_chunk_size[0], "x": process_chunk_size[1]}
+        )
+        for var in ds_corrections.data_vars:
+            if ds_corrections[var].shape != da_displacement.shape:
+                continue
+            da_displacement = da_displacement - ds_corrections[var]
+
     da_disp = disp.create_rebased_displacement(
-        ds.displacement,
+        da_displacement,
         # Need to strip timezone to match the ds.time coordinates
-        df.reference_datetime.dt.tz_localize(None),
+        reference_datetimes=df.reference_datetime.dt.tz_localize(None),
+        process_chunk_size=process_chunk_size,
     )
     da_disp = da_disp.assign_coords(spatial_ref=ds.spatial_ref)
     ds_disp = da_disp.to_dataset(name="displacement")

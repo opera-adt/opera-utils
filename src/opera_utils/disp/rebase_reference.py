@@ -84,10 +84,10 @@ def rebase(
         Name of HDF5 dataset within product to use as a mask.
         If None, no masking is performed.
     apply_solid_earth_corrections : bool
-        Apply solid earth tides to the data.
+        Apply solid earth tide correction to the data.
         Default is True.
     apply_ionospheric_corrections : bool
-        Apply ionospheric delay to the data.
+        Apply ionospheric delay correction to the data.
         Default is True.
     nan_policy : str | NaNPolicy
         Whether to propagate or omit (zero out) NaNs in the data.
