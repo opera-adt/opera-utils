@@ -38,6 +38,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup ~/.netrc
+        uses: extractions/netrc@v2
+        with:
+          machine: urs.earthdata.nasa.gov
+          username: ${{ secrets.EARTHDATA_USERNAME }}
+          password: ${{ secrets.EARTHDATA_PASSWORD }}
+
       - name: Setup environment
         uses: mamba-org/setup-micromamba@v2
         with:
@@ -48,10 +56,11 @@ jobs:
           condarc: |
             channels:
               - conda-forge
+
       - name: Install
         run: |
-          pip install .[test,remote,geopandas]
-          pip install xarray dask
+          pip install .[test,disp,geopandas]
+
       - name: Test
         run: |
           pytest -n0
