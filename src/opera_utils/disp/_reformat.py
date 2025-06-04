@@ -14,10 +14,7 @@ from zarr.codecs import BloscCodec
 
 from opera_utils import disp
 
-from ._enums import (
-    SAME_PER_MINISTACK_DATASETS,
-    UNIQUE_PER_DATE_DATASETS,
-)
+from ._enums import SAME_PER_MINISTACK_DATASETS, UNIQUE_PER_DATE_DATASETS
 
 
 def reformat_stack(
@@ -98,6 +95,7 @@ def reformat_stack(
         )
     print(f"Wrote minimal dataset: {time.time() - start_time:.1f}s")
 
+    # ############
     # Create rebased stack with specified chunking
     print(f"Creating rebased stack with chunks: {out_chunk_dict}")
     da_disp = disp.create_rebased_displacement(
@@ -106,7 +104,6 @@ def reformat_stack(
     )
     da_disp = da_disp.assign_coords(spatial_ref=ds.spatial_ref)
     ds_disp = da_disp.to_dataset(name="displacement")
-    print(f"Rebased displacement: {time.time() - start_time:.1f}s")
 
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_disp, out_chunks)
@@ -120,24 +117,35 @@ def reformat_stack(
         out_chunk_dict
     )
 
+    # ############
     print(f"Writing remaining variables: {ds_remaining.data_vars}")
+    # Now here, we'll use the virtual dataset feature of HDF5 if we're writing NetCDF
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_remaining, out_chunks)
         ds_remaining.to_zarr(output_name, encoding=encoding, mode="a")
+
     else:
-        encoding = _get_netcdf_encoding(ds_remaining, out_chunks)
-        ds_remaining.to_netcdf(
-            output_name, engine="h5netcdf", encoding=encoding, mode="a"
+        from ._netcdf import create_virtual_stack
+
+        create_virtual_stack(
+            input_files=dps.filenames,
+            output=output_name,
+            dataset_names=[
+                str(ds) for ds in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS
+            ],
         )
     print(f"Wrote remaining: {time.time() - start_time:.1f}s")
 
+    _print_summary(output_name, start_time)
+
+
+def _print_summary(output_name: Path | str, start_time: float) -> None:
     # Report completion
     elapsed_time = time.time() - start_time
     file_size = sum(
         f.stat().st_size for f in Path(output_name).rglob("*") if f.is_file()
     )
     file_size_mb = file_size / (1024 * 1024)
-
     print(f"Successfully created {output_name}")
     print(f"File size: {file_size_mb:.1f} MB")
     print(f"Completed in {elapsed_time:.1f} seconds")
@@ -150,10 +158,16 @@ def _get_netcdf_encoding(
     data_vars: Sequence[str] = [],
 ) -> dict:
     encoding = {}
-    comp = {"zlib": True, "complevel": compression_level, "chunks": chunks}
+    comp = {"zlib": True, "complevel": compression_level, "chunksizes": chunks}
     if not data_vars:
         data_vars = list(ds.data_vars)
     encoding = {var: comp for var in data_vars if ds[var].ndim >= 2}
+    for var in data_vars:
+        if ds[var].ndim < 2:
+            continue
+        encoding[var] = comp
+        if ds[var].ndim == 2:
+            encoding[var]["chunksizes"] = chunks[-2:]
     return encoding
 
 
@@ -164,8 +178,7 @@ def _get_zarr_encoding(
     compression_name: str = "zstd",
     compression_level: int = 6,
     data_vars: Sequence[str] = [],
-) -> dict:
-    # out_chunk_dict = dict(zip(["time", "y", "x"], chunks))
+) -> dict[str, dict]:
     encoding_per_var = {
         "compressors": [
             BloscCodec(
