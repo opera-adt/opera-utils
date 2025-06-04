@@ -59,20 +59,20 @@ def create_rebased_displacement(
     process_chunks = _ensure_chunks(process_chunks, da_displacement.shape)
 
     # Make the map_blocks-compatible function to accumulate the displacement
-
     def process_block(arr: xr.DataArray) -> xr.DataArray:
-        out = rebase_timeseries(arr.data, reference_datetimes)
+        out = rebase_timeseries(arr.to_numpy(), reference_datetimes)
         return xr.DataArray(out, coords=arr.coords, dims=arr.dims)
 
-    # Process the dataset
-    # da = xr.open_mfdataset(dps.filenames).displacement
+    # Process the dataset in blocks
     rebased_da = da_displacement.chunk(process_chunks).map_blocks(process_block)
+
     if add_reference_time:
         # Add initial reference epoch of zeros, and rechunk
         rebased_da = xr.concat(
-            [xr.full_like(rebased_da[0], 0), rebased_da], dim="time"
-        ).transpose(
-            "time", "y", "x"
-        )  # Ensure correct dimension order
+            [xr.full_like(rebased_da[0], 0), rebased_da],
+            dim="time",
+        )
+        # Ensure correct dimension order
+        rebased_da = rebased_da.transpose("time", "y", "x")
 
     return rebased_da

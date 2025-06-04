@@ -308,13 +308,9 @@ class DispProductStack:
         """Convert the longitude and latitude (in degrees) row/column indices."""
         return lonlat_to_rowcol(self.products[0], lon, lat)
 
-    def to_dataframe(self, strip_timezone: bool = True) -> pd.DataFrame:
+    def to_dataframe(self) -> pd.DataFrame:
         """Create a DataFrame holding the product stack metadata."""
-        df = pd.DataFrame([asdict(p) for p in self.products])
-        if strip_timezone:
-            df.reference_datetime = df.reference_datetime.dt.tz_localize(None)
-            df.secondary_datetime = df.secondary_datetime.dt.tz_localize(None)
-        return df
+        return pd.DataFrame([asdict(p) for p in self.products])
 
 
 def _get_download_url(
