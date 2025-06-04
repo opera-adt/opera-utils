@@ -21,6 +21,8 @@ from opera_utils._utils import _get_path_from_gdal_str, numpy_to_gdal_type
 
 logger = logging.getLogger(__name__)
 
+gdal.UseExceptions()
+
 DEFAULT_TIFF_OPTIONS = (
     "COMPRESS=DEFLATE",
     "ZLEVEL=4",

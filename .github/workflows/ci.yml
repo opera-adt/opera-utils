@@ -60,7 +60,10 @@ jobs:
       - name: Install
         run: |
           pip install .[test,disp,geopandas]
-
+      # TODO: figure out the best way to get the test data here.
+      # - name: Download test DISP data
+      #   run: |
+      #     opera-utils disp-s1-download --output-dir tests/data/subsets-new-orleans-small  --frame-id 44055 --end-datetime 2017-06-01 --wkt 'POLYGON ((-90.15 29.95, -90.15 30.1, -89.95 30.1, -89.95 29.95, -90.15 29.95))' \
       - name: Test
         run: |
           pytest -n0
