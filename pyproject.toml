@@ -60,8 +60,9 @@ geopandas = ["geopandas", "pyogrio"]
 # Work with DISP data - downloads and subsetting
 disp = [
   "affine",
-  "botocore",
   "aiohttp",
+  "botocore",
+  "dask",
   "fsspec",
   "h5netcdf",
   "s3fs",
@@ -69,7 +70,8 @@ disp = [
   "xarray",
   "zarr>=3",
 ]
-all = ["opera-utils[disp,geopandas]"]
+cslc = ["asf_search"]
+all = ["opera-utils[cslc,disp,geopandas]"]
 
 test = [
   "asf_search",

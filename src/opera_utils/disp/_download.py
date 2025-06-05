@@ -12,6 +12,7 @@ from tqdm.contrib.concurrent import process_map
 from opera_utils.credentials import get_earthdata_username_password
 
 from ._product import DispProductStack
+from ._remote import open_file
 from ._search import UrlType, search
 
 logger = logging.getLogger("opera_utils")
@@ -55,26 +56,30 @@ def process_file(
         logger.info(f"Skipped (exists): {filename}")
         return outpath
 
-    if session is None:
-        session = requests.Session()
-        username, password = get_earthdata_username_password()
-        session.auth = (username, password)
-    response = session.get(url)
-    response.raise_for_status()
     with tempfile.NamedTemporaryFile(suffix=".nc") as tf:
         temp_path = Path(tf.name)
-        with open(temp_path, "wb") as f:
-            f.write(response.content)
+        if url.startswith("s3://"):
+            with open_file(url) as in_f, open(temp_path, "wb") as out_f:
+                out_f.write(in_f.read())
+        else:
+            if session is None:
+                session = requests.Session()
+                username, password = get_earthdata_username_password()
+                session.auth = (username, password)
+            response = session.get(url)
+            response.raise_for_status()
+            with open(temp_path, "wb") as out_f:
+                out_f.write(response.content)
 
         # Open and slice root data
         ds = xr.open_dataset(temp_path, engine="h5netcdf")
         subset = ds.isel(y=slice(Y0, Y1), x=slice(X0, X1))
-        subset.to_netcdf(outpath)
+        subset.to_netcdf(outpath, engine="h5netcdf")
 
         # Also subset and add /corrections data
         ds_corr = xr.open_dataset(temp_path, engine="h5netcdf", group="corrections")
         corr_subset = ds_corr.isel(y=slice(Y0, Y1), x=slice(X0, X1))
-        corr_subset.to_netcdf(outpath, mode="a", group="corrections")
+        corr_subset.to_netcdf(outpath, mode="a", engine="h5netcdf", group="corrections")
         # Add the top-level /identification and /metadata too
         for group in "metadata", "identification":
             # Note: we can't use xarray here, due to the np.bytes_ datasets:
