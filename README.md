@@ -38,7 +38,7 @@ The `pip` dependency list for the base package is smaller; the optional depencie
 
 ```bash
 pip install opera-utils[geopandas] # for just geopandas data frame support
-pip install opera-utils[remote] # For remote access to DISP files
+pip install opera-utils[disp] # For remote access to DISP files
 pip install opera-utils[all]  # all optional dependencies
 ```
 

@@ -16,6 +16,8 @@ from opera_utils._types import Bbox, PathOrStr
 from opera_utils._utils import format_nc_filename, scratch_directory
 from opera_utils.download import download_cslc_static_layers
 
+gdal.UseExceptions()
+
 logger = logging.getLogger(__name__)
 
 EXTRA_COMPRESSED_TIFF_OPTIONS = (

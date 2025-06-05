@@ -11,6 +11,7 @@ from math import nan
 from pathlib import Path
 from typing import Any
 
+import h5py
 import numpy as np
 import pandas as pd
 import pyproj
@@ -113,14 +114,23 @@ class DispProduct:
 
     @property
     def shape(self) -> tuple[int, int]:
-        left, bottom, right, top = self._frame_bbox_result[1]
-        return (round((top - bottom) / 30), round((right - left) / 30))
+        # First check if files actually exist
+        if not Path(self.filename).exists():
+            # If not, assume the full size shape:
+            left, bottom, right, top = self._frame_bbox_result[1]
+            return (round((top - bottom) / 30), round((right - left) / 30))
+        # Otherwise, read the shape from the file
+        with h5py.File(self.filename) as f:
+            return f["displacement"].shape
 
     @cached_property
     def _coordinates(self) -> tuple[np.ndarray, np.ndarray]:
-        from ._utils import get_frame_coordinates
+        if not Path(self.filename).exists():
+            from ._utils import get_frame_coordinates
 
-        return get_frame_coordinates(self.frame_id)
+            return get_frame_coordinates(self.frame_id)
+        with h5py.File(self.filename) as f:
+            return f["x"][()], f["y"][()]
 
     @property
     def x(self) -> np.ndarray:
@@ -132,8 +142,13 @@ class DispProduct:
 
     @property
     def transform(self) -> Affine:
-        left, _bottom, _right, top = self._frame_bbox_result[1]
-        return Affine(30, 0, left, 0, -30, top)
+        if not Path(self.filename).exists():
+            left, _bottom, _right, top = self._frame_bbox_result[1]
+            return Affine(30, 0, left, 0, -30, top)
+        with h5py.File(self.filename) as f:
+            x0, y0 = f["x"][0], f["y"][0]
+            # Shift by half a pixel
+            return Affine(30, 0, x0 - 15, 0, -30, y0 + 15)
 
     def get_rasterio_profile(self, chunks: tuple[int, int] = (256, 256)) -> dict:
         """Generate a `profile` usable by `rasterio.open()`."""
@@ -149,7 +164,6 @@ class DispProduct:
             "count": 1,
         }
         # Add frame georeferencing metadata
-        left, bottom, right, top = self._frame_bbox_result[1]
         profile["width"] = self.shape[1]
         profile["height"] = self.shape[0]
         profile["transform"] = self.transform

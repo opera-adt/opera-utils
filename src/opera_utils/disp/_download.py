@@ -101,7 +101,7 @@ def run_download(
     bbox: tuple[float, float, float, float] | None = None,
     wkt: str | None = None,
     url_type: UrlType = UrlType.HTTPS,
-    num_workers: int = 20,
+    num_workers: int = 8,
     product_version: str | None = "1.0",
     output_dir: Path = Path("./subsets"),
 ) -> list[Path]:
