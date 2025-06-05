@@ -21,7 +21,7 @@ __all__ = ["open_file", "open_h5"]
 
 
 def open_file(
-    url: PathLike[str],
+    url: str | PathLike[str],
     earthdata_username: str | None = None,
     earthdata_password: str | None = None,
     asf_endpoint: str | ASFCredentialEndpoints = "OPERA",
@@ -102,12 +102,12 @@ def open_file(
     return byte_stream
 
 
-def _get_url_str(url: PathLike[str]) -> str:
+def _get_url_str(url: str | PathLike[str]) -> str:
     return fsdecode(url.resolve().as_uri() if isinstance(url, Path) else url)
 
 
 def open_h5(
-    url: PathLike[str],
+    url: str | PathLike[str],
     page_size: int = 4 * 1024 * 1024,
     rdcc_nbytes: int = 1024 * 1024 * 1000,
     earthdata_username: str | None = None,
