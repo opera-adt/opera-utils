@@ -21,19 +21,21 @@ from ._enums import (
     CorrectionDataset,
     QualityDataset,
 )
+from ._netcdf import create_virtual_stack
 from ._utils import _ensure_chunks, round_mantissa
 
 
 def reformat_stack(
     input_files: list[Path],
     output_name: str,
-    out_chunks: tuple[int, int, int] = (5, 256, 256),
+    out_chunks: tuple[int, int, int] = (4, 256, 256),
     drop_vars: Sequence[str] | None = None,
     apply_solid_earth_corrections: bool = True,
     apply_ionospheric_corrections: bool = False,
     quality_dataset: QualityDataset | None = QualityDataset.RECOMMENDED_MASK,
     quality_threshold: float = 0.5,
     do_round: bool = True,
+    max_workers: int = 1,
 ) -> None:
     """Reformat NetCDF DISP-S1 files into one NetCDF/Zarr stack.
 
@@ -50,7 +52,7 @@ def reformat_stack(
         Must end in ".nc" or ".zarr".
     out_chunks : tuple[int, int, int]
         Chunking configuration for output DataArray.
-        Defaults to DEFAULT_CHUNKS, which is {"time": 5, "x": 256, "y": 256}
+        Defaults to DEFAULT_CHUNKS, which is {"time": 4, "x": 256, "y": 256}
     drop_vars : list of str, optional
         list of variable names to drop from the dataset before saving.
         Example: ["estimated_phase_quality"]
@@ -69,6 +71,9 @@ def reformat_stack(
         Default is 0.5.
     do_round : bool
         If True, rounds mantissa bits of floating point rasters to compress the data.
+    max_workers : int
+        Number of workers to use for parallel processing.
+        Default is 1.
 
     """
     start_time = time.time()
@@ -81,6 +86,17 @@ def reformat_stack(
     else:
         msg = "Only .nc and .zarr output formats are supported"
         raise ValueError(msg)
+
+    if max_workers == 1:
+        client = None
+    else:
+        import dask.distributed
+
+        cluster = dask.distributed.LocalCluster(n_workers=max_workers)
+        print(f"Cluster: {cluster}")
+        client = dask.distributed.Client(cluster)
+        print("Dashboard link:", client.dashboard_link)
+        print(f"Dask client: {client}")
 
     corrections: list[CorrectionDataset] = []
     if apply_solid_earth_corrections:
@@ -95,7 +111,8 @@ def reformat_stack(
     # #####################
     # Write minimal dataset
     # #####################
-    ds = xr.open_mfdataset(dps.filenames, engine="h5netcdf")
+    process_chunk_dict = dict(zip(["time", "y", "x"], (1, 2048, 2048)))
+    ds = xr.open_mfdataset(dps.filenames, engine="h5netcdf", chunks=process_chunk_dict)
 
     # Drop specified variables if requested
     if drop_vars:
@@ -127,7 +144,10 @@ def reformat_stack(
     if corrections:
         correction_names = [str(c).split("/")[-1] for c in corrections]
         ds_corrections = xr.open_mfdataset(
-            dps.filenames, engine="h5netcdf", group="corrections"
+            dps.filenames,
+            engine="h5netcdf",
+            group="corrections",
+            chunks=process_chunk_dict,
         )[correction_names]
     else:
         ds_corrections = None
@@ -140,15 +160,16 @@ def reformat_stack(
         ds_corrections=ds_corrections,
         quality_dataset=quality_dataset,
         quality_threshold=quality_threshold,
+        process_chunk_size=(process_chunk_dict["y"], process_chunk_dict["x"]),
     )
     print(f"Wrote displacement: {time.time() - start_time:.1f}s")
 
     # #########################
     # Write remaining variables
     # #########################
-
+    # TODO: we could just read once per ministack, then tile, then write
     ds_remaining = ds[UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS].chunk(
-        out_chunk_dict
+        {"time": out_chunk_dict["time"], "y": 2048, "x": 2048}
     )
     for var in ds_remaining.data_vars:
         # Round, if it's a float32
@@ -162,8 +183,6 @@ def reformat_stack(
         ds_remaining.to_zarr(output_name, encoding=encoding, mode="a")
 
     else:
-        from ._netcdf import create_virtual_stack
-
         create_virtual_stack(
             input_files=dps.filenames,
             output=output_name,
@@ -184,9 +203,9 @@ def _write_rebased_stack(
     quality_dataset: QualityDataset | None = None,
     quality_threshold: float = 0.5,
     do_round: bool = True,
+    process_chunk_size: tuple[int, int] = (2048, 2048),
 ) -> None:
     da_displacement = ds.displacement
-    process_chunk_size: tuple[int, int] = (512, 512)
 
     process_chunks = {
         "time": -1,
