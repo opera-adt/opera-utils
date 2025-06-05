@@ -34,6 +34,7 @@ def reformat_stack(
     apply_ionospheric_corrections: bool = False,
     quality_dataset: QualityDataset | None = QualityDataset.RECOMMENDED_MASK,
     quality_threshold: float = 0.5,
+    process_chunk_size: tuple[int, int] = (2048, 2048),
     do_round: bool = True,
     max_workers: int = 1,
 ) -> None:
@@ -69,6 +70,9 @@ def reformat_stack(
     quality_threshold : float
         Threshold for the quality dataset to use as a mask.
         Default is 0.5.
+    process_chunk_size : tuple[int, int]
+        Chunking configuration for processing DataArray.
+        Defaults to (2048, 2048).
     do_round : bool
         If True, rounds mantissa bits of floating point rasters to compress the data.
     max_workers : int
@@ -111,7 +115,11 @@ def reformat_stack(
     # #####################
     # Write minimal dataset
     # #####################
-    process_chunk_dict = dict(zip(["time", "y", "x"], (1, 2048, 2048)))
+    process_chunk_dict = {
+        "time": 1,
+        "y": process_chunk_size[0],
+        "x": process_chunk_size[1],
+    }
     ds = xr.open_mfdataset(dps.filenames, engine="h5netcdf", chunks=process_chunk_dict)
 
     # Drop specified variables if requested
@@ -160,7 +168,8 @@ def reformat_stack(
         ds_corrections=ds_corrections,
         quality_dataset=quality_dataset,
         quality_threshold=quality_threshold,
-        process_chunk_size=(process_chunk_dict["y"], process_chunk_dict["x"]),
+        process_chunk_size=process_chunk_size,
+        do_round=do_round,
     )
     print(f"Wrote displacement: {time.time() - start_time:.1f}s")
 
@@ -169,7 +178,11 @@ def reformat_stack(
     # #########################
     # TODO: we could just read once per ministack, then tile, then write
     ds_remaining = ds[UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS].chunk(
-        {"time": out_chunk_dict["time"], "y": 2048, "x": 2048}
+        {
+            "time": out_chunk_dict["time"],
+            "y": process_chunk_dict["y"],
+            "x": process_chunk_dict["x"],
+        }
     )
     for var in ds_remaining.data_vars:
         # Round, if it's a float32
@@ -207,6 +220,8 @@ def _write_rebased_stack(
 ) -> None:
     da_displacement = ds.displacement
 
+    # For this, we want to work on the entire time stack at once
+    # Otherwise the summation in `create_rebased_displacement` won't work
     process_chunks = {
         "time": -1,
         "y": process_chunk_size[0],

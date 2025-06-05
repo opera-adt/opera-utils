@@ -23,3 +23,5 @@ dependencies:
   - h5netcdf
   - s3fs
   - tqdm
+  - dask
+  - zarr
