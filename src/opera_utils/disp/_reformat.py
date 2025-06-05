@@ -19,6 +19,7 @@ from ._enums import (
     SAME_PER_MINISTACK_DATASETS,
     UNIQUE_PER_DATE_DATASETS,
     CorrectionDataset,
+    DisplacementDataset,
     QualityDataset,
 )
 from ._netcdf import create_virtual_stack
@@ -164,14 +165,27 @@ def reformat_stack(
         df,
         output_name,
         out_chunks,
-        out_format,
+        data_var=DisplacementDataset.DISPLACEMENT,
+        out_format=out_format,
         ds_corrections=ds_corrections,
         quality_dataset=quality_dataset,
         quality_threshold=quality_threshold,
         process_chunk_size=process_chunk_size,
         do_round=do_round,
     )
-    print(f"Wrote displacement: {time.time() - start_time:.1f}s")
+    print(f"Wrote displacement at {time.time() - start_time:.1f}s")
+    if str(DisplacementDataset.SHORT_WAVELENGTH) in ds.data_vars:
+        _write_rebased_stack(
+            ds,
+            df,
+            output_name,
+            out_chunks,
+            data_var=DisplacementDataset.SHORT_WAVELENGTH,
+            out_format=out_format,
+            process_chunk_size=process_chunk_size,
+            do_round=do_round,
+        )
+        print(f"Wrote short_wavelength_displacement at {time.time() - start_time:.1f}s")
 
     # #########################
     # Write remaining variables
@@ -211,6 +225,7 @@ def _write_rebased_stack(
     df: pd.DataFrame,
     output_name: Path | str,
     out_chunks: tuple[int, int, int],
+    data_var: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
     out_format: str = "zarr",
     ds_corrections: xr.Dataset | None = None,
     quality_dataset: QualityDataset | None = None,
@@ -218,7 +233,7 @@ def _write_rebased_stack(
     do_round: bool = True,
     process_chunk_size: tuple[int, int] = (2048, 2048),
 ) -> None:
-    da_displacement = ds.displacement
+    da_displacement = ds[str(data_var)]
 
     # For this, we want to work on the entire time stack at once
     # Otherwise the summation in `create_rebased_displacement` won't work
@@ -248,7 +263,7 @@ def _write_rebased_stack(
     da_disp = da_disp.assign_coords(spatial_ref=ds.spatial_ref)
     if do_round and np.issubdtype(da_disp.dtype, np.floating):
         da_disp.data = round_mantissa(da_disp.data, keep_bits=10)
-    ds_disp = da_disp.to_dataset(name="displacement")
+    ds_disp = da_disp.to_dataset(name=str(data_var))
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_disp, out_chunks)
         ds_disp.to_zarr(output_name, encoding=encoding, mode="a")
