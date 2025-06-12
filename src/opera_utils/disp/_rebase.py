@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from enum import Enum
+from functools import reduce
 
 import numpy as np
 import pandas as pd
@@ -96,6 +97,48 @@ def create_rebased_displacement(
         rebased_da = rebased_da.transpose("time", "y", "x")
 
     return rebased_da
+
+
+def combine_quality_masks(
+    quality_datasets: Sequence[xr.DataArray],
+    thresholds: Sequence[float],
+    reduction_func: Callable = np.logical_or,
+) -> xr.DataArray:
+    """Create a combined mask from multiple quality datasets.
+
+    This function creates on boolean mask from multiple quality datasets
+    by applying `reduction_func` on each thresholded array.
+
+    For example, with `reduction_func=np.logical_or` and
+    `thresholds=[0.5, 0.5]`, the mask will be True if any of the quality datasets
+    have a value greater than 0.5.
+    If you want *all* quality datasets to pass their respective thresholds,
+    use `reduction_func=np.logical_and`.
+
+    Parameters
+    ----------
+    quality_datasets : Sequence[xr.DataArray]
+        Sequence of quality datasets.
+    thresholds : Sequence[float]
+        Thresholds for each quality dataset.
+        Must be same length as `quality_datasets`.
+    reduction_func : Callable
+        Function to use for combining the quality datasets.
+        Defaults to `np.logical_or`.
+
+    Returns
+    -------
+    xr.DataArray
+        Combined mask.
+
+    """
+    return reduce(
+        reduction_func,
+        [
+            qd > threshold
+            for qd, threshold in zip(quality_datasets, thresholds, strict=True)
+        ],
+    )
 
 
 def rebase_timeseries(

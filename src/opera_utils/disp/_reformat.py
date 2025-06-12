@@ -35,8 +35,10 @@ def reformat_stack(
     drop_vars: Sequence[str] | None = None,
     apply_solid_earth_corrections: bool = True,
     apply_ionospheric_corrections: bool = False,
-    quality_dataset: QualityDataset | None = QualityDataset.RECOMMENDED_MASK,
-    quality_threshold: float = 0.5,
+    quality_datasets: Sequence[QualityDataset] | None = [
+        QualityDataset.RECOMMENDED_MASK
+    ],
+    quality_thresholds: Sequence[float] | None = [0.5],
     process_chunk_size: tuple[int, int] = (2048, 2048),
     do_round: bool = True,
     max_workers: int = 1,
@@ -71,13 +73,17 @@ def reformat_stack(
     apply_ionospheric_corrections : bool
         Apply ionospheric delay correction to the data.
         Default is False.
-    quality_dataset : QualityDataset | None
-        Name of the quality dataset to use as a mask when accumulating
+    quality_datasets : Sequence[QualityDataset] | None
+        Name of the quality datasets to use as a mask when accumulating
         displacement for re-referencing.
         If None, no masking is performed.
-    quality_threshold : float
-        Threshold for the quality dataset to use as a mask.
-        Default is 0.5.
+        Must be same length as `quality_thresholds`.
+        Default is [QualityDataset.RECOMMENDED_MASK], which uses the built-in
+        recommended mask.
+    quality_thresholds : Sequence[float]
+        Thresholds for the quality datasets to use as a mask.
+        Must be same length as `quality_datasets`.
+        Default is [0.5].
     process_chunk_size : tuple[int, int]
         Chunking configuration for processing DataArray.
         Defaults to (2048, 2048).
@@ -183,8 +189,8 @@ def reformat_stack(
         data_var=DisplacementDataset.DISPLACEMENT,
         out_format=out_format,
         ds_corrections=ds_corrections,
-        quality_dataset=quality_dataset,
-        quality_threshold=quality_threshold,
+        quality_datasets=quality_datasets,
+        quality_thresholds=quality_thresholds,
         process_chunk_size=process_chunk_size,
         shard_factors=shard_factors,
         do_round=do_round,
@@ -258,8 +264,8 @@ def _write_rebased_stack(
     data_var: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
     out_format: str = "zarr",
     ds_corrections: xr.Dataset | None = None,
-    quality_dataset: QualityDataset | None = None,
-    quality_threshold: float = 0.5,
+    quality_datasets: Sequence[QualityDataset] | None = None,
+    quality_thresholds: Sequence[float] | None = None,
     do_round: bool = True,
     process_chunk_size: tuple[int, int] = (2048, 2048),
     shard_factors: tuple[int, int, int] = (1, 4, 4),
@@ -283,9 +289,20 @@ def _write_rebased_stack(
                 continue
             da_displacement = da_displacement - ds_corrections[var]
 
-    if quality_dataset is not None:
-        quality_da = ds[quality_dataset].chunk(process_chunks)
-        da_displacement = da_displacement.where(quality_da > quality_threshold)
+    if quality_datasets is not None:
+        if quality_thresholds is None:
+            msg = "quality_thresholds must be provided if quality_datasets is not None"
+            raise ValueError(msg)
+        if len(quality_datasets) != len(quality_thresholds):
+            msg = "quality_datasets and quality_thresholds must have the same length"
+            raise ValueError(msg)
+        from ._rebase import combine_quality_masks
+
+        da_quality_mask = combine_quality_masks(
+            [ds[qd].chunk(process_chunks) for qd in quality_datasets],
+            quality_thresholds,
+        )
+        da_displacement = da_displacement.where(da_quality_mask)
 
     da_disp = disp.create_rebased_displacement(
         da_displacement,
