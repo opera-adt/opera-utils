@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from ._product import DispProduct, DispProductStack
-from ._rebase import rebase_timeseries
+from ._rebase import create_rebased_displacement, rebase_timeseries
 from ._reformat import reformat_stack
 from ._remote import open_file, open_h5
 from ._search import search
-from ._xarray import create_rebased_displacement
 
 __all__ = [
     "DispProduct",
@@ -16,5 +15,6 @@ __all__ = [
     "open_file",
     "open_h5",
     "rebase_timeseries",
+    "reformat_stack",
     "search",
 ]
