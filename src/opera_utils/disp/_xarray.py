@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 import xarray as xr
 
-from ._rebase import rebase_timeseries
+from ._rebase import NaNPolicy, rebase_timeseries
 from ._utils import _ensure_chunks
 
 logger = logging.getLogger("opera_utils")
@@ -22,6 +22,7 @@ def create_rebased_displacement(
     reference_datetimes: Sequence[datetime | pd.DatetimeIndex],
     process_chunk_size: tuple[int, int] = (512, 512),
     add_reference_time: bool = False,
+    nan_policy: str | NaNPolicy = NaNPolicy.propagate,
 ) -> xr.DataArray:
     """Rebase and stack displacement products with different reference dates.
 
@@ -42,6 +43,12 @@ def create_rebased_displacement(
     add_reference_time : bool, optional
         Whether to add a zero array for the reference time.
         Defaults to False.
+    nan_policy : choices = ["propagate", "omit"]
+        Whether to propagate or omit (zero out) NaNs in the data.
+        By default "propagate", which means any ministack, or any "reference crossover"
+        product, with nan at a pixel causes all subsequent data to be nan.
+        If "omit", then any nan causes the pixel to be zeroed out, which is
+        equivalent to assuming that 0 displacement occurred during that time.
 
     Returns
     -------
@@ -60,7 +67,9 @@ def create_rebased_displacement(
 
     # Make the map_blocks-compatible function to accumulate the displacement
     def process_block(arr: xr.DataArray) -> xr.DataArray:
-        out = rebase_timeseries(arr.to_numpy(), reference_datetimes)
+        out = rebase_timeseries(
+            arr.to_numpy(), reference_datetimes, nan_policy=nan_policy
+        )
         return xr.DataArray(out, coords=arr.coords, dims=arr.dims)
 
     # Process the dataset in blocks

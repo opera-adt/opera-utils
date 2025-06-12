@@ -23,6 +23,7 @@ from ._enums import (
     QualityDataset,
 )
 from ._netcdf import create_virtual_stack
+from ._rebase import NaNPolicy
 from ._utils import _ensure_chunks, round_mantissa
 
 
@@ -30,6 +31,7 @@ def reformat_stack(
     input_files: list[Path],
     output_name: str,
     out_chunks: tuple[int, int, int] = (4, 256, 256),
+    shard_factors: tuple[int, int, int] = (1, 4, 4),
     drop_vars: Sequence[str] | None = None,
     apply_solid_earth_corrections: bool = True,
     apply_ionospheric_corrections: bool = False,
@@ -54,7 +56,12 @@ def reformat_stack(
         Must end in ".nc" or ".zarr".
     out_chunks : tuple[int, int, int]
         Chunking configuration for output DataArray.
-        Defaults to DEFAULT_CHUNKS, which is {"time": 4, "x": 256, "y": 256}
+        Defaults to (4, 256, 256).
+    shard_factors : tuple[int, int, int]
+        For Zarr outputs, sharding configuration for output DataArray.
+        The factors are applied respectively to the chunks sizes in `out_chunks` to
+        create fewer output files in the Zarr store.
+        Defaults to (1, 4, 4).
     drop_vars : list of str, optional
         list of variable names to drop from the dataset before saving.
         Example: ["estimated_phase_quality"]
@@ -110,6 +117,9 @@ def reformat_stack(
         corrections.append(CorrectionDataset.IONOSPHERIC_DELAY)
     # Set default chunks if none provided
     out_chunk_dict = dict(zip(["time", "y", "x"], out_chunks))
+    # Multiply the chunk sizes by the shard factors
+    out_shard_dict = _to_shard_dict(out_chunks, shard_factors)
+
     dps = disp.DispProductStack.from_file_list(input_files)
     df = dps.to_dataframe()
 
@@ -138,7 +148,12 @@ def reformat_stack(
     # Configure compression encoding
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_minimal, out_chunks, add_coords=True)
-        ds_minimal.to_zarr(output_name, encoding=encoding, mode="w")
+        ds_minimal.chunk(out_shard_dict).to_zarr(
+            output_name,
+            encoding=encoding,
+            mode="w",
+            consolidated=False,
+        )
     else:
         encoding = _get_netcdf_encoding(ds_minimal, out_chunks)
         ds_minimal.to_netcdf(
@@ -171,6 +186,7 @@ def reformat_stack(
         quality_dataset=quality_dataset,
         quality_threshold=quality_threshold,
         process_chunk_size=process_chunk_size,
+        shard_factors=shard_factors,
         do_round=do_round,
     )
     print(f"Wrote displacement at {time.time() - start_time:.1f}s")
@@ -183,6 +199,7 @@ def reformat_stack(
             data_var=DisplacementDataset.SHORT_WAVELENGTH,
             out_format=out_format,
             process_chunk_size=process_chunk_size,
+            shard_factors=shard_factors,
             do_round=do_round,
         )
         print(f"Wrote short_wavelength_displacement at {time.time() - start_time:.1f}s")
@@ -193,7 +210,7 @@ def reformat_stack(
     # TODO: we could just read once per ministack, then tile, then write
     ds_remaining = ds[UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS].chunk(
         {
-            "time": out_chunk_dict["time"],
+            "time": out_shard_dict["time"],
             "y": process_chunk_dict["y"],
             "x": process_chunk_dict["x"],
         }
@@ -207,7 +224,12 @@ def reformat_stack(
     # Now here, we'll use the virtual dataset feature of HDF5 if we're writing NetCDF
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_remaining, out_chunks)
-        ds_remaining.to_zarr(output_name, encoding=encoding, mode="a")
+        ds_remaining.to_zarr(
+            output_name,
+            encoding=encoding,
+            mode="a",
+            consolidated=False,
+        )
 
     else:
         create_virtual_stack(
@@ -218,6 +240,14 @@ def reformat_stack(
             ],
         )
     print(f"Wrote remaining: {time.time() - start_time:.1f}s")
+
+
+def _to_shard_dict(
+    out_chunks: tuple[int, int, int], shard_factors: tuple[int, int, int]
+) -> dict[str, int]:
+    return dict(
+        zip(["time", "y", "x"], [c * f for c, f in zip(out_chunks, shard_factors)])
+    )
 
 
 def _write_rebased_stack(
@@ -232,6 +262,8 @@ def _write_rebased_stack(
     quality_threshold: float = 0.5,
     do_round: bool = True,
     process_chunk_size: tuple[int, int] = (2048, 2048),
+    shard_factors: tuple[int, int, int] = (1, 4, 4),
+    nan_policy: str | NaNPolicy = NaNPolicy.propagate,
 ) -> None:
     da_displacement = ds[str(data_var)]
 
@@ -242,6 +274,7 @@ def _write_rebased_stack(
         "y": process_chunk_size[0],
         "x": process_chunk_size[1],
     }
+    out_shard_dict = _to_shard_dict(out_chunks, shard_factors)
     process_chunks = _ensure_chunks(process_chunks, da_displacement.shape)
     if ds_corrections:
         ds_corrections = ds_corrections.chunk(process_chunks)
@@ -259,14 +292,20 @@ def _write_rebased_stack(
         # Need to strip timezone to match the ds.time coordinates
         reference_datetimes=df.reference_datetime.dt.tz_localize(None),
         process_chunk_size=process_chunk_size,
+        nan_policy=nan_policy,
     )
     da_disp = da_disp.assign_coords(spatial_ref=ds.spatial_ref)
     if do_round and np.issubdtype(da_disp.dtype, np.floating):
         da_disp.data = round_mantissa(da_disp.data, keep_bits=10)
     ds_disp = da_disp.to_dataset(name=str(data_var))
     if out_format == "zarr":
-        encoding = _get_zarr_encoding(ds_disp, out_chunks)
-        ds_disp.to_zarr(output_name, encoding=encoding, mode="a")
+        encoding = _get_zarr_encoding(ds_disp, out_chunks, shard_factors=shard_factors)
+        ds_disp.chunk(out_shard_dict).to_zarr(
+            output_name,
+            encoding=encoding,
+            mode="a",
+            consolidated=False,
+        )
     else:
         encoding = _get_netcdf_encoding(ds_disp, out_chunks)
         ds_disp.to_netcdf(output_name, engine="h5netcdf", encoding=encoding, mode="a")
@@ -299,19 +338,29 @@ def _get_zarr_encoding(
     compression_name: str = "zstd",
     compression_level: int = 6,
     data_vars: Sequence[str] = [],
+    shard_factors: tuple[int, int, int] | None = (1, 4, 4),
 ) -> dict[str, dict]:
+    if shard_factors is not None:
+        shards = tuple(int(c * f) for c, f in zip(chunks, shard_factors))
+    else:
+        shards = None
+
     encoding_per_var = {
-        "compressors": [
-            BloscCodec(
-                cname=compression_name,
-                clevel=compression_level,
-            )
-        ],
+        "compressors": [BloscCodec(cname=compression_name, clevel=compression_level)],
         "chunks": chunks,
+        "shards": shards,
     }
     if not data_vars:
         data_vars = list(ds.data_vars)
-    encoding = {var: encoding_per_var for var in data_vars if ds[var].ndim >= 2}
+    encoding = {}
+    for var in data_vars:
+        if ds[var].ndim < 2:
+            continue
+        encoding[var] = encoding_per_var
+        if ds[var].ndim == 2:
+            encoding[var]["chunks"] = chunks[-2:]
+            if shards is not None:
+                encoding[var]["shards"] = shards[-2:]
     if not add_coords:
         return encoding
     # Handle coordinate compression

@@ -33,7 +33,7 @@ def test_reformat_stack_zarr(tmp_path):
     reformat_stack(input_files=input_files, output_name=output_name)
 
     # Inspect results
-    ds = xr.open_zarr(output_name)
+    ds = xr.open_zarr(output_name, consolidated=False)
     for ds_name in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS:
         assert ds_name in ds.data_vars
 
