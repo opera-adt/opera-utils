@@ -225,7 +225,10 @@ def reformat_stack(
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_remaining, out_chunks)
         ds_remaining.to_zarr(
-            output_name, encoding=encoding, mode="a", consolidated=False
+            output_name,
+            encoding=encoding,
+            mode="a",
+            consolidated=False,
         )
 
     else:
@@ -297,7 +300,12 @@ def _write_rebased_stack(
     ds_disp = da_disp.to_dataset(name=str(data_var))
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_disp, out_chunks, shard_factors=shard_factors)
-        ds_disp.chunk(out_shard_dict).to_zarr(output_name, encoding=encoding, mode="a")
+        ds_disp.chunk(out_shard_dict).to_zarr(
+            output_name,
+            encoding=encoding,
+            mode="a",
+            consolidated=False,
+        )
     else:
         encoding = _get_netcdf_encoding(ds_disp, out_chunks)
         ds_disp.to_netcdf(output_name, engine="h5netcdf", encoding=encoding, mode="a")
@@ -330,14 +338,29 @@ def _get_zarr_encoding(
     compression_name: str = "zstd",
     compression_level: int = 6,
     data_vars: Sequence[str] = [],
+    shard_factors: tuple[int, int, int] | None = (1, 4, 4),
 ) -> dict[str, dict]:
+    if shard_factors is not None:
+        shards = tuple(int(c * f) for c, f in zip(chunks, shard_factors))
+    else:
+        shards = None
+
     encoding_per_var = {
         "compressors": [BloscCodec(cname=compression_name, clevel=compression_level)],
         "chunks": chunks,
+        "shards": shards,
     }
     if not data_vars:
         data_vars = list(ds.data_vars)
-    encoding = {var: encoding_per_var for var in data_vars if ds[var].ndim >= 2}
+    encoding = {}
+    for var in data_vars:
+        if ds[var].ndim < 2:
+            continue
+        encoding[var] = encoding_per_var
+        if ds[var].ndim == 2:
+            encoding[var]["chunks"] = chunks[-2:]
+            if shards is not None:
+                encoding[var]["shards"] = shards[-2:]
     if not add_coords:
         return encoding
     # Handle coordinate compression
