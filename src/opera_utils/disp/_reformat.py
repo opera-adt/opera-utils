@@ -21,6 +21,7 @@ from ._enums import (
     CorrectionDataset,
     DisplacementDataset,
     QualityDataset,
+    # ReferenceMethod,
 )
 from ._netcdf import create_virtual_stack
 from ._rebase import NaNPolicy

@@ -8,6 +8,113 @@ from pyproj import CRS, Transformer
 from ._enums import ReferenceMethod
 
 
+def _convert_lonlat_to_rowcol(
+    da: xr.DataArray,
+    lon: float,
+    lat: float,
+    crs_wkt: str,
+) -> tuple[int, int]:
+    """Convert longitude/latitude to row/column indices.
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        DataArray with x/y coordinates.
+    lon : float
+        Longitude in degrees.
+    lat : float
+        Latitude in degrees.
+    crs_wkt : str
+        Well-Known Text representation of the coordinate reference system.
+
+    Returns
+    -------
+    tuple[int, int]
+        Row and column indices.
+
+    """
+    crs = CRS.from_wkt(crs_wkt)
+    transformer_from_latlon = Transformer.from_crs(
+        "EPSG:4326",
+        crs,
+        always_xy=True,
+    )
+    xx, yy = transformer_from_latlon.transform(lon, lat, radians=False)
+    r = int((np.abs(da.y.values - yy)).argmin())
+    c = int((np.abs(da.x.values - xx)).argmin())
+    return r, c
+
+
+def _get_border_pixels(
+    da: xr.DataArray,
+    border_pixels: int,
+) -> xr.DataArray:
+    """Extract border pixels from a DataArray.
+
+    Parameters
+    ----------
+    da : xr.DataArray
+        Input DataArray.
+    border_pixels : int
+        Number of pixels to use for border.
+
+    Returns
+    -------
+    xr.DataArray
+        Concatenated border pixels.
+
+    """
+    bb = border_pixels
+    # Stack the border regions together
+    top = da.isel(y=slice(0, bb))
+    bottom = da.isel(y=slice(-bb, None))
+    left = da.isel(x=slice(0, bb))
+    right = da.isel(x=slice(-bb, None))
+
+    # Flatten spatial dimensions for each border region
+    top_flat = top.stack(pixels=("y", "x"))
+    bottom_flat = bottom.stack(pixels=("y", "x"))
+    left_flat = left.stack(pixels=("y", "x"))
+    right_flat = right.stack(pixels=("y", "x"))
+
+    # Concatenate all border pixels
+    border = xr.concat(
+        [top_flat, bottom_flat, left_flat, right_flat],
+        dim="pixels",
+    )
+    return border
+
+
+def _compute_coherence_harmonic_mean(
+    coherence: ArrayLike,
+    coherence_thresh: float,
+) -> np.ndarray:
+    """Compute harmonic mean of coherence along time axis.
+
+    Parameters
+    ----------
+    coherence : ArrayLike
+        Coherence dataset.
+    coherence_thresh : float
+        Coherence threshold for masking.
+
+    Returns
+    -------
+    np.ndarray
+        2D coherence mask (True where coherence > threshold).
+
+    """
+    # Harmonic mean along time
+    if np.ndim(coherence) > 2:
+        arr_coherence = np.asarray(coherence)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            coh_2d = np.nanmedian(len(arr_coherence) / (1.0 / arr_coherence), axis=0)
+    else:
+        coh_2d = np.asarray(coherence)
+
+    return coh_2d > coherence_thresh
+
+
 def get_reference_values(
     da: xr.DataArray,
     *,
@@ -58,17 +165,7 @@ def get_reference_values(
             if lon is None or lat is None or crs_wkt is None:
                 msg = "Need (row, col) or (lon, lat & crs_wkt)"
                 raise ValueError(msg)
-            # simple nearest-neighbour lookup
-            crs = CRS.from_wkt(crs_wkt)
-            transformer_from_latlon = Transformer.from_crs(
-                "EPSG:4326",
-                crs,
-                always_xy=True,
-            )
-            xx, yy = transformer_from_latlon.transform(lon, lat, radians=False)
-            r = int(np.argmin(np.abs(da.y - yy)))
-            c = int(np.argmin(np.abs(da.x - xx)))
-            row, col = r, c
+            row, col = _convert_lonlat_to_rowcol(da, lon, lat, crs_wkt)
         ref_vals = da[:, row, col]
         return ref_vals
 
@@ -78,33 +175,15 @@ def get_reference_values(
 
     # ----  Border median  ----
     if method is ReferenceMethod.BORDER:
-        bb = border_pixels
-        border = xr.concat(
-            [
-                da.isel(y=slice(0, bb)),  # top
-                da.isel(y=slice(-bb, None)),  # bottom
-                da.isel(x=slice(0, bb)),  # left
-                da.isel(x=slice(-bb, None)),  # right
-            ],
-            dim="stack",
-        )
-        return border.median(dim=("y", "x"), skipna=True)
+        border = _get_border_pixels(da, border_pixels)
+        return border.median(dim="pixels", skipna=True)
 
     # ----  High-coherence mask  ----
     if method is ReferenceMethod.HIGH_COHERENCE:
-        if not coherence:
+        if coherence is None:
             msg = "Need coherence dataset"
             raise ValueError(msg)
-        # Harmonic mean along time
-        if np.ndim(coherence) > 2:
-            arr_coherence = np.asarray(coherence)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                coh_2d = np.nanmedian(
-                    len(arr_coherence) / (1.0 / arr_coherence), axis=0
-                )
-        else:
-            coh_2d = np.asarray(coherence)
-        mask = coh_2d > coherence_thresh
+        mask = _compute_coherence_harmonic_mean(coherence, coherence_thresh)
         masked = da.where(mask)
         return masked.median(dim=("y", "x"), skipna=True)
 
