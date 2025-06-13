@@ -39,6 +39,7 @@ def reformat_stack(
         QualityDataset.RECOMMENDED_MASK
     ],
     quality_thresholds: Sequence[float] | None = [0.5],
+    # reference_method: ReferenceMethod = ReferenceMethod.HIGH_COHERENCE,
     process_chunk_size: tuple[int, int] = (2048, 2048),
     do_round: bool = True,
     max_workers: int = 1,
