@@ -16,7 +16,7 @@ from pathlib import Path
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
-from shapely import box
+from shapely import box, from_wkt
 from shapely import plotting as splot
 
 import opera_utils
@@ -57,8 +57,10 @@ def _get_track(frame_id):
 
 
 def plot_frames_with_labels(
-    bounds: tuple[float, float, float, float],
-    /,
+    bounds: tuple[float, float, float, float] | None = None,
+    wkt: str | None = None,
+    ascending: bool = True,
+    descending: bool = True,
     cmap_name: str = "tab10",
     output: Path | str | None = None,
 ) -> plt.Figure:
@@ -66,8 +68,17 @@ def plot_frames_with_labels(
 
     Parameters
     ----------
-    bounds : tuple
+    bounds : tuple, optional
         A tuple of lat/lon (west, south, east, north) defining the area of interest.
+    wkt : str, optional
+        Alternative to bounds: a well-known text string of the area of interest in
+        degrees lat/lon.
+    ascending : bool
+        Whether to include ascending frames in the plot.
+        Default is True
+    descending : bool
+        Whether to include descending frames in the plot.
+        Default is True
     cmap_name : str, optional
         The name of the matplotlib colormap to use, by default 'tab10'.
     output : Path | str, optional
@@ -80,12 +91,20 @@ def plot_frames_with_labels(
         The figure containing the plotted frames.
 
     """
-    fig, ax = plt.subplots()
-
+    if bounds is None:
+        if wkt is None:
+            msg = "Must provide wkt or bounds"
+            raise ValueError(msg)
+        bounds = from_wkt(wkt).bounds
     poly = box(*bounds)
 
+    fig, ax = plt.subplots()
     gdf_frames = opera_utils.get_frame_geodataframe()
     gdf_intersect = gdf_frames[gdf_frames.intersects(poly)]
+    if not ascending:
+        gdf_intersect = gdf_intersect[gdf_intersect.orbit_pass != "ASCENDING"]
+    if not descending:
+        gdf_intersect = gdf_intersect[gdf_intersect.orbit_pass != "DESCENDING"]
     gdf_intersect.plot(ax=ax, facecolor="none")
 
     track_to_color = _get_track_colors(gdf_intersect, cmap_name=cmap_name)
