@@ -55,7 +55,7 @@ def reformat_stack(
     reference_lon: float | None = None,
     reference_lat: float | None = None,
     reference_border_pixels: int = 3,
-    reference_coherence_thresh: float = 0.7,
+    reference_coherence_threshold: float = 0.7,
     process_chunk_size: tuple[int, int] = (2048, 2048),
     do_round: bool = True,
     max_workers: int = 1,
@@ -101,6 +101,29 @@ def reformat_stack(
         Thresholds for the quality datasets to use as a mask.
         Must be same length as `quality_datasets`.
         Default is [0.5].
+    reference_method : ReferenceMethod
+        Reference method to use.
+        Default is ReferenceMethod.NONE.
+        Options are:
+        - ReferenceMethod.NONE: No reference method.
+        - ReferenceMethod.POINT: Reference point.
+        - ReferenceMethod.MEDIAN: Full-scene median per date. Excludes water pixels.
+        - ReferenceMethod.BORDER: Median of border pixels. Excludes water pixels.
+        - ReferenceMethod.HIGH_COHERENCE: Median of high-coherence mask.
+    reference_row : int | None
+        For ReferenceMethod.POINT, row index for point reference.
+    reference_col : int | None
+        For ReferenceMethod.POINT, column index for point reference.
+    reference_lon : float | None
+        For ReferenceMethod.POINT, longitude (in degrees) for point reference.
+    reference_lat : float | None
+        For ReferenceMethod.POINT, latitude (in degrees) for point reference.
+    reference_border_pixels : int
+        For ReferenceMethod.BORDER, number of pixels to use for border median.
+        Defaults to 3.
+    reference_coherence_threshold : float
+        For ReferenceMethod.HIGH_COHERENCE, threshold for coherence to use as a mask.
+        Defaults to 0.7.
     process_chunk_size : tuple[int, int]
         Chunking configuration for processing DataArray.
         Defaults to (2048, 2048).
@@ -226,7 +249,7 @@ def reformat_stack(
 
         # Get the average coherence dataset
         avg_coherence = _compute_coherence_harmonic_mean(ds.temporal_coherence)
-        mask = avg_coherence > reference_coherence_thresh
+        mask = avg_coherence > reference_coherence_threshold
         ref_row = ref_col = None
     elif reference_method == ReferenceMethod.POINT:
         from ._reference import _get_reference_row_col
@@ -375,20 +398,23 @@ def _write_rebased_stack(
     if reference_method is not ReferenceMethod.NONE:
         logger.info(f"spatially referencing with {reference_method}")
         ref_values = get_reference_values(
-            da_displacement,
+            da_disp,
             method=reference_method,
             row=reference_row,
             col=reference_col,
             crs=crs,
             transform=transform,
             border_pixels=border_pixels,
+            good_pixel_mask=good_pixel_mask,
         )
-        da_disp = da_disp - ref_values
+        da_disp_referenced = da_disp - ref_values
+    else:
+        da_disp_referenced = da_disp
 
-    da_disp = da_disp.assign_coords(spatial_ref=ds.spatial_ref)
-    if do_round and np.issubdtype(da_disp.dtype, np.floating):
-        da_disp.data = round_mantissa(da_disp.data, keep_bits=10)
-    ds_disp = da_disp.to_dataset(name=str(data_var))
+    da_disp_referenced = da_disp_referenced.assign_coords(spatial_ref=ds.spatial_ref)
+    if do_round and np.issubdtype(da_disp_referenced.dtype, np.floating):
+        da_disp_referenced.data = round_mantissa(da_disp_referenced.data, keep_bits=10)
+    ds_disp = da_disp_referenced.to_dataset(name=str(data_var))
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_disp, out_chunks, shard_factors=shard_factors)
         ds_disp.chunk(out_shard_dict).to_zarr(

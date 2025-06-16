@@ -45,8 +45,10 @@ def get_reference_values(
         Longitude (in degrees) for point reference.
     lat : float, optional
         Latitude (in degrees) for point reference.
-    crs_wkt : str, optional
-        Well-Known Text representation of the coordinate reference system.
+    crs : CRS, optional
+        Coordinate Reference System of the frame.
+    transform : Affine, optional
+        Affine transform of the frame's UTM grid.
     border_pixels : int, optional
         For ReferenceMethod.BORDER, number of pixels to use for border median.
         Defaults to 3.
@@ -134,7 +136,7 @@ def _convert_lonlat_to_rowcol(
     xx, yy = transformer_from_latlon.transform(lon, lat, radians=False)
     # Now transform from the grid x, y to row, col using the inverse of the transform
     col, row = ~transform * (xx, yy)
-    return row, col
+    return int(row), int(col)
 
 
 def _get_border_pixels(

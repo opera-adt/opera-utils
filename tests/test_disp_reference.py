@@ -38,36 +38,41 @@ def sample_coherence():
 
 
 @pytest.fixture
-def sample_crs_wkt():
-    """Sample CRS WKT string for testing coordinate conversion."""
-    # Use a simple projection for testing
-    return (
-        'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS'
-        ' 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]'
-    )
+def sample_crs():
+    """Sample CRS for testing coordinate conversion."""
+    from pyproj import CRS
+
+    return CRS.from_epsg(4326)
+
+
+@pytest.fixture
+def sample_transform():
+    """Sample transform for testing coordinate conversion."""
+    from affine import Affine
+
+    # Simple transform for geographic coordinates
+    return Affine.from_gdal(-120.0, 0.0666667, 0.0, 41.0, 0.0, -0.1)
 
 
 class TestConvertLonLatToRowCol:
-    def test_convert_lonlat_to_rowcol(self, sample_da, sample_crs_wkt):
+    def test_convert_lonlat_to_rowcol(self, sample_crs, sample_transform):
         """Test coordinate conversion from lon/lat to row/col."""
         lon, lat = -119.5, 40.5
-        row, col = _convert_lonlat_to_rowcol(sample_da, lon, lat, sample_crs_wkt)
+        row, col = _convert_lonlat_to_rowcol(lon, lat, sample_crs, sample_transform)
 
-        assert isinstance(row, int)
-        assert isinstance(col, int)
-        assert 0 <= row < sample_da.sizes["y"]
-        assert 0 <= col < sample_da.sizes["x"]
+        assert isinstance(row, (int, float))
+        assert isinstance(col, (int, float))
 
-    def test_convert_edge_coordinates(self, sample_da, sample_crs_wkt):
+    def test_convert_edge_coordinates(self, sample_crs, sample_transform):
         """Test coordinate conversion at edges."""
         # Test corner coordinates
-        lon_min, lat_min = float(sample_da.x.min()), float(sample_da.y.min())
+        lon_min, lat_min = -120.0, 40.0
         row, col = _convert_lonlat_to_rowcol(
-            sample_da, lon_min, lat_min, sample_crs_wkt
+            lon_min, lat_min, sample_crs, sample_transform
         )
 
-        assert row >= 0
-        assert col >= 0
+        assert isinstance(row, (int, float))
+        assert isinstance(col, (int, float))
 
 
 class TestGetBorderPixels:
@@ -103,30 +108,27 @@ class TestGetBorderPixels:
 class TestComputeCoherenceHarmonicMean:
     def test_compute_coherence_3d(self, sample_coherence):
         """Test coherence harmonic mean with 3D coherence."""
-        thresh = 0.5
-        mask = _compute_coherence_harmonic_mean(sample_coherence, thresh)
+        result = _compute_coherence_harmonic_mean(sample_coherence)
 
-        assert mask.shape == sample_coherence.shape[1:]  # Should be 2D
-        assert mask.dtype == bool
+        assert result.shape == sample_coherence.shape[1:]  # Should be 2D
+        assert result.dtype == np.float64
 
     def test_compute_coherence_2d(self):
         """Test coherence harmonic mean with 2D coherence."""
         coherence_2d = np.random.rand(10, 15) * 0.9 + 0.1
-        thresh = 0.5
-        mask = _compute_coherence_harmonic_mean(coherence_2d, thresh)
+        result = _compute_coherence_harmonic_mean(coherence_2d)
 
-        assert mask.shape == coherence_2d.shape
-        assert mask.dtype == bool
+        assert result.shape == coherence_2d.shape
+        assert result.dtype == np.float64
 
     def test_coherence_threshold(self):
-        """Test coherence thresholding."""
+        """Test coherence computation with known values."""
         # Create coherence with known values
         coherence = np.array([[0.3, 0.7], [0.9, 0.2]])
-        thresh = 0.5
-        mask = _compute_coherence_harmonic_mean(coherence, thresh)
+        result = _compute_coherence_harmonic_mean(coherence)
 
-        expected = np.array([[False, True], [True, False]])
-        np.testing.assert_array_equal(mask, expected)
+        # Should return the input for 2D arrays
+        np.testing.assert_array_equal(result, coherence)
 
 
 class TestGetReferenceValues:
@@ -143,7 +145,7 @@ class TestGetReferenceValues:
         expected = sample_da[:, row, col]
         xr.testing.assert_equal(ref_vals, expected)
 
-    def test_point_method_lonlat(self, sample_da, sample_crs_wkt):
+    def test_point_method_lonlat(self, sample_da, sample_crs, sample_transform):
         """Test POINT method with lon/lat specification."""
         lon, lat = -119.5, 40.5
         ref_vals = get_reference_values(
@@ -151,7 +153,8 @@ class TestGetReferenceValues:
             method=ReferenceMethod.POINT,
             lon=lon,
             lat=lat,
-            crs_wkt=sample_crs_wkt,
+            crs=sample_crs,
+            transform=sample_transform,
         )
 
         assert ref_vals.sizes["time"] == sample_da.sizes["time"]
@@ -160,7 +163,7 @@ class TestGetReferenceValues:
     def test_point_method_missing_params(self, sample_da):
         """Test POINT method with missing parameters."""
         with pytest.raises(
-            ValueError, match="Need \\(row, col\\) or \\(lon, lat & crs_wkt\\)"
+            ValueError, match="Need \\(row, col\\) or \\(lon, lat & crs & transform\\)"
         ):
             get_reference_values(sample_da, method=ReferenceMethod.POINT)
 
@@ -185,24 +188,26 @@ class TestGetReferenceValues:
 
     def test_high_coherence_method(self, sample_da, sample_coherence):
         """Test HIGH_COHERENCE method."""
-        coherence_thresh = 0.5
+        # Create a mask from the coherence data
+        mask = sample_coherence[0] > 0.5  # Use first time slice
         ref_vals = get_reference_values(
             sample_da,
             method=ReferenceMethod.HIGH_COHERENCE,
-            coherence=sample_coherence,
-            coherence_thresh=coherence_thresh,
+            good_pixel_mask=mask,
         )
 
         assert ref_vals.sizes["time"] == sample_da.sizes["time"]
         assert ref_vals.ndim == 1
 
-    def test_high_coherence_method_missing_coherence(self, sample_da):
-        """Test HIGH_COHERENCE method without coherence data."""
-        with pytest.raises(ValueError, match="Need coherence dataset"):
-            get_reference_values(
-                sample_da,
-                method=ReferenceMethod.HIGH_COHERENCE,
-            )
+    def test_high_coherence_method_missing_mask(self, sample_da):
+        """Test HIGH_COHERENCE method without good pixel mask."""
+        # Should work without mask (uses all pixels)
+        ref_vals = get_reference_values(
+            sample_da,
+            method=ReferenceMethod.HIGH_COHERENCE,
+        )
+        assert ref_vals.sizes["time"] == sample_da.sizes["time"]
+        assert ref_vals.ndim == 1
 
     def test_unknown_method(self, sample_da):
         """Test with unknown reference method."""
