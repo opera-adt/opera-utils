@@ -3,6 +3,9 @@
 # /// script
 # dependencies = ['zarr>=3', 'xarray', 'opera_utils[disp]']
 # ///
+from __future__ import annotations
+
+import logging
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -11,6 +14,9 @@ import numpy as np
 import pandas as pd
 import tyro
 import xarray as xr
+from affine import Affine
+from numpy.typing import ArrayLike
+from pyproj import CRS
 from zarr.codecs import BloscCodec
 
 from opera_utils import disp
@@ -21,11 +27,14 @@ from ._enums import (
     CorrectionDataset,
     DisplacementDataset,
     QualityDataset,
-    # ReferenceMethod,
+    ReferenceMethod,
 )
 from ._netcdf import create_virtual_stack
 from ._rebase import NaNPolicy
+from ._reference import get_reference_values
 from ._utils import _ensure_chunks, round_mantissa
+
+logger = logging.getLogger("opera_utils")
 
 
 def reformat_stack(
@@ -40,7 +49,13 @@ def reformat_stack(
         QualityDataset.RECOMMENDED_MASK
     ],
     quality_thresholds: Sequence[float] | None = [0.5],
-    # reference_method: ReferenceMethod = ReferenceMethod.HIGH_COHERENCE,
+    reference_method: ReferenceMethod = ReferenceMethod.HIGH_COHERENCE,
+    reference_row: int | None = None,
+    reference_col: int | None = None,
+    reference_lon: float | None = None,
+    reference_lat: float | None = None,
+    reference_border_pixels: int = 3,
+    reference_coherence_thresh: float = 0.7,
     process_chunk_size: tuple[int, int] = (2048, 2048),
     do_round: bool = True,
     max_workers: int = 1,
@@ -169,52 +184,9 @@ def reformat_stack(
         )
     print(f"Wrote minimal dataset: {time.time() - start_time:.1f}s")
 
-    # #########################
-    # Rebase displacement array
-    # #########################
-    print(f"Creating rebased stack with chunks: {out_chunk_dict}")
-    if corrections:
-        correction_names = [str(c).split("/")[-1] for c in corrections]
-        ds_corrections = xr.open_mfdataset(
-            dps.filenames,
-            engine="h5netcdf",
-            group="corrections",
-            chunks=process_chunk_dict,
-        )[correction_names]
-    else:
-        ds_corrections = None
-    _write_rebased_stack(
-        ds,
-        df,
-        output_name,
-        out_chunks,
-        data_var=DisplacementDataset.DISPLACEMENT,
-        out_format=out_format,
-        ds_corrections=ds_corrections,
-        quality_datasets=quality_datasets,
-        quality_thresholds=quality_thresholds,
-        process_chunk_size=process_chunk_size,
-        shard_factors=shard_factors,
-        do_round=do_round,
-    )
-    print(f"Wrote displacement at {time.time() - start_time:.1f}s")
-    if str(DisplacementDataset.SHORT_WAVELENGTH) in ds.data_vars:
-        _write_rebased_stack(
-            ds,
-            df,
-            output_name,
-            out_chunks,
-            data_var=DisplacementDataset.SHORT_WAVELENGTH,
-            out_format=out_format,
-            process_chunk_size=process_chunk_size,
-            shard_factors=shard_factors,
-            do_round=do_round,
-        )
-        print(f"Wrote short_wavelength_displacement at {time.time() - start_time:.1f}s")
-
-    # #########################
-    # Write remaining variables
-    # #########################
+    # ################################
+    # Write non-displacement variables
+    # ################################
     # TODO: we could just read once per ministack, then tile, then write
     ds_remaining = ds[UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS].chunk(
         {
@@ -249,6 +221,86 @@ def reformat_stack(
         )
     print(f"Wrote remaining: {time.time() - start_time:.1f}s")
 
+    if reference_method == ReferenceMethod.HIGH_COHERENCE:
+        from ._reference import _compute_coherence_harmonic_mean
+
+        # Get the average coherence dataset
+        avg_coherence = _compute_coherence_harmonic_mean(ds.temporal_coherence)
+        mask = avg_coherence > reference_coherence_thresh
+        ref_row = ref_col = None
+    elif reference_method == ReferenceMethod.POINT:
+        from ._reference import _get_reference_row_col
+
+        transform = _get_transform(ds)
+        crs = CRS.from_wkt(ds.spatial_ref.crs_wkt)
+
+        ref_row, ref_col = _get_reference_row_col(
+            row=reference_row,
+            col=reference_col,
+            lon=reference_lon,
+            lat=reference_lat,
+            crs=crs,
+            transform=transform,
+        )
+    elif reference_method in (ReferenceMethod.BORDER, ReferenceMethod.MEDIAN):
+        mask = np.asarray(ds.water_mask)
+        ref_row = ref_col = None
+    else:
+        msg = f"Unknown ReferenceMethod {reference_method}"
+        raise ValueError(msg)
+
+    # #########################
+    # Rebase displacement array
+    # #########################
+    print(f"Creating rebased stack with chunks: {out_chunk_dict}")
+    if corrections:
+        correction_names = [str(c).split("/")[-1] for c in corrections]
+        ds_corrections = xr.open_mfdataset(
+            dps.filenames,
+            engine="h5netcdf",
+            group="corrections",
+            chunks=process_chunk_dict,
+        )[correction_names]
+    else:
+        ds_corrections = None
+    _write_rebased_stack(
+        ds,
+        df,
+        output_name,
+        out_chunks=out_chunks,
+        data_var=DisplacementDataset.DISPLACEMENT,
+        reference_method=reference_method,
+        reference_row=ref_row,
+        reference_col=ref_col,
+        border_pixels=reference_border_pixels,
+        good_pixel_mask=mask,
+        out_format=out_format,
+        ds_corrections=ds_corrections,
+        quality_datasets=quality_datasets,
+        quality_thresholds=quality_thresholds,
+        process_chunk_size=process_chunk_size,
+        shard_factors=shard_factors,
+        do_round=do_round,
+    )
+    print(f"Wrote displacement at {time.time() - start_time:.1f}s")
+    if str(DisplacementDataset.SHORT_WAVELENGTH) in ds.data_vars:
+        _write_rebased_stack(
+            ds,
+            df,
+            output_name,
+            out_chunks=out_chunks,
+            data_var=DisplacementDataset.SHORT_WAVELENGTH,
+            out_format=out_format,
+            process_chunk_size=process_chunk_size,
+            shard_factors=shard_factors,
+            do_round=do_round,
+        )
+        print(f"Wrote short_wavelength_displacement at {time.time() - start_time:.1f}s")
+
+
+def _get_transform(ds: xr.Dataset) -> Affine:
+    return Affine.from_gdal(*map(float, ds.spatial_ref.GeoTransform.split()))
+
 
 def _to_shard_dict(
     out_chunks: tuple[int, int, int], shard_factors: tuple[int, int, int]
@@ -264,6 +316,11 @@ def _write_rebased_stack(
     output_name: Path | str,
     out_chunks: tuple[int, int, int],
     data_var: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
+    reference_method: ReferenceMethod = ReferenceMethod.NONE,
+    good_pixel_mask: ArrayLike | None = None,
+    border_pixels: int = 3,
+    reference_row: int | None = None,
+    reference_col: int | None = None,
     out_format: str = "zarr",
     ds_corrections: xr.Dataset | None = None,
     quality_datasets: Sequence[QualityDataset] | None = None,
@@ -313,6 +370,21 @@ def _write_rebased_stack(
         process_chunk_size=process_chunk_size,
         nan_policy=nan_policy,
     )
+    crs = CRS.from_wkt(ds.spatial_ref.crs_wkt)
+    transform = _get_transform(ds)
+    if reference_method is not ReferenceMethod.NONE:
+        logger.info(f"spatially referencing with {reference_method}")
+        ref_values = get_reference_values(
+            da_displacement,
+            method=reference_method,
+            row=reference_row,
+            col=reference_col,
+            crs=crs,
+            transform=transform,
+            border_pixels=border_pixels,
+        )
+        da_disp = da_disp - ref_values
+
     da_disp = da_disp.assign_coords(spatial_ref=ds.spatial_ref)
     if do_round and np.issubdtype(da_disp.dtype, np.floating):
         da_disp.data = round_mantissa(da_disp.data, keep_bits=10)

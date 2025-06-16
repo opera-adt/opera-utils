@@ -15,6 +15,9 @@ class ReferenceMethod(str, Enum):
     """Mean/median of high-quality mask."""
     HIGH_COHERENCE = "high_coherence"
 
+    def __str__(self) -> str:
+        return self.value
+
 
 class DisplacementDataset(str, Enum):
     """Enumeration of displacement datasets."""
