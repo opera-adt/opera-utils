@@ -30,8 +30,12 @@ from ._enums import (
     ReferenceMethod,
 )
 from ._netcdf import create_virtual_stack
-from ._rebase import NaNPolicy
-from ._reference import get_reference_values
+from ._rebase import NaNPolicy, combine_quality_masks
+from ._reference import (
+    _compute_coherence_harmonic_mean,
+    _get_reference_row_col,
+    get_reference_values,
+)
 from ._utils import _ensure_chunks, round_mantissa
 
 logger = logging.getLogger("opera_utils")
@@ -245,15 +249,11 @@ def reformat_stack(
     print(f"Wrote remaining: {time.time() - start_time:.1f}s")
 
     if reference_method == ReferenceMethod.HIGH_COHERENCE:
-        from ._reference import _compute_coherence_harmonic_mean
-
         # Get the average coherence dataset
         avg_coherence = _compute_coherence_harmonic_mean(ds.temporal_coherence)
         mask = avg_coherence > reference_coherence_threshold
         ref_row = ref_col = None
     elif reference_method == ReferenceMethod.POINT:
-        from ._reference import _get_reference_row_col
-
         transform = _get_transform(ds)
         crs = CRS.from_wkt(ds.spatial_ref.crs_wkt)
 
@@ -378,8 +378,6 @@ def _write_rebased_stack(
         if len(quality_datasets) != len(quality_thresholds):
             msg = "quality_datasets and quality_thresholds must have the same length"
             raise ValueError(msg)
-        from ._rebase import combine_quality_masks
-
         da_quality_mask = combine_quality_masks(
             [ds[qd].chunk(process_chunks) for qd in quality_datasets],
             quality_thresholds,
