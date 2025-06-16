@@ -32,7 +32,7 @@ from ._enums import (
 from ._netcdf import create_virtual_stack
 from ._rebase import NaNPolicy, combine_quality_masks
 from ._reference import (
-    _compute_coherence_harmonic_mean,
+    _compute_harmonic_mean,
     _get_reference_row_col,
     get_reference_values,
 )
@@ -222,6 +222,11 @@ def reformat_stack(
             "x": process_chunk_dict["x"],
         }
     )
+    # TODO: make this configurable: currently we take every 15th coherence since, during
+    # historical processing, the coherences are the same per ministack
+    avg_coherence = _compute_harmonic_mean(ds.temporal_coherence[::15])
+    # Save the coherence to the output
+    ds_remaining["average_temporal_coherence"] = avg_coherence
     for var in ds_remaining.data_vars:
         # Round, if it's a float32
         d = ds_remaining[var]
@@ -250,8 +255,7 @@ def reformat_stack(
 
     if reference_method == ReferenceMethod.HIGH_COHERENCE:
         # Get the average coherence dataset
-        avg_coherence = _compute_coherence_harmonic_mean(ds.temporal_coherence)
-        mask = avg_coherence > reference_coherence_threshold
+        good_pixel_mask = avg_coherence > reference_coherence_threshold
         ref_row = ref_col = None
     elif reference_method == ReferenceMethod.POINT:
         transform = _get_transform(ds)
@@ -266,7 +270,7 @@ def reformat_stack(
             transform=transform,
         )
     elif reference_method in (ReferenceMethod.BORDER, ReferenceMethod.MEDIAN):
-        mask = np.asarray(ds.water_mask)
+        good_pixel_mask = np.asarray(ds.water_mask) == 1
         ref_row = ref_col = None
     else:
         msg = f"Unknown ReferenceMethod {reference_method}"
@@ -296,7 +300,7 @@ def reformat_stack(
         reference_row=ref_row,
         reference_col=ref_col,
         border_pixels=reference_border_pixels,
-        good_pixel_mask=mask,
+        good_pixel_mask=good_pixel_mask,
         out_format=out_format,
         ds_corrections=ds_corrections,
         quality_datasets=quality_datasets,

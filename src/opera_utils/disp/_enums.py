@@ -4,16 +4,16 @@ from enum import Enum
 class ReferenceMethod(str, Enum):
     """Enumeration of reference methods."""
 
-    """No reference method."""
     NONE = "none"
-    """Reference point."""
+    """No reference method."""
     POINT = "point"
-    """Full-scene median per date."""
+    """Reference point."""
     MEDIAN = "median"
-    """Median of border pixels."""
+    """Full-scene median per date."""
     BORDER = "border"
-    """Mean/median of high-quality mask."""
+    """Median of border pixels."""
     HIGH_COHERENCE = "high_coherence"
+    """Mean/median of high-quality mask."""
 
     def __str__(self) -> str:
         return self.value

@@ -136,7 +136,7 @@ def _convert_lonlat_to_rowcol(
     xx, yy = transformer_from_latlon.transform(lon, lat, radians=False)
     # Now transform from the grid x, y to row, col using the inverse of the transform
     col, row = ~transform * (xx, yy)
-    return int(row), int(col)
+    return round(row), round(col)
 
 
 def _get_border_pixels(
@@ -158,48 +158,30 @@ def _get_border_pixels(
         Concatenated border pixels.
 
     """
+    mask = np.zeros(da.shape[-2:], dtype=bool)
+    mask[:num_border_pixels, :] = True  # top
+    mask[-num_border_pixels:, :] = True  # bottom
+    mask[:, :num_border_pixels] = True  # left
+    mask[:, -num_border_pixels:] = True  # right
     # Stack the border regions together
-    top = da.isel(y=slice(0, num_border_pixels))
-    bottom = da.isel(y=slice(-num_border_pixels, None))
-    left = da.isel(x=slice(0, num_border_pixels))
-    right = da.isel(x=slice(-num_border_pixels, None))
-
-    # Flatten spatial dimensions for each border region
-    top_flat = top.stack(pixels=("y", "x"))
-    bottom_flat = bottom.stack(pixels=("y", "x"))
-    left_flat = left.stack(pixels=("y", "x"))
-    right_flat = right.stack(pixels=("y", "x"))
-
-    # Concatenate all border pixels
-    border = xr.concat(
-        [top_flat, bottom_flat, left_flat, right_flat],
-        dim="pixels",
-    )
-    return border
+    return da.where(mask).stack(pixels=("y", "x")).dropna("pixels")
 
 
-def _compute_coherence_harmonic_mean(
-    coherence: ArrayLike,
-) -> np.ndarray:
-    """Compute harmonic mean of coherence along time axis.
+def _compute_harmonic_mean(
+    arr: xr.DataArray,
+) -> xr.DataArray:
+    """Compute harmonic mean of arr along time axis (axis=0).
 
     Parameters
     ----------
-    coherence : ArrayLike
-        Coherence dataset.
+    arr : ArrayLike
+        Array to compute harmonic mean of.
 
     Returns
     -------
     np.ndarray
-        2D coherence mask (True where coherence > threshold).
+        2D harmonic mean array
 
     """
-    # Harmonic mean along time
-    if np.ndim(coherence) > 2:
-        arr_coherence = np.asarray(coherence)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            coh_2d = np.nanmedian(len(arr_coherence) / (1.0 / arr_coherence), axis=0)
-    else:
-        coh_2d = np.asarray(coherence)
-
-    return coh_2d
+    num = arr.time.size
+    return num / (1.0 / arr).sum(dim="time", skipna=False, min_count=1)
