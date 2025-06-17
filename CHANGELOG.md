@@ -1,12 +1,46 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-This project adheres to [Semantic Versioning](https://semver.org/) and follows the principles outlined in [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+## [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.23.0...HEAD)
 
-## [Unreleased](https://github.com/opera-adt/opera-utils/compare/v0.19.0...HEAD)
+## [0.23.0](https://github.com/opera-adt/opera-utils/compare/v0.22.1...v0.23.0) - 2025-06-16
 
-## [0.20.0](https://github.com/opera-adt/opera-utils/compare/v0.19.0...v0.20.0)
+### Added
+
+- Add spatial reference to `disp-s1-reformat` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/147
+- Add `NanPolicy`, `shards` to `disp-s1-reformat` output by @scottstanie in https://github.com/opera-adt/opera-utils/pull/144
+- `disp-s1-reformat`: Add quality masking options by @scottstanie in https://github.com/opera-adt/opera-utils/pull/145
+- `plot-disp-s1-intersecting-frames.py`: Add `--wkt` and `--no-ascending`/`--no-descending` filters by @scottstanie in https://github.com/opera-adt/opera-utils/pull/146
+
+## [0.22.1](https://github.com/opera-adt/opera-utils/compare/v0.22.0...v0.22.1) - 2025-06-05
+
+### Added
+- Write out `short_wavelength_displacement` unless dropped by @scottstanie in https://github.com/opera-adt/opera-utils/pull/142
+
+### Fixed
+- Update disp download to allow `s3://` urls by @scottstanie in https://github.com/opera-adt/opera-utils/pull/141
+
+## [0.22.0](https://github.com/opera-adt/opera-utils/compare/v0.21.0...v0.22.0) - 2025-06-04
+
+### Added
+- Add alternative DISP stack reformatters by @scottstanie in https://github.com/opera-adt/opera-utils/pull/140
+- Add `disp-s1-download` for a subsetted download by @scottstanie in https://github.com/opera-adt/opera-utils/pull/137
+- `plot-disp-s1-frame.py`: Add multiple frame option by @scottstanie in https://github.com/opera-adt/opera-utils/pull/134
+- `download`: add `search-l2` to CLI interface by @scottstanie in https://github.com/opera-adt/opera-utils/pull/136
+- `disp-s1-download`: Add `/metadata` and `/identification` to outputs by @scottstanie in https://github.com/opera-adt/opera-utils/pull/139
+
+### Changed
+- `cslc`: Add Compressed SLC file regex to `parse_filename` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/135
+
+## [0.21.0](https://github.com/opera-adt/opera-utils/compare/v0.20.0...v0.21.0) - 2025-05-19
+
+### Added
+- Add optional `disp-s1-search` to cli by @scottstanie in https://github.com/opera-adt/opera-utils/pull/130
+- Add `reference_lonlat` option to `rebase_reference` by @scottstanie in https://github.com/opera-adt/opera-utils/pull/131
+
+## [0.20.0](https://github.com/opera-adt/opera-utils/compare/v0.19.0...v0.20.0) - 2025-05-09
 
 ### Added
 
