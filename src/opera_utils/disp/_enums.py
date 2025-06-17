@@ -1,6 +1,24 @@
 from enum import Enum
 
 
+class ReferenceMethod(str, Enum):
+    """Enumeration of reference methods."""
+
+    NONE = "none"
+    """No reference method."""
+    POINT = "point"
+    """Reference point."""
+    MEDIAN = "median"
+    """Full-scene median per date."""
+    BORDER = "border"
+    """Median of border pixels."""
+    HIGH_COHERENCE = "high_coherence"
+    """Mean/median of high-quality mask."""
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class DisplacementDataset(str, Enum):
     """Enumeration of displacement datasets."""
 

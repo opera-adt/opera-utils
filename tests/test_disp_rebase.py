@@ -4,7 +4,11 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from opera_utils.disp._rebase import combine_quality_masks, rebase_timeseries
+from opera_utils.disp._rebase import (
+    NaNPolicy,
+    create_rebased_displacement,
+    rebase_timeseries,
+)
 
 
 def test_rebase_single_reference():
@@ -141,151 +145,177 @@ def test_rebase_with_nan_values(nan_policy: str):
         np.testing.assert_array_equal(result[:, 1, 0], np.array([1, np.nan, np.nan]))
 
 
-def test_combine_quality_masks_logical_or():
-    """Test combine_quality_masks with default logical_or reduction."""
-    # Create test quality datasets
-    quality1 = xr.DataArray(
-        [[0.3, 0.7], [0.2, 0.8]], dims=["y", "x"], coords={"y": [0, 1], "x": [0, 1]}
-    )
-    quality2 = xr.DataArray(
-        [[0.6, 0.4], [0.9, 0.1]], dims=["y", "x"], coords={"y": [0, 1], "x": [0, 1]}
-    )
+class TestCreateRebasedDisplacement:
+    """Test suite for create_rebased_displacement function."""
 
-    quality_datasets = [quality1, quality2]
-    thresholds = [0.5, 0.5]
+    def test_create_rebased_displacement_single_reference(self):
+        """Test create_rebased_displacement with single reference date."""
+        # Create test displacement DataArray
+        np.random.seed(42)
+        data = np.random.randn(3, 4, 5).astype(np.float32)
+        times = [datetime(2020, 1, i + 1, tzinfo=timezone.utc) for i in range(3)]
+        da = xr.DataArray(
+            data,
+            dims=["time", "y", "x"],
+            coords={"time": times, "y": np.arange(4), "x": np.arange(5)},
+        )
 
-    result = combine_quality_masks(quality_datasets, thresholds)
+        # All same reference date
+        reference_dates = [datetime(2020, 1, 1, tzinfo=timezone.utc)] * 3
 
-    # Expected: True where any dataset > threshold
-    # quality1 > 0.5: [[False, True], [False, True]]
-    # quality2 > 0.5: [[True, False], [True, False]]
-    # logical_or:     [[True, True], [True, True]]
-    expected = xr.DataArray(
-        [[True, True], [True, True]], dims=["y", "x"], coords={"y": [0, 1], "x": [0, 1]}
-    )
+        result = create_rebased_displacement(da, reference_dates)
 
-    xr.testing.assert_equal(result, expected)
+        # Should be unchanged when reference date is constant
+        xr.testing.assert_allclose(result, da)
+        assert result.dims == da.dims
+        assert result.shape == da.shape
 
+    def test_create_rebased_displacement_multiple_references(self):
+        """Test create_rebased_displacement with multiple reference dates."""
+        # Create test data with known pattern
+        data = np.zeros((4, 2, 2), dtype=np.float32)
+        data[0] = 1.0  # First image: 1.0 everywhere
+        data[1] = 2.0  # Second image: 2.0 everywhere
+        data[2] = 1.0  # Third image: 1.0 everywhere (new reference)
+        data[3] = 2.0  # Fourth image: 2.0 everywhere
 
-def test_combine_quality_masks_logical_and():
-    """Test combine_quality_masks with logical_and reduction."""
-    # Create test quality datasets
-    quality1 = xr.DataArray(
-        [[0.3, 0.7], [0.6, 0.8]], dims=["y", "x"], coords={"y": [0, 1], "x": [0, 1]}
-    )
-    quality2 = xr.DataArray(
-        [[0.6, 0.4], [0.7, 0.9]], dims=["y", "x"], coords={"y": [0, 1], "x": [0, 1]}
-    )
+        times = [datetime(2020, 1, i + 1, tzinfo=timezone.utc) for i in range(4)]
+        da = xr.DataArray(
+            data,
+            dims=["time", "y", "x"],
+            coords={"time": times, "y": np.arange(2), "x": np.arange(2)},
+        )
 
-    quality_datasets = [quality1, quality2]
-    thresholds = [0.5, 0.5]
+        # Reference dates: first two same, last two same but different
+        reference_dates = [
+            datetime(2020, 1, 1, tzinfo=timezone.utc),
+            datetime(2020, 1, 1, tzinfo=timezone.utc),
+            datetime(2020, 1, 3, tzinfo=timezone.utc),  # Reference changes
+            datetime(2020, 1, 3, tzinfo=timezone.utc),
+        ]
 
-    result = combine_quality_masks(
-        quality_datasets, thresholds, reduction_func=np.logical_and
-    )
+        result = create_rebased_displacement(da, reference_dates)
 
-    # Expected: True where all datasets > threshold
-    # quality1 > 0.5: [[False, True], [True, True]]
-    # quality2 > 0.5: [[True, False], [True, True]]
-    # logical_and:    [[False, False], [True, True]]
-    expected = xr.DataArray(
-        [[False, False], [True, True]],
-        dims=["y", "x"],
-        coords={"y": [0, 1], "x": [0, 1]},
-    )
+        # Expected: [1, 2, 3, 4] (accumulated at reference change)
+        expected_data = np.array([1.0, 2.0, 3.0, 4.0])
 
-    xr.testing.assert_equal(result, expected)
+        np.testing.assert_array_equal(result.values[:, 0, 0], expected_data)
+        np.testing.assert_array_equal(result.values[:, 0, 1], expected_data)
+        np.testing.assert_array_equal(result.values[:, 1, 0], expected_data)
+        np.testing.assert_array_equal(result.values[:, 1, 1], expected_data)
 
+    def test_create_rebased_displacement_with_add_reference_time(self):
+        """Test create_rebased_displacement with add_reference_time=True."""
+        data = np.ones((2, 2, 2), dtype=np.float32)
+        times = [datetime(2020, 1, i + 1, tzinfo=timezone.utc) for i in range(2)]
+        da = xr.DataArray(
+            data,
+            dims=["time", "y", "x"],
+            coords={"time": times, "y": np.arange(2), "x": np.arange(2)},
+        )
 
-def test_combine_quality_masks_different_thresholds():
-    """Test combine_quality_masks with different thresholds for each dataset."""
-    # Create test quality datasets
-    quality1 = xr.DataArray(
-        [[0.2, 0.4], [0.6, 0.8]], dims=["y", "x"], coords={"y": [0, 1], "x": [0, 1]}
-    )
-    quality2 = xr.DataArray(
-        [[0.5, 0.7], [0.3, 0.9]], dims=["y", "x"], coords={"y": [0, 1], "x": [0, 1]}
-    )
+        reference_dates = [datetime(2020, 1, 1, tzinfo=timezone.utc)] * 2
 
-    quality_datasets = [quality1, quality2]
-    thresholds = [0.3, 0.6]  # Different thresholds
+        result = create_rebased_displacement(
+            da, reference_dates, add_reference_time=True
+        )
 
-    result = combine_quality_masks(quality_datasets, thresholds)
+        # Should have one extra time dimension at the beginning with zeros
+        assert result.shape == (3, 2, 2)
+        np.testing.assert_array_equal(result.values[0], np.zeros((2, 2)))
+        np.testing.assert_array_equal(result.values[1:], data)
 
-    # Expected: True where any dataset > its threshold
-    # quality1 > 0.3: [[False, True], [True, True]]
-    # quality2 > 0.6: [[False, True], [False, True]]
-    # logical_or:     [[False, True], [True, True]]
-    expected = xr.DataArray(
-        [[False, True], [True, True]],
-        dims=["y", "x"],
-        coords={"y": [0, 1], "x": [0, 1]},
-    )
+    @pytest.mark.parametrize("nan_policy", [NaNPolicy.propagate, NaNPolicy.omit])
+    def test_create_rebased_displacement_with_nans(self, nan_policy):
+        """Test create_rebased_displacement with NaN values."""
+        data = np.ones((3, 2, 2), dtype=np.float32)
+        data[1, 0, 0] = np.nan  # Add NaN at one location
 
-    xr.testing.assert_equal(result, expected)
+        times = [datetime(2020, 1, i + 1, tzinfo=timezone.utc) for i in range(3)]
+        da = xr.DataArray(
+            data,
+            dims=["time", "y", "x"],
+            coords={"time": times, "y": np.arange(2), "x": np.arange(2)},
+        )
 
+        # Reference date changes at third time step
+        reference_dates = [
+            datetime(2020, 1, 1, tzinfo=timezone.utc),
+            datetime(2020, 1, 1, tzinfo=timezone.utc),
+            datetime(2020, 1, 3, tzinfo=timezone.utc),  # Reference changes
+        ]
 
-def test_combine_quality_masks_single_dataset():
-    """Test combine_quality_masks with a single quality dataset."""
-    quality1 = xr.DataArray(
-        [[0.3, 0.7], [0.2, 0.8]], dims=["y", "x"], coords={"y": [0, 1], "x": [0, 1]}
-    )
+        result = create_rebased_displacement(da, reference_dates, nan_policy=nan_policy)
 
-    quality_datasets = [quality1]
-    thresholds = [0.5]
+        # Check that NaN handling follows the policy
+        if nan_policy == NaNPolicy.propagate:
+            # NaN should propagate through the reference change
+            assert np.isnan(result.values[2, 0, 0])
+        else:  # omit
+            # NaN should be treated as zero, so result should be finite
+            assert np.isfinite(result.values[2, 0, 0])
 
-    result = combine_quality_masks(quality_datasets, thresholds)
+        # Other locations should not be affected
+        assert np.isfinite(result.values[:, 0, 1]).all()
+        assert np.isfinite(result.values[:, 1, :]).all()
 
-    # Expected: True where dataset > threshold
-    expected = xr.DataArray(
-        [[False, True], [False, True]],
-        dims=["y", "x"],
-        coords={"y": [0, 1], "x": [0, 1]},
-    )
+    def test_create_rebased_displacement_custom_chunk_size(self):
+        """Test create_rebased_displacement with custom chunk size."""
+        data = np.ones((2, 4, 4), dtype=np.float32)
+        times = [datetime(2020, 1, i + 1, tzinfo=timezone.utc) for i in range(2)]
+        da = xr.DataArray(
+            data,
+            dims=["time", "y", "x"],
+            coords={"time": times, "y": np.arange(4), "x": np.arange(4)},
+        )
 
-    xr.testing.assert_equal(result, expected)
+        reference_dates = [datetime(2020, 1, 1, tzinfo=timezone.utc)] * 2
 
+        result = create_rebased_displacement(
+            da, reference_dates, process_chunk_size=(2, 2)
+        )
 
-def test_combine_quality_masks_three_datasets():
-    """Test combine_quality_masks with three quality datasets."""
-    quality1 = xr.DataArray(
-        [[0.3, 0.7]], dims=["y", "x"], coords={"y": [0], "x": [0, 1]}
-    )
-    quality2 = xr.DataArray(
-        [[0.4, 0.2]], dims=["y", "x"], coords={"y": [0], "x": [0, 1]}
-    )
-    quality3 = xr.DataArray(
-        [[0.8, 0.1]], dims=["y", "x"], coords={"y": [0], "x": [0, 1]}
-    )
+        # Should work the same regardless of chunk size
+        xr.testing.assert_allclose(result, da)
 
-    quality_datasets = [quality1, quality2, quality3]
-    thresholds = [0.5, 0.5, 0.5]
+    def test_create_rebased_displacement_preserves_coordinates(self):
+        """Test that create_rebased_displacement preserves coordinates."""
+        data = np.ones((2, 3, 4), dtype=np.float32)
+        times = [datetime(2020, 1, i + 1, tzinfo=timezone.utc) for i in range(2)]
+        y_coords = np.array([10.0, 20.0, 30.0])
+        x_coords = np.array([100.0, 200.0, 300.0, 400.0])
 
-    result = combine_quality_masks(quality_datasets, thresholds)
+        da = xr.DataArray(
+            data,
+            dims=["time", "y", "x"],
+            coords={"time": times, "y": y_coords, "x": x_coords},
+        )
 
-    # Expected: True where any dataset > threshold
-    # quality1 > 0.5: [[False, True]]
-    # quality2 > 0.5: [[False, False]]
-    # quality3 > 0.5: [[True, False]]
-    # logical_or:     [[True, True]]
-    expected = xr.DataArray(
-        [[True, True]], dims=["y", "x"], coords={"y": [0], "x": [0, 1]}
-    )
+        reference_dates = [datetime(2020, 1, 1, tzinfo=timezone.utc)] * 2
 
-    xr.testing.assert_equal(result, expected)
+        result = create_rebased_displacement(da, reference_dates)
 
+        # Check that coordinates are preserved
+        np.testing.assert_array_equal(result.coords["time"], da.coords["time"])
+        np.testing.assert_array_equal(result.coords["y"], da.coords["y"])
+        np.testing.assert_array_equal(result.coords["x"], da.coords["x"])
 
-def test_combine_quality_masks_mismatched_lengths():
-    """Test that combine_quality_masks raises error for mismatched lengths."""
-    quality1 = xr.DataArray(
-        [[0.3, 0.7]], dims=["y", "x"], coords={"y": [0], "x": [0, 1]}
-    )
-    quality2 = xr.DataArray(
-        [[0.4, 0.2]], dims=["y", "x"], coords={"y": [0], "x": [0, 1]}
-    )
+    def test_create_rebased_displacement_dimension_order(self):
+        """Test that create_rebased_displacement maintains proper dimension order."""
+        data = np.ones((2, 3, 4), dtype=np.float32)
+        times = [datetime(2020, 1, i + 1, tzinfo=timezone.utc) for i in range(2)]
+        da = xr.DataArray(
+            data,
+            dims=["time", "y", "x"],
+            coords={"time": times, "y": np.arange(3), "x": np.arange(4)},
+        )
 
-    quality_datasets = [quality1, quality2]
-    thresholds = [0.5]  # Wrong length
+        reference_dates = [datetime(2020, 1, 1, tzinfo=timezone.utc)] * 2
 
-    with pytest.raises(ValueError, match="argument 2 is shorter than argument 1"):
-        combine_quality_masks(quality_datasets, thresholds)
+        result = create_rebased_displacement(
+            da, reference_dates, add_reference_time=True
+        )
+
+        # Check dimension order is maintained as (time, y, x)
+        assert result.dims == ("time", "y", "x")
+        assert result.shape == (3, 3, 4)  # +1 time dimension
