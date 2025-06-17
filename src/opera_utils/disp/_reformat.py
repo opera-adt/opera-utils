@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Sequence
+import warnings
+from collections.abc import Callable, Sequence
+from functools import reduce
 from pathlib import Path
 
 import numpy as np
@@ -30,9 +32,8 @@ from ._enums import (
     ReferenceMethod,
 )
 from ._netcdf import create_virtual_stack
-from ._rebase import NaNPolicy, combine_quality_masks
+from ._rebase import NaNPolicy
 from ._reference import (
-    _compute_harmonic_mean,
     _get_reference_row_col,
     get_reference_values,
 )
@@ -224,9 +225,15 @@ def reformat_stack(
     )
     # TODO: make this configurable: currently we take every 15th coherence since, during
     # historical processing, the coherences are the same per ministack
-    avg_coherence = _compute_harmonic_mean(ds.temporal_coherence[::15])
+    da_temp_coh = ds.temporal_coherence[::15]
+    # Use the harmonic mean to downweight any time periods with low coherence
+    avg_coherence = da_temp_coh.shape[0] / (1.0 / da_temp_coh).sum(
+        dim="time", skipna=False, min_count=1
+    )
     # Save the coherence to the output
-    ds_remaining["average_temporal_coherence"] = avg_coherence
+    ds_remaining["average_temporal_coherence"] = xr.DataArray(
+        avg_coherence, dims=("y", "x"), coords={"y": ds.y, "x": ds.x}
+    )
     for var in ds_remaining.data_vars:
         # Round, if it's a float32
         d = ds_remaining[var]
@@ -460,31 +467,84 @@ def _get_zarr_encoding(
     shard_factors: tuple[int, int, int] | None = (1, 4, 4),
 ) -> dict[str, dict]:
     if shard_factors is not None:
-        shards = tuple(int(c * f) for c, f in zip(chunks, shard_factors))
+        c1, c2, c3 = chunks
+        f1, f2, f3 = shard_factors
+        shards = (c1 * f1, c2 * f2, c3 * f3)
     else:
         shards = None
 
     encoding_per_var = {
         "compressors": [BloscCodec(cname=compression_name, clevel=compression_level)],
         "chunks": chunks,
-        "shards": shards,
     }
+    # Only add shards if they're properly divisible
+    if shards is not None:
+        # Check if shards are divisible by chunks
+        if all(s % c == 0 for s, c in zip(shards, chunks)):
+            encoding_per_var["shards"] = shards
+        else:
+            msg = "Shards are not properly divisible by chunks"
+            warnings.warn(msg, stacklevel=2)
+
     if not data_vars:
         data_vars = list(ds.data_vars)
     encoding = {}
     for var in data_vars:
         if ds[var].ndim < 2:
             continue
-        encoding[var] = encoding_per_var
+        var_encoding = encoding_per_var.copy()
         if ds[var].ndim == 2:
-            encoding[var]["chunks"] = chunks[-2:]
+            var_encoding["chunks"] = chunks[-2:]
             if shards is not None:
-                encoding[var]["shards"] = shards[-2:]
+                var_encoding["shards"] = shards[-2:]
+        encoding[var] = var_encoding
     if not add_coords:
         return encoding
     # Handle coordinate compression
     encoding.update({var: {"compressors": []} for var in ds.coords})
     return encoding
+
+
+def combine_quality_masks(
+    quality_datasets: Sequence[xr.DataArray],
+    thresholds: Sequence[float],
+    reduction_func: Callable = np.logical_or,
+) -> xr.DataArray:
+    """Create a combined mask from multiple quality datasets.
+
+    This function creates on boolean mask from multiple quality datasets
+    by applying `reduction_func` on each thresholded array.
+
+    For example, with `reduction_func=np.logical_or` and
+    `thresholds=[0.5, 0.5]`, the mask will be True if any of the quality datasets
+    have a value greater than 0.5.
+    If you want *all* quality datasets to pass their respective thresholds,
+    use `reduction_func=np.logical_and`.
+
+    Parameters
+    ----------
+    quality_datasets : Sequence[xr.DataArray]
+        Sequence of quality datasets.
+    thresholds : Sequence[float]
+        Thresholds for each quality dataset.
+        Must be same length as `quality_datasets`.
+    reduction_func : Callable
+        Function to use for combining the quality datasets.
+        Defaults to `np.logical_or`.
+
+    Returns
+    -------
+    xr.DataArray
+        Combined mask.
+
+    """
+    return reduce(
+        reduction_func,
+        [
+            qd > threshold
+            for qd, threshold in zip(quality_datasets, thresholds, strict=True)
+        ],
+    )
 
 
 if __name__ == "__main__":

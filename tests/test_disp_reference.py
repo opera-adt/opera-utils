@@ -6,7 +6,6 @@ import xarray as xr
 
 from opera_utils.disp._enums import ReferenceMethod
 from opera_utils.disp._reference import (
-    _compute_coherence_harmonic_mean,
     _convert_lonlat_to_rowcol,
     _get_border_pixels,
     get_reference_values,
@@ -89,11 +88,15 @@ class TestGetBorderPixels:
         border_pixels = 1
         border = _get_border_pixels(sample_da, border_pixels)
 
-        # Should have top, bottom, left, right borders
-        expected_pixels = (
-            2 * 1 * sample_da.sizes["x"]  # top + bottom
-            + 2 * 1 * sample_da.sizes["y"]  # left + right
-        )
+        # The border includes overlapping corners, so we calculate actual count
+        # by creating the same mask used in the implementation
+        mask = np.zeros(sample_da.shape[-2:], dtype=bool)
+        mask[:border_pixels, :] = True  # top
+        mask[-border_pixels:, :] = True  # bottom
+        mask[:, :border_pixels] = True  # left
+        mask[:, -border_pixels:] = True  # right
+        expected_pixels = mask.sum()
+
         assert border.sizes["pixels"] == expected_pixels
 
     def test_get_border_pixels_large(self, sample_da):
@@ -103,32 +106,6 @@ class TestGetBorderPixels:
 
         assert border.sizes["time"] == sample_da.sizes["time"]
         assert "pixels" in border.dims
-
-
-class TestComputeCoherenceHarmonicMean:
-    def test_compute_coherence_3d(self, sample_coherence):
-        """Test coherence harmonic mean with 3D coherence."""
-        result = _compute_coherence_harmonic_mean(sample_coherence)
-
-        assert result.shape == sample_coherence.shape[1:]  # Should be 2D
-        assert result.dtype == np.float64
-
-    def test_compute_coherence_2d(self):
-        """Test coherence harmonic mean with 2D coherence."""
-        coherence_2d = np.random.rand(10, 15) * 0.9 + 0.1
-        result = _compute_coherence_harmonic_mean(coherence_2d)
-
-        assert result.shape == coherence_2d.shape
-        assert result.dtype == np.float64
-
-    def test_coherence_threshold(self):
-        """Test coherence computation with known values."""
-        # Create coherence with known values
-        coherence = np.array([[0.3, 0.7], [0.9, 0.2]])
-        result = _compute_coherence_harmonic_mean(coherence)
-
-        # Should return the input for 2D arrays
-        np.testing.assert_array_equal(result, coherence)
 
 
 class TestGetReferenceValues:

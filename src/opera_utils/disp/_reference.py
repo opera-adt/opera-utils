@@ -165,23 +165,3 @@ def _get_border_pixels(
     mask[:, -num_border_pixels:] = True  # right
     # Stack the border regions together
     return da.where(mask).stack(pixels=("y", "x")).dropna("pixels")
-
-
-def _compute_harmonic_mean(
-    arr: xr.DataArray,
-) -> xr.DataArray:
-    """Compute harmonic mean of arr along time axis (axis=0).
-
-    Parameters
-    ----------
-    arr : ArrayLike
-        Array to compute harmonic mean of.
-
-    Returns
-    -------
-    np.ndarray
-        2D harmonic mean array
-
-    """
-    num = arr.time.size
-    return num / (1.0 / arr).sum(dim="time", skipna=False, min_count=1)
