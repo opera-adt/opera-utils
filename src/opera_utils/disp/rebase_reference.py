@@ -118,6 +118,7 @@ def rebase(
     product_stack = DispProductStack.from_file_list(nc_files)
     # Flatten all dates, find unique sorted list of SAR epochs
     all_dates = sorted(set(flatten(product_stack.ifg_date_pairs)))
+    reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=np.nan)
 
     # Create the main displacement dataset.
     writer = GeotiffStackWriter.from_dates(
@@ -126,6 +127,7 @@ def rebase(
         date_list=all_dates,
         keep_bits=keep_bits,
         profile=product_stack.get_rasterio_profile(),
+        units=reader.units,
     )
     if all(Path(f).exists() for f in writer.files):
         return
@@ -133,7 +135,6 @@ def rebase(
     if reference_lonlat is not None:
         reference_point = product_stack.lonlat_to_rowcol(*reference_lonlat)
 
-    reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=np.nan)
     corrections_readers = []
     if apply_solid_earth_corrections:
         corrections_readers.append(
@@ -227,6 +228,12 @@ class HDF5StackReader:
             dset = hf[str(self.dset_name)]
             dset.read_direct(dest)
 
+    @property
+    def units(self) -> str | None:
+        with h5py.File(self.file_list[0], "r") as hf:
+            u = hf[str(self.dset_name)].attrs.get("units")
+            return u.decode("utf-8") if isinstance(u, bytes) else u
+
 
 @dataclass
 class GeotiffStackWriter:
@@ -238,6 +245,7 @@ class GeotiffStackWriter:
     nodata: float = np.nan
     keep_bits: int | None = 9
     dtype: DTypeLike | None = None
+    units: str | None = None
 
     def __post_init__(self):
         if self.profile is None:
@@ -245,6 +253,8 @@ class GeotiffStackWriter:
         if self.like_filename is not None:
             with rio.open(self.like_filename) as src:
                 self.profile.update(src.profile)
+                if src.units is not None and src.units[0] is not None:
+                    self.units = src.units[0]
 
         self.profile["count"] = 1
         self.profile["driver"] = "GTiff"
@@ -269,6 +279,7 @@ class GeotiffStackWriter:
             mode = "r+" if Path(self.files[idx]).exists() else "w"
             with rio.open(self.files[idx], mode, **self.profile) as dst:
                 dst.write(value, 1)
+                dst.units = [self.units]
 
     def __len__(self):
         return len(self.files)

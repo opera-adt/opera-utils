@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import rasterio as rio
 import xarray as xr
 
 from opera_utils.disp._enums import (
@@ -44,3 +45,7 @@ def test_rebase_reference(tmp_path):
         assert (
             len(list(output_dir.glob(str(ds_name) + "*.tif"))) == num_unique_ref_dates
         )
+    # Check for the units on displacement
+    assert all(
+        rio.open(f).units[0] == "meters" for f in output_dir.glob("displacement*.tif")
+    )
