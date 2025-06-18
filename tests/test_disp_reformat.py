@@ -38,6 +38,8 @@ def test_reformat_stack_zarr(tmp_path):
     for ds_name in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS:
         assert ds_name in ds.data_vars
 
+    assert ds.displacement.units == "meters"
+
 
 @pytest.mark.skipif(
     SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"

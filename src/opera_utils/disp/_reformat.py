@@ -423,6 +423,10 @@ def _write_rebased_stack(
     da_disp_referenced = da_disp_referenced.assign_coords(spatial_ref=ds.spatial_ref)
     if do_round and np.issubdtype(da_disp_referenced.dtype, np.floating):
         da_disp_referenced.data = round_mantissa(da_disp_referenced.data, keep_bits=10)
+
+    # Ensure we have the attrs (units) from the original dataset
+    da_disp_referenced.attrs.update(ds[data_var].attrs)
+
     ds_disp = da_disp_referenced.to_dataset(name=str(data_var))
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_disp, out_chunks, shard_factors=shard_factors)
