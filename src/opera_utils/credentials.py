@@ -234,3 +234,8 @@ def get_earthdata_username_password(
         f" '{host}' entry, nor environment variables set."
     )
     raise EarthdataLoginError(msg)
+
+
+if __name__ == "__main__":
+    for k, v in AWSCredentials.from_asf().to_env().items():
+        print(f"export {k}={v}")

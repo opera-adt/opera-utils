@@ -67,6 +67,7 @@ disp = [
   "h5netcdf",
   "s3fs",
   "tqdm",
+  "rasterio",
   "xarray",
   "zarr>=3",
 ]
