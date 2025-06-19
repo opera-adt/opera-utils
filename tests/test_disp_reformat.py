@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import pytest
 import xarray as xr
 
@@ -24,36 +25,66 @@ INPUT_DISP_S1_DIR = Path(__file__).parent / "data" / "subsets-new-orleans-small"
 SKIP_TESTS = len(list(INPUT_DISP_S1_DIR.glob("*.nc"))) == 0
 
 
-@pytest.mark.skipif(
-    SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"
-)
-def test_reformat_stack_zarr(tmp_path):
-    input_files = list(INPUT_DISP_S1_DIR.glob("*.nc"))
-    output_name = tmp_path / "test.zarr"
+class TestReformatStack:
+    @pytest.fixture(scope="class")
+    def ds_stack_zarr(self, tmp_path_factory):
+        input_files = list(INPUT_DISP_S1_DIR.glob("*.nc"))
+        output_name = tmp_path_factory.mktemp("test") / "test.zarr"
 
-    reformat_stack(input_files=input_files, output_name=output_name)
+        reformat_stack(input_files=input_files, output_name=output_name)
 
-    # Inspect results
-    ds = xr.open_zarr(output_name, consolidated=False)
-    for ds_name in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS:
-        assert ds_name in ds.data_vars
+        # Inspect results
+        ds = xr.open_zarr(output_name, consolidated=False)
+        return ds
 
-    assert ds.displacement.units == "meters"
+    @pytest.mark.skipif(
+        SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"
+    )
+    def test_reformat_stack_zarr(self, ds_stack_zarr):
+        for ds_name in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS:
+            assert ds_name in ds_stack_zarr.data_vars
 
+        assert ds_stack_zarr.displacement.units == "meters"
 
-@pytest.mark.skipif(
-    SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"
-)
-def test_reformat_stack_netcdf(tmp_path):
-    input_files = list(INPUT_DISP_S1_DIR.glob("*.nc"))
-    output_name = tmp_path / "test.nc"
+    @pytest.fixture(scope="class")
+    def ds_stack_netcdf(self, tmp_path_factory):
+        input_files = list(INPUT_DISP_S1_DIR.glob("*.nc"))
+        output_name = tmp_path_factory.mktemp("test") / "test.nc"
 
-    reformat_stack(input_files=input_files, output_name=output_name)
+        reformat_stack(input_files=input_files, output_name=output_name)
 
-    # Inspect results
-    ds = xr.open_dataset(output_name, engine="h5netcdf")
-    for ds_name in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS:
-        assert ds_name in ds.data_vars
+        # Inspect results
+        ds = xr.open_dataset(output_name, engine="h5netcdf")
+        return ds
+
+    @pytest.mark.skipif(
+        SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"
+    )
+    def test_reformat_stack_netcdf(self, ds_stack_netcdf):
+        for ds_name in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS:
+            assert ds_name in ds_stack_netcdf.data_vars
+
+        assert ds_stack_netcdf.displacement.units == "meters"
+
+    @pytest.mark.skipif(
+        SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"
+    )
+    def test_compare_netcdf_zarr(self, ds_stack_netcdf, ds_stack_zarr):
+        for ds_name in ds_stack_zarr.data_vars:
+            if ds_stack_zarr[ds_name].ndim == 0:
+                assert ds_stack_netcdf[ds_name].values == ds_stack_zarr[ds_name].values
+            elif ds_name in ("time", "reference_time"):
+                assert (
+                    np.sum(
+                        ds_stack_netcdf[ds_name].values - ds_stack_zarr[ds_name].values
+                    )
+                    == 0
+                )
+            else:
+                rtol = 1e-5 if "displacement" in ds_name else 1e-2
+                np.testing.assert_allclose(
+                    ds_stack_netcdf[ds_name], ds_stack_zarr[ds_name], rtol=rtol
+                )
 
 
 def test_combine_quality_masks_logical_or():

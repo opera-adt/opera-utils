@@ -258,6 +258,14 @@ def reformat_stack(
                 str(ds) for ds in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS
             ],
         )
+        # Write the extra "average_temporal_coherence"
+        encoding = _get_netcdf_encoding(
+            ds_remaining[["average_temporal_coherence"]], out_chunks
+        )
+        ds_remaining[["average_temporal_coherence"]].to_netcdf(
+            output_name, engine="h5netcdf", encoding=encoding, mode="a"
+        )
+
     print(f"Wrote remaining: {time.time() - start_time:.1f}s")
 
     if reference_method == ReferenceMethod.HIGH_COHERENCE:
