@@ -56,7 +56,7 @@ def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.datet
     date_list = re.findall(pattern, path.name)
     if not date_list:
         return []
-    return [_parse_date(d, fmt) for d in date_list]
+    return [datetime.datetime.strptime(d, fmt) for d in date_list]
 
 
 @overload
@@ -100,10 +100,6 @@ def filter_by_date(files, dates, fmt=DATE_FORMAT):
         if any(d in date_set for d in date_tuple):
             out.append(f)
     return out
-
-
-def _parse_date(datestr: str, fmt: str = DATE_FORMAT) -> datetime.datetime:
-    return datetime.datetime.strptime(datestr, fmt)
 
 
 def _date_format_to_regex(date_format: str) -> re.Pattern:
