@@ -10,10 +10,15 @@ on:
         description: Sentinel-1 frame ID
         required: true
         default: '20697'
+      output_name:
+        type: string
+        description: Output file name. Must end in .zarr (for Zarr output), .nc (for NetCDF output)
+        required: false
+        default: 'disp-output.zarr'
       bbox:
         type: string
         description: >-
-          Bounding box "minlon minlat maxlon maxlat"
+          Bounding box as "minlon minlat maxlon maxlat"
         required: true
         default: '-102.71 31.35 -102.6 31.45'
       start_datetime:
@@ -64,7 +69,6 @@ jobs:
           environment-file: environment.yml
           environment-name: opera_utils-env
           generate-run-shell: false
-          create-args: ${{ matrix.deps.spec }}
           condarc: |
             channels:
               - conda-forge
@@ -87,19 +91,19 @@ jobs:
             --end-datetime ${{ inputs.end_datetime }} \
             --num-workers $NUM_WORKERS
 
-          echo "Reformatting to Zarr..."
+          echo "Reformatting to ${{ inputs.output_name }}"
           opera-utils disp-s1-reformat \
             --reference-method BORDER \
-            --output-name disp-output.zarr \
+            --output-name ${{ inputs.output_name }} \
             --input-files subset-ncs/OPERA_L3_DISP-S1*.nc
 
           echo "Zipping product..."
-          zip -1 -r disp-output.zarr.zip disp-output.zarr
+          zip -1 -r ${{ inputs.output_name }}.zip ${{ inputs.output_name }}
 
       # Upload the final artefact
       - name: Upload Zarr ZIP
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.workflow_name }}-product
-          path: disp-output.zarr.zip
+          path: ${{ inputs.output_name }}.zip
           retention-days: 3

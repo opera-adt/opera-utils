@@ -42,7 +42,20 @@ pip install opera-utils[disp] # For remote access to DISP files
 pip install opera-utils[all]  # all optional dependencies
 ```
 
-## Example Usage
+
+## DISP-S1 Usage examples
+
+### Try it out!
+
+We have set up Github Actions so that users can download and format subsets of DISP-S1 data with no coding required!
+
+1. Fork this repository
+1. Set up your EARTHDATA_USERNAME and EARTHDATA_PASSWORD in the Github Actions secrets settings (e.g. for my fork, I use https://github.com/scottstanie/opera-utils/settings/secrets/actions )
+1. Under the Actions tab, click on the `disp_download_reformat` workflow.
+1. Select the Run workflow dropdown and supply the required information, then click the green Run workflow button
+1. The resulting reformatted Zarr will be preserved as Github Artifacts, which can be downloaded.
+
+## Usage examples
 
 ### Parsing Sentinel-1 Burst IDs
 
@@ -80,7 +93,20 @@ Out[3]:
  't042_088913_iw3']
  ```
 
-## DISP-S1 Usage examples
+### DISP-S1 access
+
+### Download a subset from the command lind
+
+```bash
+opera-utils disp-s1-download \
+    --bbox -102.71 31.35 -102.6 31.45 \
+    --frame-id 20697 \
+    --output-dir subsets-west-texas \
+    --end-datetime 2018-01-01 \\
+    --num-workers 4
+```
+
+#### Search for products and create a stack
 
 ```python
 from opera_utils.disp import search, reader, DispProductStack
@@ -90,13 +116,6 @@ products = search.get_products(frame_id=9154)
 
 # Create the product stack for parsing frame metadata
 stack = DispProductStack(products)
-
-# Read a a lon/lat box
-data = reader.read_stack_lonlat(
-    stack,
-    lons=slice(-120.45, -120.3),
-    lats=slice(34.07, 34.01)
-)
 ```
 
 ## Setup for Developers
@@ -118,7 +137,7 @@ mamba env create --name my-opera-env --file environment.yml
 3. Install the source in editable mode:
 ```bash
 mamba activate my-opera-env
-python -m pip install -e ".[docs,test]"
+python -m pip install -e ".[all]"
 ```
 
 We use [`pre-commit`](https://pre-commit.com/) to automatically run linting and formatting:
