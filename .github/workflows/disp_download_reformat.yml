@@ -79,7 +79,7 @@ jobs:
           export NUM_WORKERS=${{ inputs.num_workers }}
 
           echo "Downloading NetCDF subset..."
-          pixi run -- opera-utils disp-s1-download \
+          opera-utils disp-s1-download \
             --output-dir subset-ncs \
             --bbox ${{ inputs.bbox }} \
             --frame-id ${{ inputs.frame_id }} \
@@ -88,7 +88,7 @@ jobs:
             --num-workers $NUM_WORKERS
 
           echo "Reformatting to Zarr..."
-          pixi run -- opera-utils disp-s1-reformat \
+          opera-utils disp-s1-reformat \
             --reference-method BORDER \
             --output-name disp-output.zarr \
             --input-files subset-ncs/OPERA_L3_DISP-S1*.nc
