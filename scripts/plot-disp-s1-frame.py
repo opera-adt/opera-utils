@@ -32,6 +32,7 @@ from typing import Optional
 import cartopy.crs as ccrs
 import cartopy.io.shapereader as shpreader
 import matplotlib.pyplot as plt
+from cartopy.io.img_tiles import GoogleTiles
 from cartopy.mpl.geoaxes import GeoAxes
 from shapely.ops import unary_union
 
@@ -75,8 +76,6 @@ def map_background(
     if use_satellite:
         # Example: a Google or Mapbox tiles source.
         # Requires cartopy >= 0.20 and an internet connection.
-        from cartopy.io.img_tiles import GoogleTiles
-
         tiler = GoogleTiles(style="satellite")
         ax.add_image(tiler, zoom_level)
 

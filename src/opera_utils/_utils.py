@@ -13,6 +13,13 @@ from numpy.typing import DTypeLike
 from ._helpers import reproject_bounds, reproject_coordinates
 from ._types import Bbox, PathOrStr
 
+try:
+    from osgeo import gdal, gdal_array, gdalconst
+
+    HAS_GDAL = True
+except ImportError:
+    HAS_GDAL = False
+
 __all__ = [
     "create_yx_arrays",
     "format_nc_filename",
@@ -66,10 +73,10 @@ def _get_path_from_gdal_str(name: PathOrStr) -> Path:
     s = str(name)
     if s.upper().startswith("DERIVED_SUBDATASET"):
         # like DERIVED_SUBDATASET:AMPLITUDE:slc_filepath.tif
-        p = s.split(":")[-1].strip('"').strip("'")
+        p = s.rsplit(":", maxsplit=1)[-1].strip('"').strip("'")
     elif ":" in s and (s.upper().startswith("NETCDF") or s.upper().startswith("HDF")):
         # like NETCDF:"slc_filepath.nc":subdataset
-        p = s.split(":")[1].strip('"').strip("'")
+        p = s.rsplit(":", maxsplit=2)[1].strip('"').strip("'")
     else:
         # Whole thing is the path
         p = str(name)
@@ -96,7 +103,9 @@ def numpy_to_gdal_type(np_dtype: DTypeLike) -> int:
         supported by GDAL (for example, `np.dtype('>i4')`)
 
     """
-    from osgeo import gdal_array, gdalconst
+    if not HAS_GDAL:
+        msg = "osgeo (GDAL) must be installed to use this function"
+        raise ImportError(msg)
 
     np_dtype = np.dtype(np_dtype)
 
@@ -111,7 +120,9 @@ def numpy_to_gdal_type(np_dtype: DTypeLike) -> int:
 
 def gdal_to_numpy_type(gdal_type: str | int) -> np.dtype:
     """Convert gdal type to numpy type."""
-    from osgeo import gdal, gdal_array
+    if not HAS_GDAL:
+        msg = "osgeo (GDAL) must be installed to use this function"
+        raise ImportError(msg)
 
     if isinstance(gdal_type, str):
         gdal_type = gdal.GetDataTypeByName(gdal_type)

@@ -63,7 +63,6 @@ def reformat_stack(
     reference_coherence_threshold: float = 0.7,
     process_chunk_size: tuple[int, int] = (2048, 2048),
     do_round: bool = True,
-    max_workers: int = 1,
 ) -> None:
     """Reformat NetCDF DISP-S1 files into one NetCDF/Zarr stack.
 
@@ -134,9 +133,6 @@ def reformat_stack(
         Defaults to (2048, 2048).
     do_round : bool
         If True, rounds mantissa bits of floating point rasters to compress the data.
-    max_workers : int
-        Number of workers to use for parallel processing.
-        Default is 1.
 
     """
     start_time = time.time()
@@ -149,17 +145,6 @@ def reformat_stack(
     else:
         msg = "Only .nc and .zarr output formats are supported"
         raise ValueError(msg)
-
-    if max_workers == 1:
-        client = None
-    else:
-        import dask.distributed
-
-        cluster = dask.distributed.LocalCluster(n_workers=max_workers)
-        print(f"Cluster: {cluster}")
-        client = dask.distributed.Client(cluster)
-        print("Dashboard link:", client.dashboard_link)
-        print(f"Dask client: {client}")
 
     corrections: list[CorrectionDataset] = []
     if apply_solid_earth_corrections:

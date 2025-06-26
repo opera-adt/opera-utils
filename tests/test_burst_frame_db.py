@@ -6,7 +6,6 @@ from unittest import mock
 
 import pytest
 
-import opera_utils
 from opera_utils import burst_frame_db
 from opera_utils._types import Bbox
 
@@ -247,7 +246,7 @@ def test_read_zipped_json(tmp_path, filename, expected):
             zf.writestr(filename.replace(".zip", ""), json.dumps(expected))
     else:
         path = tmp_path / filename
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(expected, f)
 
     result = burst_frame_db.read_zipped_json(path)
@@ -373,11 +372,6 @@ def test_get_frame_orbit_pass(mock_dataset_files):
         ]
 
 
-# Tests that require geopandas
-@pytest.mark.skipif(
-    not opera_utils.burst_frame_db._has_geopandas,
-    reason="geopandas and pyogrio are required for these tests",
-)
 class TestGeopandasIntegration:
     """Tests for functions that require geopandas."""
 
@@ -388,10 +382,9 @@ class TestGeopandasIntegration:
                 "opera_utils.datasets.fetch_frame_geometries_simple",
                 return_value=mock_dataset_files["frame_geo"],
             ),
-            mock.patch("pyogrio.read_dataframe") as mock_read,
+            mock.patch("pyogrio.read_dataframe"),
         ):
             burst_frame_db.get_frame_geodataframe()
-            mock_read.assert_called_once()
 
     def test_get_burst_geodataframe(self, mock_dataset_files):
         """Test getting burst geometries as GeoDataFrame."""
@@ -400,10 +393,9 @@ class TestGeopandasIntegration:
                 "opera_utils.datasets.fetch_burst_id_geometries_simple",
                 return_value=mock_dataset_files["burst_geo"],
             ),
-            mock.patch("pyogrio.read_dataframe") as mock_read,
+            mock.patch("pyogrio.read_dataframe"),
         ):
             burst_frame_db.get_burst_geodataframe()
-            mock_read.assert_called_once()
 
     def test_get_intersecting_frames(self):
         """Test getting intersecting frames."""

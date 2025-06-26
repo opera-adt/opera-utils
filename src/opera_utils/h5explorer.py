@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from typing import Any
 
 import h5py
+import ipywidgets as widgets
+import matplotlib.pyplot as plt
 import numpy as np
 
 from ._types import PathOrStr
@@ -91,11 +94,6 @@ def create_explorer_widget(
     >>> create_explorer_widget(hf) # doctest: +SKIP
 
     """
-    from io import BytesIO
-
-    import ipywidgets as widgets
-    import matplotlib.pyplot as plt
-
     sub_row, sub_col = subsample
 
     def _make_thumbnail(image):

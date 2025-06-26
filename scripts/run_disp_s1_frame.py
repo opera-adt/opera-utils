@@ -21,6 +21,13 @@ from opera_utils.disp import rebase_reference, search
 from opera_utils.disp._rebase import NaNPolicy
 from opera_utils.disp._search import UrlType
 
+try:
+    from dolphin import ReferencePoint, timeseries, utils
+
+    HAS_DOLPHIN = True
+except ImportError:
+    HAS_DOLPHIN = False
+
 
 def _download(url: str, out_dir: Path) -> Path:
     """Download *url* into *out_dir* if needed and return the local path."""
@@ -116,12 +123,6 @@ def process_frame(
         num_workers=num_workers,
     )
 
-    try:
-        from dolphin import ReferencePoint, timeseries, utils
-    except ImportError as e:
-        msg = "dolphin is required for velocity creation."
-        raise ImportError(msg) from e
-
     utils.disable_gpu()
     disp_files = sorted(aligned_dir.glob("displacement*.tif"))
     if not disp_files:
@@ -129,6 +130,10 @@ def process_frame(
         raise RuntimeError(msg)
     vel_file = aligned_dir / "velocity.tif"
     mask_files = sorted(aligned_dir.glob("recommended_mask*20*.tif"))
+    if not HAS_DOLPHIN:
+        print("dolphin is required for velocity creation.")
+        return
+
     timeseries.create_velocity(
         unw_file_list=disp_files,
         output_file=vel_file,

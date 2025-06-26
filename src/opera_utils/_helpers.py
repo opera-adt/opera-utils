@@ -4,7 +4,17 @@ from collections.abc import Iterable, Mapping, Sequence
 from itertools import chain, combinations
 from typing import Any
 
+from pyproj import Transformer
+
 from ._types import Bbox
+
+try:
+    from rasterio.warp import transform_bounds
+
+    HAS_RASTERIO = True
+except ImportError:
+    HAS_RASTERIO = False
+
 
 __all__ = ["reproject_bounds"]
 
@@ -35,7 +45,9 @@ def powerset(iterable: Iterable[Any]) -> chain[tuple[Any, ...]]:
 
 def reproject_bounds(bounds: Bbox, src_epsg: int, dst_epsg: int) -> Bbox:
     """Reproject the (left, bottom, right top) from `src_epsg to `dst_epsg`."""
-    from rasterio.warp import transform_bounds
+    if not HAS_RASTERIO:
+        msg = "rasterio must be installed to use this function"
+        raise ImportError(msg)
 
     left, bottom, right, top = transform_bounds(src_epsg, dst_epsg, *bounds)
     return Bbox(left, bottom, right, top)
@@ -45,7 +57,5 @@ def reproject_coordinates(
     x: Sequence[float], y: Sequence[float], src_epsg: int, dst_epsg: int
 ) -> tuple[list[float], list[float]]:
     """Reproject the coordinates from `src_epsg` to `dst_epsg`."""
-    from pyproj import Transformer
-
     t = Transformer.from_crs(src_epsg, dst_epsg, always_xy=True)
     return t.transform(x, y)

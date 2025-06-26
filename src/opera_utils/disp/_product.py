@@ -27,6 +27,8 @@ from opera_utils.burst_frame_db import (
 )
 from opera_utils.constants import DISP_FILE_REGEX
 
+from ._utils import get_frame_coordinates
+
 __all__ = ["DispProduct", "DispProductStack", "UrlType"]
 
 
@@ -126,8 +128,6 @@ class DispProduct:
     @cached_property
     def _coordinates(self) -> tuple[np.ndarray, np.ndarray]:
         if not Path(self.filename).exists():
-            from ._utils import get_frame_coordinates
-
             return get_frame_coordinates(self.frame_id)
         with h5py.File(self.filename) as f:
             return f["x"][()], f["y"][()]

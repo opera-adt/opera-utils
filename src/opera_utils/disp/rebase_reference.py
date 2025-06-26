@@ -31,6 +31,11 @@ import h5py
 import numpy as np
 import rasterio as rio
 from numpy.typing import DTypeLike
+
+try:
+    from scipy import ndimage
+except ImportError:
+    ndimage = None
 from rasterio.enums import Resampling
 from tqdm.auto import trange
 from typing_extensions import Self
@@ -44,7 +49,7 @@ from ._enums import (
 )
 from ._product import DispProductStack
 from ._rebase import NaNPolicy
-from ._utils import _last_per_ministack, flatten, round_mantissa
+from ._utils import flatten, last_per_ministack, round_mantissa
 
 UINT16_MAX: Final = 65535
 
@@ -429,7 +434,9 @@ def find_reference_point(
         Reference point (row, column)
 
     """
-    from scipy import ndimage
+    if ndimage is None:
+        msg = "scipy is required for image processing operations"
+        raise ImportError(msg)
 
     with rio.open(average_quality_raster) as src:
         quality = src.read(1)
@@ -504,7 +511,7 @@ def main(
 
     # Transfer the quality layers (no rebasing needed)
     last_per_ministack_products = DispProductStack.from_file_list(
-        _last_per_ministack(nc_files)
+        last_per_ministack(nc_files)
     )
     with multiprocessing.Pool(num_workers) as pool:
         pool.starmap(

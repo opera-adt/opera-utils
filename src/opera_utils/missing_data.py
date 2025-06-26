@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -8,6 +9,8 @@ from itertools import groupby
 from typing import Any
 
 import numpy as np
+from rich.console import Console
+from rich.table import Table
 
 from ._dates import filter_by_date, get_dates
 from ._helpers import flatten, powerset, sorted_deduped_values
@@ -141,12 +144,10 @@ def get_burst_id_to_dates(
 
 
 def _duplicated_bursts(burst_id_to_dates: Mapping[str, Sequence[datetime]]):
-    from collections import Counter
-
     counts: Counter = Counter()
     for burst_id, d_list in burst_id_to_dates.items():
         for d in d_list:
-            counts[(burst_id, d)] += 1
+            counts[burst_id, d] += 1
     return [pair for pair, count in counts.items() if count > 1]
 
 
@@ -174,7 +175,7 @@ def get_burst_id_date_incidence(
     burst_id_to_date_incidence = {}
     for burst_id, date_list in burst_id_to_dates.items():
         cur_incidences = np.zeros(len(all_dates), dtype=bool)
-        idxs = np.searchsorted(all_dates, date_list)
+        idxs = np.searchsorted(np.array(all_dates), np.array(date_list))
         cur_incidences[idxs] = True
         burst_id_to_date_incidence[burst_id] = cur_incidences
 
@@ -325,9 +326,6 @@ def print_with_rich(
     options: Iterable[BurstSubsetOption], use_stderr: bool = True
 ) -> None:
     """Print a summary of the burst options using `rich.Table`."""
-    from rich.console import Console
-    from rich.table import Table
-
     console = Console(stderr=use_stderr)
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Option", style="dim", width=6)

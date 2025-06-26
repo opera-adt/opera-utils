@@ -10,9 +10,20 @@ from os import fsdecode
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Union, overload
 
+from shapely.geometry import box
+
 from . import datasets
 from ._types import Bbox, PathOrStr
 from .bursts import normalize_burst_id
+
+try:
+    import geopandas
+    from pyogrio import read_dataframe
+
+    _HAS_GEOPANDAS = True
+except ImportError:
+    read_dataframe = None
+    _HAS_GEOPANDAS = False
 
 if TYPE_CHECKING:
     import geopandas
@@ -20,7 +31,7 @@ if TYPE_CHECKING:
 GeojsonOrGdf = Union[dict, "geopandas.GeoDataFrame"]
 
 # Check if geopandas is available
-_has_geopandas = (
+_HAS_GEOPANDAS = (
     importlib.util.find_spec("pyogrio") is not None
     and importlib.util.find_spec("geopandas") is not None
 )
@@ -56,7 +67,7 @@ def read_zipped_json(filename: Path | str) -> dict:
             b = zf.read(str(Path(filename).name).replace(".zip", ""))
             return json.loads(b.decode())
     else:
-        with open(filename) as f:
+        with open(filename, encoding="utf-8") as f:
             return json.load(f)
 
 
@@ -213,11 +224,9 @@ def get_frame_geodataframe(
         Frame geometries as a GeoDataFrame.
 
     """
-    try:
-        from pyogrio import read_dataframe
-    except ImportError as e:
+    if not _HAS_GEOPANDAS:
         msg = "geopandas and pyogrio are required for GeoDataFrame support"
-        raise ImportError(msg) from e
+        raise ImportError(msg)
 
     if json_file is None:
         json_file = datasets.fetch_frame_geometries_simple()
@@ -247,11 +256,9 @@ def get_burst_geodataframe(
         Burst geometries as a GeoDataFrame.
 
     """
-    try:
-        from pyogrio import read_dataframe
-    except ImportError as e:
+    if not _HAS_GEOPANDAS:
         msg = "geopandas and pyogrio are required for GeoDataFrame support"
-        raise ImportError(msg) from e
+        raise ImportError(msg)
 
     if json_file is None:
         json_file = datasets.fetch_burst_id_geometries_simple()
@@ -386,12 +393,9 @@ def get_intersecting_frames(bounds: Bbox) -> dict:
         Returns a GeoJSON dict object.
 
     """
-    try:
-        import geopandas  # noqa: F401
-        from shapely.geometry import box
-    except ImportError as e:
+    if not _HAS_GEOPANDAS:
         msg = "geopandas and shapely are required for this function"
-        raise ImportError(msg) from e
+        raise ImportError(msg)
 
     gdf = get_frame_geodataframe()
     frames = gdf[gdf.geometry.intersects(box(*bounds))]

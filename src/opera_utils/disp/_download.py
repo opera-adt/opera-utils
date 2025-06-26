@@ -3,6 +3,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+import h5py
 import requests
 import xarray as xr
 from shapely import from_wkt
@@ -46,11 +47,10 @@ def process_file(
         Path to the downloaded and subsetted product
 
     """
-    filename = url.split("/")[-1]
     outname = f"{output_dir}/{Path(url).name}"
     outpath = Path(outname)
     if outpath.exists():
-        logger.info(f"Skipped (exists): {filename}")
+        logger.info(f"Skipped (exists): {outname}")
         return outpath
 
     with tempfile.NamedTemporaryFile(suffix=".nc") as tf:
@@ -72,7 +72,7 @@ def process_file(
                 out_f.write(response.content)
             _extract_subset(temp_path, outpath=outpath, rows=rows, cols=cols)
 
-        logger.debug(f"Done: {filename}")
+        logger.debug(f"Done: {outname}")
     return outpath
 
 
@@ -95,8 +95,6 @@ def _extract_subset(
     for group in "metadata", "identification":
         # Note: we can't use xarray here, due to the np.bytes_ datasets:
         # See https://github.com/pydata/xarray/issues/10389
-        import h5py
-
         with h5py.File(input_obj) as hf, h5py.File(outpath, "a") as dest_hf:
             hf.copy(group, dest_hf, name=group)
 

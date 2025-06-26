@@ -49,7 +49,7 @@ def slc_file_list_nc(tmp_path, slc_stack, slc_date_list):
         file_list.append(Path(fname))
 
     # Write the list of SLC files to a text file
-    with open(d / "slclist.txt", "w") as f:
+    with open(d / "slclist.txt", "w", encoding="utf-8") as f:
         f.write("\n".join([str(f) for f in file_list]))
     return file_list
 
@@ -67,7 +67,7 @@ def slc_file_list_nc_wgs84(tmp_path, slc_stack, slc_date_list):
         assert 'AUTHORITY["EPSG","4326"]]' in gdal.Open(fname).GetProjection()
         file_list.append(Path(fname))
 
-    with open(d / "slclist.txt", "w") as f:
+    with open(d / "slclist.txt", "w", encoding="utf-8") as f:
         f.write("\n".join([str(f) for f in file_list]))
     return file_list
 
@@ -131,7 +131,7 @@ def test_get_combined_bounds_gt(shifted_slc_files, shifted_slc_bounds):
 def test_get_combined_bounds_gt_different_proj(
     slc_file_list_nc, slc_file_list_nc_wgs84
 ):
-    bnds, gt = stitching.get_combined_bounds_nodata(*slc_file_list_nc)
+    bnds, _gt = stitching.get_combined_bounds_nodata(*slc_file_list_nc)
     assert bnds == (-5.5, -2.0, 4.5, 3.0)
 
     with pytest.raises(ValueError, match="The input files have different projections"):
