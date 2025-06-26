@@ -267,6 +267,12 @@ class GeotiffStackWriter:
             self.profile["dtype"] = np.dtype(self.dtype)
         if self.nodata is not None:
             self.profile["nodata"] = self.nodata
+        # Some versions of rasterio give:
+        # rasterio.errors.RasterBlockError: The height and width of TIFF dataset
+        # blocks must be multiples of 16
+        for key in ["blockxsize", "blockysize"]:
+            if key in self.profile:
+                del self.profile[key]
 
     def __setitem__(self, key, value):
         # Check if we have a floating point raster
