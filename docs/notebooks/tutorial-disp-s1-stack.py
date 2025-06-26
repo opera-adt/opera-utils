@@ -92,7 +92,8 @@ except opera_utils.credentials.EarthdataLoginError:
 #     --bbox -102.71 31.35 -102.6 31.45 \
 #     --frame-id 20697 \
 #     --output-dir subsets-west-texas \
-#     --end-datetime 2018-01-01 \\
+#     --start-datetime 2021-01-01 \
+#     --end-datetime 2024-01-01 \
 #     --num-workers 4
 #
 
