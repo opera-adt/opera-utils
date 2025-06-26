@@ -511,7 +511,11 @@ def main(
     water_mask_path = output_path / "water_mask.tif"
     if not water_mask_path.exists():
         with rio.open(f"NETCDF:{nc_files[0]}:/water_mask") as src:
-            profile = src.profile | {"driver": "GTiff"}
+            profile = src.profile | {
+                "driver": "GTiff",
+                "blockxsize": 512,
+                "blockysize": 512,
+            }
             with rio.open(water_mask_path, "w", **profile) as dst:
                 dst.write(src.read(1), 1)
 
