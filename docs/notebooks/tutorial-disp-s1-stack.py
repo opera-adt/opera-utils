@@ -19,12 +19,9 @@
 # %% [markdown]
 # ## 0. Environment Setup
 #
-# This walkthrough assumes pixi is set up on your machine.
-# If you are more comfortable with conda, you can following the set up (TODO)
-#
 # This will require an Earthdata username/password, either as a `~/.netrc` file:
 #
-# First install `opera-utils`:
+# First install `opera-utils` with the optional disp dependency (or via conda-forge):
 
 # %%
 import opera_utils
