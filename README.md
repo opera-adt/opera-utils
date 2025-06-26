@@ -55,6 +55,11 @@ We have set up Github Actions so that users can download and format subsets of D
 1. Select the Run workflow dropdown and supply the required information, then click the green Run workflow button
 1. The resulting reformatted Zarr will be preserved as Github Artifacts, which can be downloaded.
 
+You can also run the notebooks in the `docs/notebooks` directory:
+
+- [Jupyter Notebook](https://github.com/scottstanie/opera-utils/blob/add-tutorial-notebook/docs/notebooks/tutorial-disp-s1-stack.ipynb)
+- [Open in Colab](https://colab.research.google.com/github/scottstanie/opera-utils/blob/add-tutorial-notebook/docs/notebooks/tutorial-disp-s1-stack.ipynb)
+
 ## Usage examples
 
 ### Parsing Sentinel-1 Burst IDs
