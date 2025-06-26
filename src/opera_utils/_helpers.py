@@ -10,9 +10,10 @@ from ._types import Bbox
 
 try:
     from rasterio.warp import transform_bounds
+
+    HAS_RASTERIO = True
 except ImportError:
     HAS_RASTERIO = False
-    transform_bounds = None
 
 
 __all__ = ["reproject_bounds"]

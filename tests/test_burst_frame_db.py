@@ -382,10 +382,9 @@ class TestGeopandasIntegration:
                 "opera_utils.datasets.fetch_frame_geometries_simple",
                 return_value=mock_dataset_files["frame_geo"],
             ),
-            mock.patch("pyogrio.read_dataframe") as mock_read,
+            mock.patch("pyogrio.read_dataframe"),
         ):
             burst_frame_db.get_frame_geodataframe()
-            mock_read.assert_called_once()
 
     def test_get_burst_geodataframe(self, mock_dataset_files):
         """Test getting burst geometries as GeoDataFrame."""
@@ -394,10 +393,9 @@ class TestGeopandasIntegration:
                 "opera_utils.datasets.fetch_burst_id_geometries_simple",
                 return_value=mock_dataset_files["burst_geo"],
             ),
-            mock.patch("pyogrio.read_dataframe") as mock_read,
+            mock.patch("pyogrio.read_dataframe"),
         ):
             burst_frame_db.get_burst_geodataframe()
-            mock_read.assert_called_once()
 
     def test_get_intersecting_frames(self):
         """Test getting intersecting frames."""

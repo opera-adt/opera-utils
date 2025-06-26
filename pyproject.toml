@@ -85,6 +85,8 @@ test = [
   "ruff",
   "geopandas",
   "pyogrio",
+  "ipywidgets",
+  "matplotlib",
 ]
 docs = [
   "mkdocs",
