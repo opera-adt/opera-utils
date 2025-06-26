@@ -167,6 +167,7 @@ ignore = [
 ]
 "src/opera_utils/datasets.py" = ["E501"] # Line too long
 "scripts/*" = ["F401", "PLC2701"]
+"docs/notebooks/*" = ["B018", "E402", "E501"]
 
 [tool.black]
 target-version = ["py39", "py310", "py311", "py312", "py313"]
