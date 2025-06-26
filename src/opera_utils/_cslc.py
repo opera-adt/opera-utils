@@ -16,6 +16,21 @@ import numpy as np
 from pyproj import CRS, Transformer
 from shapely import geometry, ops, wkt
 
+try:
+    from isce3.core import DateTime, Orbit, StateVector
+
+    HAS_ICE3 = True
+except ImportError:
+    HAS_ICE3 = False
+
+try:
+    from osgeo import gdal
+
+    HAS_GDAL = True
+except ImportError:
+    HAS_GDAL = False
+    gdal = None
+
 from ._types import Filename
 from .bursts import normalize_burst_id
 from .constants import (
@@ -373,7 +388,9 @@ def get_cslc_orbit(h5file: Filename):
         Orbit object.
 
     """
-    from isce3.core import DateTime, Orbit, StateVector
+    if not HAS_ICE3:
+        msg = "isce3 must be installed to use this function"
+        raise ImportError(msg)
 
     times, positions, velocities, reference_epoch = get_orbit_arrays(h5file)
     orbit_svs = []
@@ -539,7 +556,9 @@ def create_nodata_mask(
         Overwrite the output file if it already exists, by default False
 
     """
-    from osgeo import gdal
+    if not HAS_GDAL:
+        msg = "osgeo (GDAL) must be installed to use this function"
+        raise ImportError(msg)
 
     gdal.UseExceptions()
     if Path(out_file).exists():
@@ -589,7 +608,7 @@ def create_nodata_mask(
     subprocess.check_call(cmd, shell=True)
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_vector_file = Path(tmpdir) / "temp.geojson"
-        with open(temp_vector_file, "w") as f:
+        with open(temp_vector_file, "w", encoding="utf-8") as f:
             f.write(json.dumps(geometry.mapping(union_poly)))
 
         # Open the input vector file
@@ -617,7 +636,9 @@ def _get_raster_gt(filename: Filename) -> list[float]:
         6 floats representing a GDAL Geotransform.
 
     """
-    from osgeo import gdal
+    if not HAS_GDAL:
+        msg = "osgeo (GDAL) must be installed to use this function"
+        raise ImportError(msg)
 
     ds = gdal.Open(fspath(filename))
     gt = ds.GetGeoTransform()

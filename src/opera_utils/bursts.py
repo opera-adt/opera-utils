@@ -100,9 +100,7 @@ def group_by_burst(file_list, burst_id_fmt=OPERA_BURST_RE):
     # Now collapse into groups, sorted by the burst_id
     grouped_images = {
         burst_id: list(g)
-        for burst_id, g in itertools.groupby(
-            sorted_file_list, key=lambda x: get_burst_id(x)
-        )
+        for burst_id, g in itertools.groupby(sorted_file_list, key=get_burst_id)
     }
     return grouped_images
 

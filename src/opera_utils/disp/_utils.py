@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from opera_utils._dates import DATETIME_FORMAT, get_dates
+from opera_utils.burst_frame_db import get_frame_bbox
 
 PathOrStrT = TypeVar("PathOrStrT", Path, str)
 
@@ -28,8 +29,6 @@ def get_frame_coordinates(frame_id: int) -> tuple[np.ndarray, np.ndarray]:
         (x, y) arrays of UTM coordinates (in meters).
 
     """
-    from opera_utils.burst_frame_db import get_frame_bbox
-
     _epsg, bbox = get_frame_bbox(frame_id)
     # 30 meter spacing, coords are on the pixel centers.
     x = np.arange(bbox[0], bbox[2], 30)
@@ -44,9 +43,21 @@ def flatten(list_of_lists: Iterable[Iterable[Any]]) -> itertools.chain[Any]:
     return itertools.chain.from_iterable(list_of_lists)
 
 
-def _last_per_ministack(
-    opera_file_list: Sequence[Path | str],
-) -> list[Path | str]:
+def last_per_ministack(opera_file_list: Sequence[Path | str]) -> list[Path | str]:
+    """Get the last file per ministack.
+
+    Parameters
+    ----------
+    opera_file_list : Sequence[Path | str]
+        List of opera files.
+
+    Returns
+    -------
+    list[Path | str]
+        List of last files per ministack.
+
+    """
+
     def _get_generation_time(fname: Path | str) -> datetime.datetime:
         return get_dates(fname, fmt=DATETIME_FORMAT)[2]
 
@@ -95,7 +106,7 @@ def round_mantissa(z: np.ndarray, keep_bits=10) -> np.ndarray:
     if np.iscomplexobj(z):
         round_mantissa(z.real, keep_bits)
         round_mantissa(z.imag, keep_bits)
-        return
+        return z
 
     if z.dtype.kind != "f" or z.dtype.itemsize > 8:
         msg = "Only float arrays (16-64bit) can be bit-rounded"

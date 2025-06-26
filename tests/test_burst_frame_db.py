@@ -6,7 +6,6 @@ from unittest import mock
 
 import pytest
 
-import opera_utils
 from opera_utils import burst_frame_db
 from opera_utils._types import Bbox
 
@@ -247,7 +246,7 @@ def test_read_zipped_json(tmp_path, filename, expected):
             zf.writestr(filename.replace(".zip", ""), json.dumps(expected))
     else:
         path = tmp_path / filename
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(expected, f)
 
     result = burst_frame_db.read_zipped_json(path)
@@ -373,11 +372,6 @@ def test_get_frame_orbit_pass(mock_dataset_files):
         ]
 
 
-# Tests that require geopandas
-@pytest.mark.skipif(
-    not opera_utils.burst_frame_db._has_geopandas,
-    reason="geopandas and pyogrio are required for these tests",
-)
 class TestGeopandasIntegration:
     """Tests for functions that require geopandas."""
 

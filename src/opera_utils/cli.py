@@ -107,7 +107,7 @@ def missing_data_options(
 
     option_1_bursts_1234_burst_ids_27_dates_10.txt
     """
-    with open(namelist) as f:
+    with open(namelist, encoding="utf-8") as f:
         file_list = [line.strip() for line in f.read().splitlines()]
 
     options = get_missing_data_options(file_list)[:max_options]
@@ -130,7 +130,7 @@ def missing_data_options(
             f"_dates_{option.num_dates}.txt"
         )
         print(f"Writing {len(valid_files)} files to {cur_output}")
-        with open(cur_output, "w") as f:
+        with open(cur_output, "w", encoding="utf-8") as f:
             f.write("\n".join(valid_files))
             f.write("\n")
 

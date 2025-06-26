@@ -14,7 +14,7 @@ def test_scratch_directory(tmp_path):
     with scratch_directory(test_dir, delete=False) as d:
         (d / "test1.txt").write_text("asdf")
     assert Path(test_dir).exists()
-    assert Path(test_dir / "test1.txt").read_text() == "asdf"
+    assert Path(test_dir / "test1.txt").read_text(encoding="utf-8") == "asdf"
 
 
 def test_scratch_directory_already_exists(tmp_path):

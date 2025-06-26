@@ -4,7 +4,6 @@ import datetime
 import logging
 import netrc
 import urllib.parse
-import warnings
 from collections.abc import Sequence
 from enum import Enum
 from itertools import groupby
@@ -17,12 +16,14 @@ from shapely.geometry import box
 try:
     import asf_search as asf
     from asf_search.ASFSearchResults import ASFSearchResults
+
+    HAS_ASF_SEARCH = True
 except ImportError:
-    warnings.warn(
-        "Can't import `asf_search`. Unable to search/download data. ", stacklevel=2
-    )
+    HAS_ASF_SEARCH = False
+
 
 from ._types import PathOrStr
+from .burst_frame_db import get_burst_ids_for_frame
 from .bursts import normalize_burst_id
 from .missing_data import BurstSubsetOption, get_missing_data_options, print_with_rich
 
@@ -39,6 +40,12 @@ __all__ = [
 ]
 
 logger = logging.getLogger("opera_utils")
+
+
+def _raise_asf_search_error():
+    if not HAS_ASF_SEARCH:
+        msg = "Can't import `asf_search`. Unable to search/download data."
+        raise ImportError(msg)
 
 
 class L2Product(str, Enum):
@@ -92,6 +99,7 @@ def download_rtc_static_layers(
         Locations to saved raster files.
 
     """
+    _raise_asf_search_error()
     selected_layers = [RTCStaticLayers(layer) for layer in layers]
 
     normalized_burst_ids = list(map(normalize_burst_id, burst_ids))
@@ -214,6 +222,7 @@ def search_l2(
         indicating possible spatially-consistent subsets of CSLC bursts.
 
     """
+    _raise_asf_search_error()
     logger.info("Searching for OPERA CSLC products")
     # If they passed a bounding box, need a WKT polygon
     if bounds is not None:
@@ -266,8 +275,9 @@ def run_search_cli(
     check_missing_data: bool = False,
 ) -> list[str]:
     if disp_s1_frame_id:
-        from .burst_frame_db import get_burst_ids_for_frame
-
+        if get_burst_ids_for_frame is None:
+            msg = "burst_frame_db is required for frame ID to burst ID mapping"
+            raise ImportError(msg)
         burst_ids = get_burst_ids_for_frame(disp_s1_frame_id)
 
     results = search_l2(
@@ -473,6 +483,7 @@ def _download_for_burst_ids(
         Locations to saved raster files.
 
     """
+    _raise_asf_search_error()
     logger.info(
         f"Searching {len(burst_ids)} bursts, {product=} (Dates: {start} to {end})"
     )
