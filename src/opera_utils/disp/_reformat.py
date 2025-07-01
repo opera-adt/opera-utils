@@ -24,8 +24,6 @@ from zarr.codecs import BloscCodec
 from opera_utils import disp
 
 from ._enums import (
-    SAME_PER_MINISTACK_DATASETS,
-    UNIQUE_PER_DATE_DATASETS,
     CorrectionDataset,
     DisplacementDataset,
     QualityDataset,
@@ -40,6 +38,7 @@ from ._reference import (
 from ._utils import _ensure_chunks, round_mantissa
 
 logger = logging.getLogger("opera_utils")
+QUALITY_DATASETS = list(QualityDataset)
 
 
 def reformat_stack(
@@ -201,7 +200,7 @@ def reformat_stack(
     # Write non-displacement variables
     # ################################
     # TODO: we could just read once per ministack, then tile, then write
-    ds_remaining = ds[UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS].chunk(
+    ds_remaining = ds[[str(q) for q in QualityDataset]].chunk(
         {
             "time": out_shard_dict["time"],
             "y": process_chunk_dict["y"],
@@ -239,9 +238,7 @@ def reformat_stack(
         create_virtual_stack(
             input_files=dps.filenames,
             output=output_name,
-            dataset_names=[
-                str(ds) for ds in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS
-            ],
+            dataset_names=[str(ds) for ds in QUALITY_DATASETS],
         )
         # Write the extra "average_temporal_coherence"
         encoding = _get_netcdf_encoding(
