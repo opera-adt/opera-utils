@@ -1,15 +1,9 @@
 from pathlib import Path
 
-import numpy as np
 import pytest
 import rasterio as rio
-import xarray as xr
 
-from opera_utils.disp._enums import (
-    SAME_PER_MINISTACK_DATASETS,
-    UNIQUE_PER_DATE_DATASETS,
-)
-from opera_utils.disp.rebase_reference import main
+from opera_utils.disp.rebase_reference import QUALITY_DATASETS, main
 
 # UserWarning: Consolidated metadata is currently not part in the Zarr format 3 specification.
 # zarr/api/asynchronous.py:203: UserWarning: Consolidated metadata is currently not
@@ -34,17 +28,10 @@ def test_rebase_reference(tmp_path):
 
     main(nc_files=input_files, output_dir=output_dir)
 
-    in_ds = xr.open_mfdataset(input_files, engine="h5netcdf")
-    for ds_name in UNIQUE_PER_DATE_DATASETS:
+    for ds_name in QUALITY_DATASETS:
         # Check for the number of geotiff files
         assert len(list(output_dir.glob(str(ds_name) + "*.tif"))) == len(input_files)
 
-    num_unique_ref_dates = np.unique(in_ds.reference_time).size
-    for ds_name in SAME_PER_MINISTACK_DATASETS:
-        # Check for the number of geotiff files
-        assert (
-            len(list(output_dir.glob(str(ds_name) + "*.tif"))) == num_unique_ref_dates
-        )
     # Check for the units on displacement
     assert all(
         rio.open(f).units[0] == "meters" for f in output_dir.glob("displacement*.tif")

@@ -41,15 +41,13 @@ from tqdm.auto import trange
 from typing_extensions import Self
 
 from ._enums import (
-    SAME_PER_MINISTACK_DATASETS,
-    UNIQUE_PER_DATE_DATASETS,
     CorrectionDataset,
     DisplacementDataset,
     QualityDataset,
 )
 from ._product import DispProductStack
 from ._rebase import NaNPolicy
-from ._utils import flatten, last_per_ministack, round_mantissa
+from ._utils import flatten, round_mantissa
 
 UINT16_MAX: Final = 65535
 
@@ -58,6 +56,7 @@ NODATA_VALUES = {
     "shp_counts": 0,
     "persistent_scatterer_mask": 255,
 }
+QUALITY_DATASETS = [str(q) for q in QualityDataset if "water" not in str(q)]
 
 
 def rebase(
@@ -520,16 +519,14 @@ def main(
                 dst.write(src.read(1), 1)
 
     # Transfer the quality layers (no rebasing needed)
-    last_per_ministack_products = DispProductStack.from_file_list(
-        last_per_ministack(nc_files)
-    )
+    all_products = DispProductStack.from_file_list(nc_files)
     with multiprocessing.Pool(num_workers) as pool:
         pool.starmap(
             extract_quality_layers,
             zip(
                 repeat(output_dir),
-                repeat(last_per_ministack_products),
-                SAME_PER_MINISTACK_DATASETS,
+                repeat(all_products),
+                QUALITY_DATASETS,
                 repeat(True),
             ),
         )
@@ -543,7 +540,6 @@ def main(
     if reference_point is None:
         reference_point = find_reference_point(coherence_path)
 
-    all_products = DispProductStack.from_file_list(nc_files)
     futures: set[Future] = set()
     mask_dataset = QualityDataset.RECOMMENDED_MASK if apply_mask else None
 
@@ -575,16 +571,7 @@ def main(
                 reference_point=None,
             )
         )
-        # Submit the others to extract
-        for dataset in UNIQUE_PER_DATE_DATASETS:
-            futures.add(
-                pool.submit(
-                    extract_quality_layers,
-                    Path(output_dir),
-                    all_products,
-                    str(dataset),
-                )
-            )
+
         # Wait for all futures to complete, raising exceptions if they arrive
         while futures:
             done, futures = wait(futures, timeout=1, return_when=FIRST_EXCEPTION)

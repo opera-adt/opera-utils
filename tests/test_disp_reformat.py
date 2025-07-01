@@ -5,11 +5,7 @@ import pytest
 import xarray as xr
 
 from opera_utils.disp import reformat_stack
-from opera_utils.disp._enums import (
-    SAME_PER_MINISTACK_DATASETS,
-    UNIQUE_PER_DATE_DATASETS,
-)
-from opera_utils.disp._reformat import combine_quality_masks
+from opera_utils.disp._reformat import QUALITY_DATASETS, combine_quality_masks
 
 # UserWarning: Consolidated metadata is currently not part in the Zarr format 3 specification.
 # zarr/api/asynchronous.py:203: UserWarning: Consolidated metadata is currently not
@@ -41,7 +37,7 @@ class TestReformatStack:
         SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"
     )
     def test_reformat_stack_zarr(self, ds_stack_zarr):
-        for ds_name in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS:
+        for ds_name in QUALITY_DATASETS:
             assert ds_name in ds_stack_zarr.data_vars
 
         assert ds_stack_zarr.displacement.units == "meters"
@@ -61,7 +57,7 @@ class TestReformatStack:
         SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"
     )
     def test_reformat_stack_netcdf(self, ds_stack_netcdf):
-        for ds_name in UNIQUE_PER_DATE_DATASETS + SAME_PER_MINISTACK_DATASETS:
+        for ds_name in QUALITY_DATASETS:
             assert ds_name in ds_stack_netcdf.data_vars
 
         assert ds_stack_netcdf.displacement.units == "meters"

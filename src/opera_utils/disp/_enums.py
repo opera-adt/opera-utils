@@ -39,21 +39,12 @@ class CorrectionDataset(str, Enum):
         return self.value
 
 
-class SamePerMinistackDataset(str, Enum):
-    """Enumeration of datasets that are same per ministack."""
+class QualityDataset(str, Enum):
+    """Enumeration of quality datasets."""
 
     TEMPORAL_COHERENCE = "temporal_coherence"
     PHASE_SIMILARITY = "phase_similarity"
     PERSISTENT_SCATTERER_MASK = "persistent_scatterer_mask"
-    SHP_COUNTS = "shp_counts"
-
-    def __str__(self) -> str:
-        return self.value
-
-
-class QualityDataset(str, Enum):
-    """Enumeration of quality datasets."""
-
     TIMESERIES_INVERSION_RESIDUALS = "timeseries_inversion_residuals"
     CONNECTED_COMPONENT_LABELS = "connected_component_labels"
     RECOMMENDED_MASK = "recommended_mask"
@@ -63,16 +54,3 @@ class QualityDataset(str, Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-SAME_PER_MINISTACK_DATASETS = [
-    SamePerMinistackDataset.TEMPORAL_COHERENCE,
-    SamePerMinistackDataset.PHASE_SIMILARITY,
-    SamePerMinistackDataset.PERSISTENT_SCATTERER_MASK,
-    SamePerMinistackDataset.SHP_COUNTS,
-]
-UNIQUE_PER_DATE_DATASETS = [
-    QualityDataset.TIMESERIES_INVERSION_RESIDUALS,
-    QualityDataset.CONNECTED_COMPONENT_LABELS,
-    QualityDataset.RECOMMENDED_MASK,
-]
