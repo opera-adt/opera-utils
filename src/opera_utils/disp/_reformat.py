@@ -207,6 +207,7 @@ def reformat_stack(
             "x": process_chunk_dict["x"],
         }
     )
+    ds_remaining = ds_remaining.drop_vars(["water_mask"])
     # TODO: make this configurable: currently we take every 15th coherence since, during
     # historical processing, the coherences are the same per ministack
     da_temp_coh = ds.temporal_coherence[::15]
