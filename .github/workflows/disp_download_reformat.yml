@@ -97,13 +97,21 @@ jobs:
             --output-name ${{ inputs.output_name }} \
             --input-files subset-ncs/OPERA_L3_DISP-S1*.nc
 
-          echo "Zipping product..."
-          zip -1 -r ${{ inputs.output_name }}.zip ${{ inputs.output_name }}
+          # Check if output_name ends with .nc and zip only in that case
+          if [[ "${{ inputs.output_name }}" == *.nc ]]; then
+            echo "Zipping product..."
+            zip -1 -r ${{ inputs.output_name }}.zip ${{ inputs.output_name }} subset-ncs/
+            # Set artifact path for the upload step
+            echo "ARTIFACT_PATH=${{ inputs.output_name }}.zip" >> $GITHUB_ENV
+          else
+            # For other formats (like .zarr), just use the output directory
+            echo "ARTIFACT_PATH=${{ inputs.output_name }}" >> $GITHUB_ENV
+          fi
 
-      # Upload the final artefact
-      - name: Upload Zarr ZIP
+      # Upload the final artefact (path determined by previous step)
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.workflow_name }}-product
-          path: ${{ inputs.output_name }}.zip
-          retention-days: 3
+          name: ${{ inputs.output_name }}
+          path: ${{ env.ARTIFACT_PATH }}
+          retention-days: 5
