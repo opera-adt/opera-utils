@@ -194,7 +194,7 @@ def reformat_stack(
         ds_minimal.to_netcdf(
             output_name, engine="h5netcdf", encoding=encoding, mode="w"
         )
-    print(f"Wrote minimal dataset: {time.time() - start_time:.1f}s")
+    print(f"Wrote minimal dataset: {ds_minimal} in {time.time() - start_time:.1f}s")
 
     # ################################
     # Write non-displacement variables
