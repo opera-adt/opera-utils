@@ -200,14 +200,14 @@ def reformat_stack(
     # Write non-displacement variables
     # ################################
     # TODO: we could just read once per ministack, then tile, then write
-    ds_remaining = ds[[str(q) for q in QualityDataset]].chunk(
+    remaining_dsets = [str(ds) for ds in QUALITY_DATASETS if ds != "water_mask"]
+    ds_remaining = ds[remaining_dsets].chunk(
         {
             "time": out_shard_dict["time"],
             "y": process_chunk_dict["y"],
             "x": process_chunk_dict["x"],
         }
     )
-    ds_remaining = ds_remaining.drop_vars(["water_mask"])
     # TODO: make this configurable: currently we take every 15th coherence since, during
     # historical processing, the coherences are the same per ministack
     da_temp_coh = ds.temporal_coherence[::15]
@@ -239,7 +239,7 @@ def reformat_stack(
         create_virtual_stack(
             input_files=dps.filenames,
             output=output_name,
-            dataset_names=[str(ds) for ds in QUALITY_DATASETS],
+            dataset_names=remaining_dsets,
         )
         # Write the extra "average_temporal_coherence"
         encoding = _get_netcdf_encoding(

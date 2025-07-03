@@ -21,6 +21,11 @@ on:
           Bounding box as "minlon minlat maxlon maxlat"
         required: true
         default: '-102.71 31.35 -102.6 31.45'
+      reference_method:
+        type: string
+        description: Method of spatially referencing each epoch (HIGH_COHERENCE,BORDER,MEDIAN)
+        required: true
+        default: 'BORDER'
       start_datetime:
         type: string
         description: Start date (YYYY-MM-DD)
@@ -93,7 +98,7 @@ jobs:
 
           echo "Reformatting to ${{ inputs.output_name }}"
           opera-utils disp-s1-reformat \
-            --reference-method BORDER \
+            --reference-method ${{ inputs.reference_method }} \
             --output-name ${{ inputs.output_name }} \
             --input-files subset-ncs/OPERA_L3_DISP-S1*.nc
 
