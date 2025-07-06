@@ -93,7 +93,7 @@ def _extract_subset(
     subset.to_netcdf(
         outpath,
         engine="h5netcdf",
-        encoding=_get_netcdf_encoding(ds, chunks=chunks),
+        encoding=_get_netcdf_encoding(subset, chunks=chunks),
     )
 
     # Also subset and add /corrections data
@@ -104,7 +104,7 @@ def _extract_subset(
         mode="a",
         engine="h5netcdf",
         group="corrections",
-        encoding=_get_netcdf_encoding(ds, chunks=chunks),
+        encoding=_get_netcdf_encoding(corr_subset, chunks=chunks),
     )
     # Add the top-level /identification and /metadata too
     for group in "metadata", "identification":
