@@ -69,7 +69,9 @@ def get_reference_values(
         return ref_vals
 
     if method is ReferenceMethod.MEDIAN:
-        return da.median(dim=("y", "x"), skipna=True)
+        return da.chunk({"time": 1, "x": -1, "y": -1}).median(
+            dim=("y", "x"), skipna=True
+        )
 
     if method is ReferenceMethod.BORDER:
         da_masked = da.where(good_pixel_mask) if good_pixel_mask is not None else da
@@ -77,7 +79,7 @@ def get_reference_values(
         return border.median(dim="pixels", skipna=True)
 
     if method is ReferenceMethod.HIGH_COHERENCE:
-        da_masked = da.where(good_pixel_mask)
+        da_masked = da.chunk({"time": 1, "x": -1, "y": -1}).where(good_pixel_mask)
         return da_masked.median(dim=("y", "x"), skipna=True)
 
     msg = f"Unknown ReferenceMethod {method}"

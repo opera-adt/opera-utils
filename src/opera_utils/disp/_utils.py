@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 import numpy as np
+import xarray as xr
 from numpy.typing import NDArray
 
 from opera_utils._dates import DATETIME_FORMAT, get_dates
@@ -148,3 +149,23 @@ def _ensure_chunks(
     chunks["y"] = min(chunks["y"], data_shape[1])
     chunks["x"] = min(chunks["x"], data_shape[2])
     return chunks
+
+
+def _get_netcdf_encoding(
+    ds: xr.Dataset,
+    chunks: tuple[int, int, int],
+    compression_level: int = 6,
+    data_vars: Sequence[str] = [],
+) -> dict:
+    encoding = {}
+    comp = {"zlib": True, "complevel": compression_level, "chunksizes": chunks}
+    if not data_vars:
+        data_vars = list(ds.data_vars)
+    encoding = {var: comp for var in data_vars if ds[var].ndim >= 2}
+    for var in data_vars:
+        if ds[var].ndim < 2:
+            continue
+        encoding[var] = comp
+        if ds[var].ndim == 2:
+            encoding[var]["chunksizes"] = chunks[-2:]
+    return encoding
