@@ -156,17 +156,20 @@ def reformat_stack(
     out_shard_dict = _to_shard_dict(out_chunks, shard_factors)
 
     dps = disp.DispProductStack.from_file_list(input_files)
-    df = dps.to_dataframe()
 
+    df = dps.to_dataframe()
+    reference_datetimes = df.reference_datetime.dt.tz_localize(None)
     # #####################
     # Write minimal dataset
     # #####################
-    process_chunk_dict = {
+    reading_chunk_dict = {
         "time": 1,
-        "y": process_chunk_size[0],
-        "x": process_chunk_size[1],
+        # "y": process_chunk_size[0],
+        # "x": process_chunk_size[1],
+        "y": -1,
+        "x": -1,
     }
-    ds = xr.open_mfdataset(dps.filenames, engine="h5netcdf", chunks=process_chunk_dict)
+    ds = xr.open_mfdataset(dps.filenames, engine="h5netcdf", chunks=reading_chunk_dict)
 
     # Drop specified variables if requested
     if drop_vars:
@@ -204,8 +207,8 @@ def reformat_stack(
     ds_remaining = ds[remaining_dsets].chunk(
         {
             "time": out_shard_dict["time"],
-            "y": process_chunk_dict["y"],
-            "x": process_chunk_dict["x"],
+            # "y": reading_chunk_dict["y"],
+            # "x": reading_chunk_dict["x"],
         }
     )
     # TODO: make this configurable: currently we take every 15th coherence since, during
@@ -267,6 +270,7 @@ def reformat_stack(
             crs=crs,
             transform=transform,
         )
+        good_pixel_mask = np.asarray(ds.water_mask) == 1
     elif reference_method in (ReferenceMethod.BORDER, ReferenceMethod.MEDIAN):
         good_pixel_mask = np.asarray(ds.water_mask) == 1
         ref_row = ref_col = None
@@ -284,15 +288,16 @@ def reformat_stack(
             dps.filenames,
             engine="h5netcdf",
             group="corrections",
-            chunks=process_chunk_dict,
+            # chunks=process_chunk_dict,
+            chunks={"time": 1, "x": -1, "y": -1},
         )[correction_names]
     else:
         ds_corrections = None
     _write_rebased_stack(
         ds,
-        df,
         output_name,
         out_chunks=out_chunks,
+        reference_datetimes=reference_datetimes,
         data_var=DisplacementDataset.DISPLACEMENT,
         reference_method=reference_method,
         reference_row=ref_row,
@@ -311,9 +316,9 @@ def reformat_stack(
     if str(DisplacementDataset.SHORT_WAVELENGTH) in ds.data_vars:
         _write_rebased_stack(
             ds,
-            df,
             output_name,
             out_chunks=out_chunks,
+            reference_datetimes=reference_datetimes,
             data_var=DisplacementDataset.SHORT_WAVELENGTH,
             out_format=out_format,
             process_chunk_size=process_chunk_size,
@@ -337,9 +342,9 @@ def _to_shard_dict(
 
 def _write_rebased_stack(
     ds: xr.Dataset,
-    df: pd.DataFrame,
     output_name: Path | str,
     out_chunks: tuple[int, int, int],
+    reference_datetimes: Sequence[pd.Timestamp],
     data_var: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
     reference_method: ReferenceMethod = ReferenceMethod.NONE,
     good_pixel_mask: ArrayLike | None = None,
@@ -366,12 +371,37 @@ def _write_rebased_stack(
     }
     out_shard_dict = _to_shard_dict(out_chunks, shard_factors)
     process_chunks = _ensure_chunks(process_chunks, da_displacement.shape)
+
     if ds_corrections:
-        ds_corrections = ds_corrections.chunk(process_chunks)
-        for var in ds_corrections.data_vars:
+        # ds_corrections = ds_corrections.chunk(process_chunks)
+        # ds_corrections = ds_corrections.chunk({"time": 1, "x": -1, "y": -1})
+        var1 = next(iter(ds_corrections.data_vars))
+        total_corrections = ds_corrections[var1]
+        for var in list(ds_corrections.data_vars)[1:]:
             if ds_corrections[var].shape != da_displacement.shape:
                 continue
-            da_displacement = da_displacement - ds_corrections[var]
+            total_corrections = total_corrections + ds_corrections[var]
+        da_displacement = da_displacement - total_corrections
+
+    if reference_method is not ReferenceMethod.NONE:
+        t0 = time.time()
+        logger.info(f"spatially referencing with {reference_method}")
+        crs = CRS.from_wkt(ds.spatial_ref.crs_wkt)
+        transform = _get_transform(ds)
+        ref_values = get_reference_values(
+            da_displacement,
+            method=reference_method,
+            row=reference_row,
+            col=reference_col,
+            crs=crs,
+            transform=transform,
+            border_pixels=border_pixels,
+            good_pixel_mask=good_pixel_mask,
+        ).compute()
+        logger.info(f"Computed referencing in {time.time() - t0:.2f} seconds")
+        da_disp_referenced = da_displacement - ref_values
+    else:
+        da_disp_referenced = da_displacement
 
     if quality_datasets is not None:
         if quality_thresholds is None:
@@ -387,38 +417,20 @@ def _write_rebased_stack(
         da_displacement = da_displacement.where(da_quality_mask)
 
     da_disp = disp.create_rebased_displacement(
-        da_displacement,
+        da_disp_referenced,
         # Need to strip timezone to match the ds.time coordinates
-        reference_datetimes=df.reference_datetime.dt.tz_localize(None),
+        reference_datetimes=reference_datetimes,
         process_chunk_size=process_chunk_size,
         nan_policy=nan_policy,
     )
-    crs = CRS.from_wkt(ds.spatial_ref.crs_wkt)
-    transform = _get_transform(ds)
-    if reference_method is not ReferenceMethod.NONE:
-        logger.info(f"spatially referencing with {reference_method}")
-        ref_values = get_reference_values(
-            da_disp,
-            method=reference_method,
-            row=reference_row,
-            col=reference_col,
-            crs=crs,
-            transform=transform,
-            border_pixels=border_pixels,
-            good_pixel_mask=good_pixel_mask,
-        )
-        da_disp_referenced = da_disp - ref_values
-    else:
-        da_disp_referenced = da_disp
-
-    da_disp_referenced = da_disp_referenced.assign_coords(spatial_ref=ds.spatial_ref)
-    if do_round and np.issubdtype(da_disp_referenced.dtype, np.floating):
-        da_disp_referenced.data = round_mantissa(da_disp_referenced.data, keep_bits=10)
+    da_disp = da_disp.assign_coords(spatial_ref=ds.spatial_ref)
+    if do_round and np.issubdtype(da_disp.dtype, np.floating):
+        da_disp.data = round_mantissa(da_disp.data, keep_bits=10)
 
     # Ensure we have the attrs (units) from the original dataset
-    da_disp_referenced.attrs.update(ds[data_var].attrs)
+    da_disp.attrs.update(ds[data_var].attrs)
 
-    ds_disp = da_disp_referenced.to_dataset(name=str(data_var))
+    ds_disp = da_disp.to_dataset(name=str(data_var))
     if out_format == "zarr":
         encoding = _get_zarr_encoding(ds_disp, out_chunks, shard_factors=shard_factors)
         ds_disp.chunk(out_shard_dict).to_zarr(
