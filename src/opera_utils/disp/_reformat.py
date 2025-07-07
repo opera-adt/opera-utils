@@ -35,7 +35,7 @@ from ._reference import (
     _get_reference_row_col,
     get_reference_values,
 )
-from ._utils import _ensure_chunks, round_mantissa
+from ._utils import _ensure_chunks, _get_netcdf_encoding, round_mantissa
 
 logger = logging.getLogger("opera_utils")
 QUALITY_DATASETS = list(QualityDataset)
@@ -157,6 +157,7 @@ def reformat_stack(
 
     dps = disp.DispProductStack.from_file_list(input_files)
     df = dps.to_dataframe()
+    reference_datetimes = df.reference_datetime.dt.tz_localize(None)
 
     # #####################
     # Write minimal dataset
@@ -194,13 +195,14 @@ def reformat_stack(
         ds_minimal.to_netcdf(
             output_name, engine="h5netcdf", encoding=encoding, mode="w"
         )
-    print(f"Wrote minimal dataset: {time.time() - start_time:.1f}s")
+    print(f"Wrote minimal dataset: {ds_minimal}\n in {time.time() - start_time:.1f}s")
 
     # ################################
     # Write non-displacement variables
     # ################################
     # TODO: we could just read once per ministack, then tile, then write
-    ds_remaining = ds[[str(q) for q in QualityDataset]].chunk(
+    remaining_dsets = [str(ds) for ds in QUALITY_DATASETS if ds != "water_mask"]
+    ds_remaining = ds[remaining_dsets].chunk(
         {
             "time": out_shard_dict["time"],
             "y": process_chunk_dict["y"],
@@ -238,7 +240,7 @@ def reformat_stack(
         create_virtual_stack(
             input_files=dps.filenames,
             output=output_name,
-            dataset_names=[str(ds) for ds in QUALITY_DATASETS],
+            dataset_names=remaining_dsets,
         )
         # Write the extra "average_temporal_coherence"
         encoding = _get_netcdf_encoding(
@@ -266,6 +268,7 @@ def reformat_stack(
             crs=crs,
             transform=transform,
         )
+        good_pixel_mask = np.asarray(ds.water_mask) == 1
     elif reference_method in (ReferenceMethod.BORDER, ReferenceMethod.MEDIAN):
         good_pixel_mask = np.asarray(ds.water_mask) == 1
         ref_row = ref_col = None
@@ -289,9 +292,9 @@ def reformat_stack(
         ds_corrections = None
     _write_rebased_stack(
         ds,
-        df,
         output_name,
         out_chunks=out_chunks,
+        reference_datetimes=reference_datetimes,
         data_var=DisplacementDataset.DISPLACEMENT,
         reference_method=reference_method,
         reference_row=ref_row,
@@ -310,9 +313,9 @@ def reformat_stack(
     if str(DisplacementDataset.SHORT_WAVELENGTH) in ds.data_vars:
         _write_rebased_stack(
             ds,
-            df,
             output_name,
             out_chunks=out_chunks,
+            reference_datetimes=reference_datetimes,
             data_var=DisplacementDataset.SHORT_WAVELENGTH,
             out_format=out_format,
             process_chunk_size=process_chunk_size,
@@ -336,9 +339,9 @@ def _to_shard_dict(
 
 def _write_rebased_stack(
     ds: xr.Dataset,
-    df: pd.DataFrame,
     output_name: Path | str,
     out_chunks: tuple[int, int, int],
+    reference_datetimes: Sequence[pd.Timestamp],
     data_var: DisplacementDataset = DisplacementDataset.DISPLACEMENT,
     reference_method: ReferenceMethod = ReferenceMethod.NONE,
     good_pixel_mask: ArrayLike | None = None,
@@ -388,13 +391,13 @@ def _write_rebased_stack(
     da_disp = disp.create_rebased_displacement(
         da_displacement,
         # Need to strip timezone to match the ds.time coordinates
-        reference_datetimes=df.reference_datetime.dt.tz_localize(None),
+        reference_datetimes=reference_datetimes,
         process_chunk_size=process_chunk_size,
         nan_policy=nan_policy,
     )
-    crs = CRS.from_wkt(ds.spatial_ref.crs_wkt)
-    transform = _get_transform(ds)
     if reference_method is not ReferenceMethod.NONE:
+        crs = CRS.from_wkt(ds.spatial_ref.crs_wkt)
+        transform = _get_transform(ds)
         logger.info(f"spatially referencing with {reference_method}")
         ref_values = get_reference_values(
             da_disp,
@@ -429,26 +432,6 @@ def _write_rebased_stack(
     else:
         encoding = _get_netcdf_encoding(ds_disp, out_chunks)
         ds_disp.to_netcdf(output_name, engine="h5netcdf", encoding=encoding, mode="a")
-
-
-def _get_netcdf_encoding(
-    ds: xr.Dataset,
-    chunks: tuple[int, int, int],
-    compression_level: int = 6,
-    data_vars: Sequence[str] = [],
-) -> dict:
-    encoding = {}
-    comp = {"zlib": True, "complevel": compression_level, "chunksizes": chunks}
-    if not data_vars:
-        data_vars = list(ds.data_vars)
-    encoding = {var: comp for var in data_vars if ds[var].ndim >= 2}
-    for var in data_vars:
-        if ds[var].ndim < 2:
-            continue
-        encoding[var] = comp
-        if ds[var].ndim == 2:
-            encoding[var]["chunksizes"] = chunks[-2:]
-    return encoding
 
 
 def _get_zarr_encoding(

@@ -15,6 +15,7 @@ from opera_utils.credentials import get_earthdata_username_password
 from ._product import DispProductStack
 from ._remote import open_file
 from ._search import UrlType, search
+from ._utils import _get_netcdf_encoding
 
 logger = logging.getLogger("opera_utils")
 
@@ -77,7 +78,11 @@ def process_file(
 
 
 def _extract_subset(
-    input_obj, outpath: Path | str, rows: slice | None, cols: slice | None
+    input_obj,
+    outpath: Path | str,
+    rows: slice | None,
+    cols: slice | None,
+    chunks: tuple[int, int, int] = (1, 256, 256),
 ) -> None:
     X0, X1 = (cols.start, cols.stop) if cols is not None else (None, None)  # type: ignore[union-attr]
     Y0, Y1 = (rows.start, rows.stop) if rows is not None else (None, None)  # type: ignore[union-attr]
@@ -85,12 +90,22 @@ def _extract_subset(
     # Open and slice root data
     ds = xr.open_dataset(input_obj, engine="h5netcdf")
     subset = ds.isel(y=slice(Y0, Y1), x=slice(X0, X1))
-    subset.to_netcdf(outpath, engine="h5netcdf")
+    subset.to_netcdf(
+        outpath,
+        engine="h5netcdf",
+        encoding=_get_netcdf_encoding(subset, chunks=chunks),
+    )
 
     # Also subset and add /corrections data
     ds_corr = xr.open_dataset(input_obj, engine="h5netcdf", group="corrections")
     corr_subset = ds_corr.isel(y=slice(Y0, Y1), x=slice(X0, X1))
-    corr_subset.to_netcdf(outpath, mode="a", engine="h5netcdf", group="corrections")
+    corr_subset.to_netcdf(
+        outpath,
+        mode="a",
+        engine="h5netcdf",
+        group="corrections",
+        encoding=_get_netcdf_encoding(corr_subset, chunks=chunks),
+    )
     # Add the top-level /identification and /metadata too
     for group in "metadata", "identification":
         # Note: we can't use xarray here, due to the np.bytes_ datasets:

@@ -21,6 +21,11 @@ on:
           Bounding box as "minlon minlat maxlon maxlat"
         required: true
         default: '-102.71 31.35 -102.6 31.45'
+      reference_method:
+        type: string
+        description: Method of spatially referencing each epoch (HIGH_COHERENCE,BORDER,MEDIAN)
+        required: true
+        default: 'BORDER'
       start_datetime:
         type: string
         description: Start date (YYYY-MM-DD)
@@ -93,17 +98,25 @@ jobs:
 
           echo "Reformatting to ${{ inputs.output_name }}"
           opera-utils disp-s1-reformat \
-            --reference-method BORDER \
+            --reference-method ${{ inputs.reference_method }} \
             --output-name ${{ inputs.output_name }} \
             --input-files subset-ncs/OPERA_L3_DISP-S1*.nc
 
-          echo "Zipping product..."
-          zip -1 -r ${{ inputs.output_name }}.zip ${{ inputs.output_name }}
+          # Check if output_name ends with .nc and zip only in that case
+          if [[ "${{ inputs.output_name }}" == *.nc ]]; then
+            echo "Zipping product..."
+            zip -1 -r ${{ inputs.output_name }}.zip ${{ inputs.output_name }} subset-ncs/
+            # Set artifact path for the upload step
+            echo "ARTIFACT_PATH=${{ inputs.output_name }}.zip" >> $GITHUB_ENV
+          else
+            # For other formats (like .zarr), just use the output directory
+            echo "ARTIFACT_PATH=${{ inputs.output_name }}" >> $GITHUB_ENV
+          fi
 
-      # Upload the final artefact
-      - name: Upload Zarr ZIP
+      # Upload the final artefact (path determined by previous step)
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.workflow_name }}-product
-          path: ${{ inputs.output_name }}.zip
-          retention-days: 3
+          name: ${{ inputs.output_name }}
+          path: ${{ env.ARTIFACT_PATH }}
+          retention-days: 5
