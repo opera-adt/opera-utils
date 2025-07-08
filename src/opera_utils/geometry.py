@@ -4,7 +4,6 @@ import logging
 from collections.abc import Mapping, Sequence
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import h5py
 import numpy as np
@@ -13,17 +12,10 @@ from numpy.typing import ArrayLike
 from osgeo import gdal
 
 from opera_utils import get_burst_ids_for_frame, stitching
+from opera_utils._cslc import get_orbit_arrays
 from opera_utils._types import Bbox, PathOrStr
 from opera_utils._utils import format_nc_filename, scratch_directory
 from opera_utils.download import download_cslc_static_layers
-
-if TYPE_CHECKING:
-    from opera_utils._cslc import get_orbit_arrays
-else:
-    try:
-        from opera_utils._cslc import get_orbit_arrays
-    except ImportError:
-        get_orbit_arrays = None
 
 gdal.UseExceptions()
 
@@ -338,10 +330,6 @@ def get_slant_range(
         Array of slant range values.
 
     """
-    if get_orbit_arrays is None:
-        msg = "opera_utils._cslc is required for orbit array operations"
-        raise ImportError(msg)
-
     _t, x, _v, _t0 = get_orbit_arrays(static_h5file)
     # Get orbit radius in ECEF coordinate system
     R = np.linalg.norm(x, axis=1).mean()
