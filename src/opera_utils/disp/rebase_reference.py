@@ -650,6 +650,11 @@ def main(
     # Find the reference point
     if reference_point is None:
         reference_point = find_reference_point(coherence_path)
+        # Account for subsampling
+        reference_point = (
+            int(reference_point[0] * subsample),
+            int(reference_point[1] * subsample),
+        )
 
     futures: set[Future] = set()
     mask_dataset = QualityDataset.RECOMMENDED_MASK if apply_mask else None
