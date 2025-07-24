@@ -150,6 +150,13 @@ class DispProduct:
             # Shift by half a pixel
             return Affine(30, 0, x0 - 15, 0, -30, y0 + 15)
 
+    @property
+    def bounds(self) -> Bbox:
+        left, top = self.transform * (0, 0)
+        height, width = self.shape[-2:]
+        right, bottom = self.transform * (width, height)
+        return Bbox(float(left), float(bottom), float(right), float(top))
+
     def get_rasterio_profile(self, chunks: tuple[int, int] = (256, 256)) -> dict:
         """Generate a `profile` usable by `rasterio.open()`."""
         profile = {
@@ -291,6 +298,10 @@ class DispProductStack:
     @property
     def y(self) -> np.ndarray:
         return self.products[0].y
+
+    @property
+    def bounds(self) -> np.ndarray:
+        return self.products[0].bounds
 
     def get_rasterio_profile(self, chunks: tuple[int, int] = (256, 256)) -> dict:
         """Generate a `profile` usable by `rasterio.open()`."""
