@@ -10,10 +10,12 @@ the slant range distance based on Sentinel-1 orbit altitude.
 """
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import rasterio
 import tyro
+from affine import Affine
 
 DEFAULT_RASTERIO_PROFILE = {
     "dtype": rasterio.float32,
@@ -26,10 +28,17 @@ DEFAULT_RASTERIO_PROFILE = {
 }
 
 
+def _subsample_profile(profile: dict[str, Any], subsample: int) -> dict[str, Any]:
+    out = profile.copy()
+    out["transform"] *= Affine.scale(subsample)
+    return out
+
+
 def compute_incidence_angle(
     los_enu_path: Path | str,
     out_path: Path | str = Path("incidence_angle.tif"),
     nodata: float = 0,
+    subsample: int = 1,
 ) -> Path:
     """Compute incidence angles from a LOS ENU raster and save the as a new GeoTIFF.
 
@@ -45,6 +54,9 @@ def compute_incidence_angle(
     nodata : float
         Value to use a nodata value in output rasters.
         Default is 0.
+    subsample : int, optional
+        Factor to subsample the raster (e.g., use every N-th pixel).
+        Default is 1 (no subsampling)
 
     Returns
     -------
@@ -62,6 +74,8 @@ def compute_incidence_angle(
         profile = src.profile.copy()
         profile.update(**DEFAULT_RASTERIO_PROFILE)
         profile["nodata"] = nodata
+        if subsample > 1:
+            profile = _subsample_profile(profile, subsample)
 
         with rasterio.open(out_path, "w", **profile) as dst:
             dst.write(incidence_deg.astype(np.float32).filled(nodata), 1)
@@ -82,7 +96,8 @@ def get_slant_range(incidence_raster: Path | str, subsample: int = 1) -> np.ndar
     incidence_raster : Path or str
         Path to the incidence angle GeoTIFF (in degrees).
     subsample : int, optional
-        Factor to subsample the raster (e.g., use every N-th pixel). Default is 100.
+        Factor to subsample the raster (e.g., use every N-th pixel).
+        Default is 1 (no subsampling)
 
     Returns
     -------
@@ -111,6 +126,7 @@ def create_inc_range(
     los_enu: Path | str,
     inc_angle_path: Path | str = Path("incidence_angle.tif"),
     slant_range_path: Path | str = Path("slant_range_distance.tif"),
+    subsample: int = 1,
 ) -> None:
     """Create an incidence-angle and slant range rasters from a LOS ENU raster.
 
@@ -124,16 +140,18 @@ def create_inc_range(
     slant_range_path : Path or str
         Path to write the slant range GeoTIFF.
         Default is "slant_range_distance.tif".
+    subsample : int, optional
+        Factor to subsample the raster (e.g., use every N-th pixel).
+        Default is 1 (no subsampling)
 
     """
     compute_incidence_angle(los_enu_path=los_enu, out_path=inc_angle_path)
     slant_range = get_slant_range(incidence_raster=inc_angle_path)
 
     with rasterio.open(inc_angle_path) as src:
-        profile = src.profile.copy()
+        profile = _subsample_profile(src.profile, subsample)
     with rasterio.open(slant_range_path, "w", **profile) as dst:
         dst.write(slant_range.astype(np.float32), 1)
-    return
 
 
 if __name__ == "__main__":
