@@ -36,3 +36,33 @@ def test_rebase_reference(tmp_path):
     assert all(
         rio.open(f).units[0] == "meters" for f in output_dir.glob("displacement*.tif")
     )
+
+
+@pytest.mark.skipif(
+    SKIP_TESTS, reason=f"No DISP-S1 input files found in {INPUT_DISP_S1_DIR}"
+)
+def test_rebase_reference_subsample(tmp_path):
+    """Test subsample functionality with coarsening factor."""
+    input_files = list(INPUT_DISP_S1_DIR.glob("*.nc"))
+    output_dir = tmp_path / "aligned_subsample"
+
+    # Run with subsample=2 (2x coarsening)
+    main(nc_files=input_files, output_dir=output_dir, subsample=2)
+
+    # Check that files were created
+    displacement_files = list(output_dir.glob("displacement*.tif"))
+    if displacement_files:
+        # Read original and subsampled files to check dimensions
+        with rio.open(f"NETCDF:{input_files[0]}:/displacement") as orig_src:
+            orig_width, orig_height = orig_src.width, orig_src.height
+
+        with rio.open(displacement_files[0]) as sub_src:
+            sub_width, sub_height = sub_src.width, sub_src.height
+            units = sub_src.units
+
+        # Check that dimensions are approximately halved (allowing for rounding)
+        assert sub_width == orig_width // 2
+        assert sub_height == orig_height // 2
+
+        # Check units are preserved
+        assert units[0] == "meters"
