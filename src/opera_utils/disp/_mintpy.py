@@ -37,6 +37,10 @@ Out[29]:
  'crs': 'EPSG:32618'}
 
 """
+from pathlib import Path
+
+import h5py
+from mintpy import readfile
 
 
 def calc_azimuth_from_east_north_obs(east, north):
@@ -75,9 +79,6 @@ def east_north_to_azimuth(east: ArrayLike, north: ArrayLike):
     return -1 * np.rad2deg(np.arctan2(east, north)) % 360
 
 
-import h5py
-
-
 def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
     """Get the metadata from the GSLC metadata file and the unwrapped interferogram."""
     print("-" * 50)
@@ -98,7 +99,7 @@ def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
     meta["Y_STEP"] = geotransform[5]
     meta["X_UNIT"] = meta["Y_UNIT"] = "meters"
 
-    meta_compass = h5py.File(meta_file, "r")
+    h5py.File(meta_file, "r")
     # USE rasterio
     crs = get_raster_crs(int_file)
     meta["EPSG"] = crs.to_epsg()
@@ -108,18 +109,7 @@ def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
     else:
         meta["UTM_ZONE"] = str(meta["EPSG"])[3:] + "S"
 
-    if "/science" in meta_compass:
-        root = "/science/SENTINEL1/CSLC"
-        processing_ds = f"{root}/metadata/processing_information"
-        burst_ds = f"{processing_ds}/s1_burst_metadata"
-        if burst_ds not in meta_compass:
-            burst_ds = f"{processing_ds}/input_burst_metadata"
-    else:
-        root = OPERA_DATASET_ROOT
-        processing_ds = f"{root}/metadata/processing_information"
-        burst_ds = f"{processing_ds}/input_burst_metadata"
-
-    meta["WAVELENGTH"] = meta_compass[f"{burst_ds}/wavelength"][()]
+    meta["WAVELENGTH"] = 0.0554657
     meta["EARTH_RADIUS"] = 6371000.0
 
     # get heading from azimuth angle
@@ -200,10 +190,9 @@ def mintpy_prepare_geometry(
     meta["FILE_TYPE"] = "geometry"
 
     file_to_path = {
-        "los_east": geom_path / "los_east.tif",
-        "los_north": geom_path / "los_north.tif",
-        "height": geom_path / "height.tif",
-        "shadowMask": geom_path / "layover_shadow_mask.tif",
+        "los_enu": next(iter(geom_path.glob("*los_enu.tif"))),
+        "height": next(iter(geom_path.glob("*dem.tif"))),
+        "shadowMask": next(iter(geom_path.glob("*layover_shadow_mask.tif"))),
     }
 
     if water_mask_file:
@@ -222,10 +211,12 @@ def mintpy_prepare_geometry(
             print(f"Skipping {fname}: {e}")
 
     # Compute the azimuth and incidence angles from east/north coefficients
-    azimuth_angle, east, north = get_azimuth_ang(dsDict)
+    azimuth_angle, _east, _north = get_azimuth_ang(dsDict)
     dsDict["azimuthAngle"] = azimuth_angle
 
-    up = np.sqrt(1 - east**2 - north**2)
+    # up = np.sqrt(1 - east**2 - north**2)
+    # Up is the 3rd band of the LOS image
+
     incidence_angle = np.rad2deg(np.arccos(up))
     dsDict["incidenceAngle"] = incidence_angle
 

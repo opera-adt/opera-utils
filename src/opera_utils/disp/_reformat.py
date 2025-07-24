@@ -168,6 +168,13 @@ def reformat_stack(
         "x": process_chunk_size[1],
     }
     ds = xr.open_mfdataset(dps.filenames, engine="h5netcdf", chunks=process_chunk_dict)
+    ds_corrections = xr.open_mfdataset(
+        dps.filenames, engine="h5netcdf", group="corrections", chunks=process_chunk_dict
+    )
+    # Grab just the middle pixel only:
+    ds_bperp = ds_corrections["perpendicular_baseline"].isel(
+        y=ds_corrections.y.shape[0] // 2, x=ds_corrections.x.shape[0] // 2
+    )
 
     # Drop specified variables if requested
     if drop_vars:
@@ -180,6 +187,7 @@ def reformat_stack(
     ds_minimal = ds.drop_vars([v for v in all_vars if v not in minimal_vars])
     # Only keep one water mask, as it's repeated for all frame outputs
     ds_minimal["water_mask"] = ds_minimal["water_mask"].isel(time=0)
+    ds_minimal["perpendicular_baseline"] = ds_bperp
 
     # Configure compression encoding
     if out_format == "zarr":
@@ -201,7 +209,11 @@ def reformat_stack(
     # Write non-displacement variables
     # ################################
     # TODO: we could just read once per ministack, then tile, then write
-    remaining_dsets = [str(ds) for ds in QUALITY_DATASETS if ds != "water_mask"]
+    remaining_dsets = [
+        str(ds)
+        for ds in QUALITY_DATASETS
+        if ds != "water_mask" and str(ds) not in drop_vars
+    ]
     ds_remaining = ds[remaining_dsets].chunk(
         {
             "time": out_shard_dict["time"],
@@ -280,16 +292,7 @@ def reformat_stack(
     # Rebase displacement array
     # #########################
     print(f"Creating rebased stack with chunks: {out_chunk_dict}")
-    if corrections:
-        correction_names = [str(c).split("/")[-1] for c in corrections]
-        ds_corrections = xr.open_mfdataset(
-            dps.filenames,
-            engine="h5netcdf",
-            group="corrections",
-            chunks=process_chunk_dict,
-        )[correction_names]
-    else:
-        ds_corrections = None
+    correction_names = [str(c).split("/")[-1] for c in corrections]
     _write_rebased_stack(
         ds,
         output_name,
@@ -302,7 +305,7 @@ def reformat_stack(
         border_pixels=reference_border_pixels,
         good_pixel_mask=good_pixel_mask,
         out_format=out_format,
-        ds_corrections=ds_corrections,
+        ds_corrections=ds_corrections[correction_names] if corrections else None,
         quality_datasets=quality_datasets,
         quality_thresholds=quality_thresholds,
         process_chunk_size=process_chunk_size,
