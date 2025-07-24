@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import multiprocessing
+import warnings
 from collections.abc import Sequence
 from concurrent.futures import FIRST_EXCEPTION, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ from typing import Any, Final, Literal
 import h5py
 import numpy as np
 import rasterio as rio
+from affine import Affine
 from numpy.typing import DTypeLike
 
 try:
@@ -137,7 +139,7 @@ def rebase(
         profile["width"] = profile["width"] // subsample
         profile["height"] = profile["height"] // subsample
         # Update transform for coarsened resolution
-        profile["transform"] = product_stack.transform.scale(subsample)
+        profile["transform"] *= Affine.scale(subsample)
 
     writer = GeotiffStackWriter.from_dates(
         Path(output_dir),
@@ -384,7 +386,10 @@ class GeotiffStackWriter:
         reshaped = trimmed_data.reshape(new_rows, factor, new_cols, factor)
 
         # Take nanmedian across the factor dimensions
-        coarsened = np.nanmedian(reshaped, axis=(1, 3))
+        # ignore the RuntimeWarning: All-NaN slice encountered for all nan pixels
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+            coarsened = np.nanmedian(reshaped, axis=(1, 3))
 
         return coarsened
 
@@ -435,7 +440,7 @@ def extract_quality_layers(
         profile = profile.copy()
         profile["width"] = profile["width"] // subsample
         profile["height"] = profile["height"] // subsample
-        profile["transform"] = products.transform.scale(subsample)
+        profile["transform"] *= Affine.scale(subsample)
 
     writer = GeotiffStackWriter.from_dates(
         output_dir,
@@ -616,7 +621,7 @@ def main(
             # Update profile for coarsened output
             profile["width"] = new_width
             profile["height"] = new_height
-            profile["transform"] = profile["transform"].scale(subsample, subsample)
+            profile["transform"] *= Affine.scale(subsample)
 
             with rio.open(water_mask_path, "w", **profile) as dst:
                 dst.write(data, 1)
