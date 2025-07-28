@@ -110,12 +110,11 @@ jobs:
           echo "Moving all outputs to mintpy/ directory..."
           mv ${{ inputs.output_name }} mintpy/
           mv subset-ncs mintpy/
-          zip -1 -r mintpy-output.zip mintpy/
 
       # Upload the final artefact
       - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
           name: mintpy-${{ inputs.output_name }}
-          path: mintpy-output.zip
+          path: mintpy
           retention-days: 5
