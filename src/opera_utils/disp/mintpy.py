@@ -1,7 +1,7 @@
-#!/usr/bin/env python
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import h5py
 import numpy as np
@@ -56,7 +56,7 @@ def _get_orbit_direction(prod: DispProduct) -> str:
 
 def _write_hdf5(
     out_f: Path,
-    datasets: dict[str, tuple[np.dtype, tuple[int, ...], np.ndarray]],
+    datasets: dict[str, tuple[Any, tuple[Any, ...], Any]],
     attrs: dict[str, str],
 ) -> None:
     """Writer that mimics MintPy's `writefile.layout_hdf5()`."""

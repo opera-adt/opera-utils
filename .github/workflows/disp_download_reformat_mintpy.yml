@@ -1,0 +1,121 @@
+# DISP subset + reformat + MintPy conversion, on demand
+name: disp_download_reformat_mintpy
+run-name: ${{ inputs.workflow_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      frame_id:
+        type: string
+        description: Sentinel-1 frame ID
+        required: true
+        default: '20697'
+      output_name:
+        type: string
+        description: Output file name. Must end in .nc (for NetCDF output)
+        required: false
+        default: 'disp-output.nc'
+      bbox:
+        type: string
+        description: >-
+          Bounding box as "minlon minlat maxlon maxlat"
+        required: true
+        default: '-102.71 31.35 -102.6 31.45'
+      reference_method:
+        type: string
+        description: Method of spatially referencing each epoch (HIGH_COHERENCE,BORDER,MEDIAN)
+        required: true
+        default: 'BORDER'
+      start_datetime:
+        type: string
+        description: Start date (YYYY-MM-DD)
+        required: true
+        default: '2021-01-01'
+      end_datetime:
+        type: string
+        description: End date (YYYY-MM-DD)
+        required: true
+        default: '2024-01-01'
+      num_workers:
+        type: number
+        description: Parallel download workers
+        required: false
+        default: 4
+      workflow_name:
+        type: string
+        description: Custom run name
+        required: false
+        default: 'disp_download_reformat_mintpy'
+
+jobs:
+  disp_download_reformat_mintpy:
+    name: ${{ inputs.workflow_name }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      # Checkout repo (needed for pixi.toml and/or local packages)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Earthdata credentials (if your commands hit NASA HTTPS)
+      - name: Configure ~/.netrc for Earthdata
+        uses: extractions/netrc@v2
+        with:
+          machine: urs.earthdata.nasa.gov
+          username: ${{ secrets.EARTHDATA_USERNAME }}
+          password: ${{ secrets.EARTHDATA_PASSWORD }}
+
+      - name: Setup environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          environment-name: opera_utils-env
+          generate-run-shell: false
+          condarc: |
+            channels:
+              - conda-forge
+      - name: Install
+        run: |
+          pip install .[disp]
+
+      # Run the DISP commands and MintPy conversion
+      - name: Download, reformat DISP subset, and convert to MintPy
+        run: |
+          set -eo pipefail
+          export NUM_WORKERS=${{ inputs.num_workers }}
+
+          echo "Downloading NetCDF subset..."
+          opera-utils disp-s1-download \
+            --output-dir subset-ncs \
+            --bbox ${{ inputs.bbox }} \
+            --frame-id ${{ inputs.frame_id }} \
+            --start-datetime ${{ inputs.start_datetime }} \
+            --end-datetime ${{ inputs.end_datetime }} \
+            --num-workers $NUM_WORKERS
+
+          echo "Reformatting to ${{ inputs.output_name }}"
+          opera-utils disp-s1-reformat \
+            --drop-vars connected_component_labels phase_similarity shp_counts persistent_scatterer_mask timeseries_inversion_residuals \
+            --reference-method ${{ inputs.reference_method }} \
+            --output-name ${{ inputs.output_name }} \
+            --input-files subset-ncs/OPERA_L3_DISP-S1*.nc
+
+          echo "Converting to MintPy format..."
+          python -m opera_utils.disp.mintpy ${{ inputs.output_name }} \
+            --sample-disp-nc $(ls subset-ncs/OPERA_L3_DISP-S1*.nc | head -1)
+
+          echo "Moving all outputs to mintpy/ directory..."
+          mv ${{ inputs.output_name }} mintpy/
+          mv subset-ncs mintpy/
+          zip -1 -r mintpy-output.zip mintpy/
+
+      # Upload the final artefact
+      - name: Upload Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: mintpy-${{ inputs.output_name }}
+          path: mintpy-output.zip
+          retention-days: 5

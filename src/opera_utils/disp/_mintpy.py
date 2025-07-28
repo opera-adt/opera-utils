@@ -1,13 +1,8 @@
-from typing import Literal
+"""ALL THE STUFF THAT CAN BE HARD CODED CUZ MINTPY JUST NEEDS APPROX VALUES.
 
-import numpy as np
-from numpy.typing import ArrayLike
-
-"""ALL THE STUFF THAT CAN BE HARD CODED CUZ MINTPY JUST NEEDS APPROX VALUES
-
-
-
-In [25]: p = disp.DispProduct.from_filename( "data/copy-subsets-nyc-f08622/OPERA_L3_DISP-S1_IW_F08622_VV_20170313T225042Z_20170723T225049Z_v1.0_20250414T034650Z.nc")
+In [25]: p = disp.DispProduct.from_filename(
+    "data/copy-subsets-nyc-f08622/OPERA_L3_DISP-S1_IW_F08622_VV_20170313T225042Z_20170723T225049Z_v1.0_20250414T034650Z.nc"
+)
 
 In [26]: p.epsg
 Out[26]: 32618
@@ -37,14 +32,19 @@ Out[29]:
  'crs': 'EPSG:32618'}
 
 """
-from pathlib import Path
 
-import h5py
+from pathlib import Path
+from typing import Literal
+
+import numpy as np
 from mintpy import readfile
+from numpy.typing import ArrayLike
 
 
 def calc_azimuth_from_east_north_obs(east, north):
-    """Calculate the azimuth angle of the given horizontal observation (in east and north).
+    """Calculate the azimuth angle of the given horizontal observation.
+
+    Calculates azimuth from east and north components.
 
     Parameters: east     - float,  eastward motion
                 north    - float, northward motion
@@ -60,8 +60,8 @@ def azimuth2heading_angle(
 ):
     """Convert azimuth angle from ISCE los.rdr band2 into satellite orbit heading angle.
 
-    ISCE-2 los.* file band2 is azimuth angle of LOS vector from ground target to the satellite
-        measured from the north in anti-clockwise as positive
+    ISCE-2 los.* file band2 is azimuth angle of LOS vector from ground target
+    to the satellite measured from the north in anti-clockwise as positive
 
     Below are typical values in deg for satellites with near-polar orbit:
         ascending  orbit: heading angle of -12  and azimuth angle of 102
@@ -79,17 +79,20 @@ def east_north_to_azimuth(east: ArrayLike, north: ArrayLike):
     return -1 * np.rad2deg(np.arctan2(east, north)) % 360
 
 
-def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
+def prepare_metadata(_meta_file, _int_file, geom_dir):
     """Get the metadata from the GSLC metadata file and the unwrapped interferogram."""
     print("-" * 50)
 
-    # JUST USE DispProduct, SEE ABOVE
-
+    # TODO: Implement actual metadata extraction
     # cols, rows = get_raster_xysize(int_file)
+    # geotransform = get_raster_gt(int_file)
+    # crs = get_raster_crs(int_file)
 
     meta = {}
-    # USE rasterio
-    # geotransform = get_raster_gt(int_file)
+    # Placeholder values - need actual implementation
+    rows, cols = 1000, 1000  # placeholder
+    geotransform = [0, 30, 0, 0, 0, -30]  # placeholder
+
     meta["LENGTH"] = rows
     meta["WIDTH"] = cols
 
@@ -99,10 +102,11 @@ def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
     meta["Y_STEP"] = geotransform[5]
     meta["X_UNIT"] = meta["Y_UNIT"] = "meters"
 
-    h5py.File(meta_file, "r")
-    # USE rasterio
-    crs = get_raster_crs(int_file)
-    meta["EPSG"] = crs.to_epsg()
+    # h5py.File(meta_file, "r")
+    # TODO: USE rasterio
+    # crs = get_raster_crs(int_file)
+    # meta["EPSG"] = crs.to_epsg()
+    meta["EPSG"] = 32618  # placeholder
 
     if str(meta["EPSG"]).startswith("326"):
         meta["UTM_ZONE"] = str(meta["EPSG"])[3:] + "N"
@@ -123,13 +127,13 @@ def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
         data = readfile.read(fname, datasetName=dsName)[0]
         data[data == 0] = np.nan
         dsDict[dsName] = data
-    azimuth_angle, _, _ = get_azimuth_ang(dsDict)
+    azimuth_angle = east_north_to_azimuth(dsDict["los_east"], dsDict["los_north"])
     azimuth_angle = np.nanmean(azimuth_angle)
     heading = azimuth2heading_angle(azimuth_angle)
     meta["HEADING"] = heading
 
     # t0 = dt.strptime(
-    #     meta_compass[f"{burst_ds}/sensing_start"][()].decode("utf-8"),
+    #     meta_compass[f"{burst_ds}/sensing_start][()].decode("utf-8"),
     #     "%Y-%m-%d %H:%M:%S.%f",
     # )
     # t1 = dt.strptime(
@@ -140,11 +144,12 @@ def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
     # center_line_utc = (
     #     t_mid - dt(t_mid.year, t_mid.month, t_mid.day)
     # ).total_seconds()
-    center_line_utc = product.secondary_datetime + timedelta(
-        seconds=15
-    )  # Approximate, based on a 30 second frame
+    # TODO: Get actual center line UTC from product
+    # center_line_utc = product.secondary_datetime + timedelta(seconds=15)
+    center_line_utc = 0.0  # placeholder
     meta["CENTER_LINE_UTC"] = center_line_utc
-    # Approximate height of the satellite, "used in dem_error, incidence_angle, convert2mat"
+    # Approximate height of the satellite,
+    # "used in dem_error, incidence_angle, convert2mat"
     meta["HEIGHT"] = 750000.0
     # HARD CODE
     # STARTING_RANGE = Distance from satellite to first ground pixel in meters,
@@ -153,13 +158,16 @@ def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
     meta["PLATFORM"] = "Sentinel-1"
     # orbit_direction is in the netcdf product, in /identification/orbit_pass_direction
     #
-    meta["ORBIT_DIRECTION"] = hf_product.orbit_direction
+    # TODO: Get actual orbit direction from product
+    # meta["ORBIT_DIRECTION"] = hf_product.orbit_direction
+    meta["ORBIT_DIRECTION"] = "ASCENDING"  # placeholder
     # RANGE_PIXEL_SIZE: "used in dem_error, incidence_angle, multilook, transect.""
     # DONT NEED FOR GEO
     # https://github.com/insarlab/MintPy/blob/86a07edb946eda33c16f4e36aaf37c0c4001a20e/src/mintpy/multi_transect.py#L603-L613
     # meta["RANGE_PIXEL_SIZE"] = meta_compass[f"{burst_ds}/range_pixel_spacing"][()]
     # meta["AZIMUTH_PIXEL_SIZE"] = 14.1
-    # ALOOKS/RLOOKS = multilook number in azimuth/range direction, used in weighted network inversion.
+    # ALOOKS/RLOOKS = multilook number in azimuth/range direction,
+    # used in weighted network inversion.
     # We dont need inversion things
     # meta["ALOOKS"] = 1
     # meta["RLOOKS"] = 1
@@ -178,7 +186,7 @@ def prepare_metadata(meta_file, int_file, geom_dir, nlks_x=1, nlks_y=1):
 
 
 def mintpy_prepare_geometry(
-    outfile, int_file, geom_dir, metadata, water_mask_file=None
+    outfile, _int_file, geom_dir, metadata, water_mask_file=None
 ):
     """Prepare the geometry file."""
     print("-" * 50)
@@ -211,25 +219,33 @@ def mintpy_prepare_geometry(
             print(f"Skipping {fname}: {e}")
 
     # Compute the azimuth and incidence angles from east/north coefficients
-    azimuth_angle, _east, _north = get_azimuth_ang(dsDict)
+    azimuth_angle = east_north_to_azimuth(dsDict["los_east"], dsDict["los_north"])
     dsDict["azimuthAngle"] = azimuth_angle
 
     # up = np.sqrt(1 - east**2 - north**2)
     # Up is the 3rd band of the LOS image
 
-    incidence_angle = np.rad2deg(np.arccos(up))
+    # TODO: Calculate incidence angle from LOS up component
+    # up = calculate_up_component(dsDict)
+    # incidence_angle = np.rad2deg(np.arccos(up))
+    incidence_angle = np.full_like(azimuth_angle, 35.0)  # placeholder
     dsDict["incidenceAngle"] = incidence_angle
 
     # write out slant range distance
     # slant_range = rio.open(int_file).get_rasterio_profile()
-    from opera_utils.geometry import get_slant_range
+    # from opera_utils.geometry import get_slant_range
 
-    slant_range = get_slant_range(int_file)
-    slant_range = float(slant_range.groups["metadata"]["slant_range_mid_swath"][0])
+    # TODO: Get actual slant range from file
+    # slant_range = get_slant_range(int_file)
+    # slant_range = float(slant_range.groups["metadata"]["slant_range_mid_swath"][0])
+    slant_range_val = 850000.0  # placeholder
     slant_range = np.full_like(
-        incidence_angle, fill_value=slant_range, dtype=np.float32
+        incidence_angle, fill_value=slant_range_val, dtype=np.float32
     )
     dsDict["slantRangeDistance"] = slant_range
 
-    writefile.write(dsDict, outfile, metadata=meta)
+    # TODO: Import writefile
+    # from mintpy import writefile
+    # writefile.write(dsDict, outfile, metadata=meta)
+    print(f"Would write to {outfile} with metadata")
     return outfile
