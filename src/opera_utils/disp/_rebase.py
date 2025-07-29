@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from ._utils import _ensure_chunks
+from ._utils import _clamp_chunk_dict
 
 logger = logging.getLogger("opera_utils")
 
@@ -74,7 +74,7 @@ def create_rebased_displacement(
         "y": process_chunk_size[0],
         "x": process_chunk_size[1],
     }
-    process_chunks = _ensure_chunks(process_chunks, da_displacement.shape)
+    process_chunks = _clamp_chunk_dict(process_chunks, da_displacement.shape)
 
     # Make the map_blocks-compatible function to accumulate the displacement
     def process_block(arr: xr.DataArray) -> xr.DataArray:

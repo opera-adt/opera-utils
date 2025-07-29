@@ -35,7 +35,7 @@ from ._reference import (
     _get_reference_row_col,
     get_reference_values,
 )
-from ._utils import _ensure_chunks, _get_netcdf_encoding, round_mantissa
+from ._utils import _clamp_chunk_dict, _get_netcdf_encoding, round_mantissa
 
 logger = logging.getLogger("opera_utils")
 QUALITY_DATASETS = list(QualityDataset)
@@ -372,7 +372,7 @@ def _write_rebased_stack(
         "x": process_chunk_size[1],
     }
     out_shard_dict = _to_shard_dict(out_chunks, shard_factors)
-    process_chunks = _ensure_chunks(process_chunks, da_displacement.shape)
+    process_chunks = _clamp_chunk_dict(process_chunks, da_displacement.shape)
     if ds_corrections:
         ds_corrections = ds_corrections.chunk(process_chunks)
         for var in ds_corrections.data_vars:
