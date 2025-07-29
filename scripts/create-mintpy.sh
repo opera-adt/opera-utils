@@ -25,7 +25,7 @@ echo
 echo "Downloading NetCDF subset..."
 opera-utils disp-s1-download \
     --output-dir subset-ncs \
-    --bbox "$BBOX" \
+    --bbox $BBOX \
     --frame-id "$FRAME_ID" \
     --start-datetime "$START" \
     --end-datetime "$END" \
