@@ -87,8 +87,7 @@ jobs:
           END: ${{ inputs.end_datetime }}
           REFERENCE_METHOD: ${{ inputs.reference_method }}
         run: |
-          chmod +x disp_workflow.sh
-          ./disp_workflow.sh
+          ./scripts/create-mintpy.sh
 
       - name: Package outputs
         run: |
