@@ -1,0 +1,104 @@
+name: disp_download_reformat_mintpy
+
+on:
+  workflow_dispatch:
+    inputs:
+      frame_id:
+        type: string
+        description: Sentinel-1 frame ID
+        required: true
+        default: '20697'
+      output_name:
+        type: string
+        description: Output file name (must end in .nc)
+        required: false
+        default: 'disp-output.nc'
+      bbox:
+        type: string
+        description: Bounding box as "minlon minlat maxlon maxlat"
+        required: true
+        default: '-102.71 31.35 -102.6 31.45'
+      reference_method:
+        type: string
+        description: HIGH_COHERENCE, BORDER, or MEDIAN
+        required: true
+        default: 'BORDER'
+      start_datetime:
+        type: string
+        description: Start date (YYYY-MM-DD)
+        required: true
+        default: '2021-01-01'
+      end_datetime:
+        type: string
+        description: End date (YYYY-MM-DD)
+        required: true
+        default: '2024-01-01'
+      num_workers:
+        type: number
+        description: Parallel download workers
+        required: false
+        default: 4
+      workflow_name:
+        type: string
+        description: Custom run name
+        required: false
+        default: 'disp_download_reformat_mintpy'
+
+jobs:
+  run-disp-workflow:
+    name: ${{ inputs.workflow_name }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure ~/.netrc for Earthdata
+        uses: extractions/netrc@v2
+        with:
+          machine: urs.earthdata.nasa.gov
+          username: ${{ secrets.EARTHDATA_USERNAME }}
+          password: ${{ secrets.EARTHDATA_PASSWORD }}
+
+      - name: Setup Conda environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          environment-name: opera_utils-env
+          generate-run-shell: false
+          condarc: |
+            channels:
+              - conda-forge
+
+      - name: Install opera-utils
+        run: |
+          pip install .[disp]
+
+      - name: Run DISP subset -> reformat -> MintPy
+        env:
+          BBOX: ${{ inputs.bbox }}
+          NUM_WORKERS: ${{ inputs.num_workers }}
+          FRAME_ID: ${{ inputs.frame_id }}
+          OUTPUT_NAME: ${{ inputs.output_name }}
+          START: ${{ inputs.start_datetime }}
+          END: ${{ inputs.end_datetime }}
+          REFERENCE_METHOD: ${{ inputs.reference_method }}
+        run: |
+          ./scripts/create-mintpy.sh
+
+      - name: Package outputs
+        run: |
+          mkdir -p output
+          mv subset-ncs output/
+          mv mintput output/
+          mv *.nc output/
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: mintpy-${{ inputs.output_name }}
+          path: output
+          retention-days: 5
