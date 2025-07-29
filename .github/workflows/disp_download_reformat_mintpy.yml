@@ -93,7 +93,7 @@ jobs:
         run: |
           mkdir -p output
           mv subset-ncs output/
-          mv mintput output/
+          mv mintpy output/
           mv *.nc output/
 
       - name: Upload results
