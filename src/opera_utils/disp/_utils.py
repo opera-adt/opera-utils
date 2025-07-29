@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import itertools
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -140,14 +140,14 @@ def _get_border(data_arrays: NDArray[np.floating]) -> NDArray[np.floating]:
     return np.nanmedian(all_pixels, axis=1)[:, np.newaxis, np.newaxis]
 
 
-def _ensure_chunks(
-    requested_chunks: dict[str, int] | None, data_shape: tuple[int, int, int]
+def _clamp_chunk_dict(
+    requested_chunks: Mapping[str, int] | None, data_shape: tuple[int, int, int]
 ) -> dict[str, int]:
     """Ensure requested_chunks are smaller than the downloaded size."""
     chunks = {**(requested_chunks or {})}
-    chunks["time"] = min(chunks["time"], data_shape[0])
-    chunks["y"] = min(chunks["y"], data_shape[1])
-    chunks["x"] = min(chunks["x"], data_shape[2])
+    chunks["time"] = min(chunks.get("time", data_shape[0]), data_shape[0])
+    chunks["y"] = min(chunks.get("y", data_shape[1]), data_shape[1])
+    chunks["x"] = min(chunks.get("x", data_shape[2]), data_shape[2])
     return chunks
 
 

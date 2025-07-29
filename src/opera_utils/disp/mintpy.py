@@ -66,13 +66,12 @@ def _write_hdf5(
         # Copy all datasets from the input file
         compression: str | None = "gzip"
         for name, (dtype, shape, data) in datasets.items():
-            if len(shape) > 2:
-                chunks: tuple[int, ...] | None = DEFAULT_CHUNKS
-            elif len(shape) == 2:
-                chunks = DEFAULT_CHUNKS[-2:]
-            else:
+            requested_chunks = DEFAULT_CHUNKS[-len(shape) :]  # Pick only last 2
+            if len(shape) < 2:
                 chunks = None
                 compression = None
+            else:
+                chunks = tuple(min(c, s) for c, s in zip(requested_chunks, shape))
             dset = f.create_dataset(
                 name, shape, dtype=dtype, chunks=chunks, compression=compression
             )
