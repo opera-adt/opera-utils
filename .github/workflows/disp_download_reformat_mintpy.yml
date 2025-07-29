@@ -77,7 +77,7 @@ jobs:
         run: |
           pip install .[disp]
 
-      - name: Run DISP subset → reformat → MintPy
+      - name: Run DISP subset -> reformat -> MintPy
         env:
           BBOX: ${{ inputs.bbox }}
           NUM_WORKERS: ${{ inputs.num_workers }}
@@ -92,13 +92,14 @@ jobs:
 
       - name: Package outputs
         run: |
-          mkdir -p mintpy
-          mv "${OUTPUT_NAME}" mintpy/
-          mv subset-ncs mintpy/ || true
+          mkdir -p output
+          mv subset-ncs output/
+          mv mintput output/
+          mv *.nc output/
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: mintpy-${{ inputs.output_name }}
-          path: mintpy
+          path: output
           retention-days: 5
