@@ -145,6 +145,9 @@ def reformat_stack(
         msg = "Only .nc and .zarr output formats are supported"
         raise ValueError(msg)
 
+    if drop_vars is None:
+        drop_vars = []  # Make empty list for later check
+
     corrections: list[CorrectionDataset] = []
     if apply_solid_earth_corrections:
         corrections.append(CorrectionDataset.SOLID_EARTH_TIDE)
@@ -176,10 +179,9 @@ def reformat_stack(
         y=ds_corrections.y.shape[0] // 2, x=ds_corrections.x.shape[0] // 2
     )
 
+    logger.debug(f"Dropping variables: {drop_vars}")
     # Drop specified variables if requested
-    if drop_vars:
-        print(f"Dropping variables: {drop_vars}")
-        ds = ds.drop_vars(drop_vars, errors="ignore")
+    ds = ds.drop_vars(drop_vars, errors="ignore")
 
     # Here we just want the output template/coordinates/water mask
     all_vars = list(ds.data_vars)
