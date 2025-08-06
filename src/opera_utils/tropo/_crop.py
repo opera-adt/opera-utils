@@ -27,7 +27,6 @@ def crop_tropo(
     datetimes: list[datetime],
     output_dir: Path = Path("cropped_tropo"),
     height_max: float = 10000.0,
-    height_margin: float = 500.0,
 ) -> None:
     """Crop OPERA TROPO products to AOI and interpolate to specific datetimes.
 
@@ -43,8 +42,6 @@ def crop_tropo(
         Directory to save cropped TROPO products.
     height_max : float
         Maximum height in meters to include in cropping.
-    height_margin : float
-        Additional height margin in meters above height_max.
 
     """
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -71,8 +68,8 @@ def crop_tropo(
         logger.info(f"Using files: {early_url}, {late_url}")
 
         # Open and crop the datasets
-        ds0 = _open_crop(early_url, lat_bounds, lon_bounds, height_max, height_margin)
-        ds1 = _open_crop(late_url, lat_bounds, lon_bounds, height_max, height_margin)
+        ds0 = _open_crop(early_url, lat_bounds, lon_bounds, height_max)
+        ds1 = _open_crop(late_url, lat_bounds, lon_bounds, height_max)
 
         # Interpolate in time
         td_interp = _interp_in_time(

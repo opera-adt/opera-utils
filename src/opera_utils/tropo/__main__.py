@@ -115,7 +115,7 @@ def main(
         surf_sec = _height_to_utm_surface(td_interp_sec.total_delay, dem_utm)
         corr = surf_sec - surf_ref
 
-        # # ---------- write corrections ------------------------------------------
+        #  write corrections
         # for _, row in df.iterrows():
         # sec_ts = pd.to_datetime(sec_ts, utc=True)
         # corr = delay_2d[sec_ts] - delay_2d[ref_ts]

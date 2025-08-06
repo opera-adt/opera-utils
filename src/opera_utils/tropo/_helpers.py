@@ -71,21 +71,16 @@ def _open_crop(
     lat_bounds: tuple[float, float],
     lon_bounds: tuple[float, float],
     h_max: float,
-    h_margin: float = 500,
 ) -> xr.Dataset:
     """Lazy-open a single L4 file and subset to bbox+height."""
     logger.info(f"Cropping {url}")
     ds = xr.open_dataset(url, engine="h5netcdf")
-    # if Path(url).exists():
-    #     ds = xr.open_dataset(url, engine="h5netcdf")
-    # else:
-    #     ds = open_file(url)
     lat_max, lat_min = lat_bounds  # note south-to-north ordering in slice
     lon_min, lon_max = lon_bounds
     ds = ds.sel(
         latitude=slice(lat_max, lat_min),
         longitude=slice(lon_min, lon_max),
-        height=slice(None, h_max + h_margin),
+        height=slice(None, h_max),
     )
     return ds.load()  # pull the small cube into memory
 
