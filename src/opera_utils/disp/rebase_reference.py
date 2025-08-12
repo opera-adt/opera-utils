@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import multiprocessing
+import warnings
 from collections.abc import Sequence
 from concurrent.futures import FIRST_EXCEPTION, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ from typing import Any, Final, Literal
 import h5py
 import numpy as np
 import rasterio as rio
+from affine import Affine
 from numpy.typing import DTypeLike
 
 try:
@@ -72,6 +74,7 @@ def rebase(
     keep_bits: int = 9,
     make_overviews: bool = True,
     tqdm_position: int = 0,
+    subsample: int | None = None,
 ) -> None:
     """Create a single-reference stack from a list of OPERA displacement files.
 
@@ -116,6 +119,10 @@ def rebase(
         Default is True.
     tqdm_position : int
         Position of the progress bar. Default is 0.
+    subsample : int | None
+        Coarsening factor for output resolution. If provided, applies nanmedian
+        coarsening with the specified factor (e.g., 2 = 2x2 blocks → 1 pixel).
+        Default is None (no coarsening).
 
     """
     nc_files = sorted(nc_files)
@@ -125,13 +132,23 @@ def rebase(
     reader = HDF5StackReader(nc_files, dset_name=dataset, nodata=np.nan)
 
     # Create the main displacement dataset.
+    profile = product_stack.get_rasterio_profile()
+    if subsample is not None:
+        # Update profile for coarsened output
+        profile = profile.copy()
+        profile["width"] = profile["width"] // subsample
+        profile["height"] = profile["height"] // subsample
+        # Update transform for coarsened resolution
+        profile["transform"] *= Affine.scale(subsample)
+
     writer = GeotiffStackWriter.from_dates(
         Path(output_dir),
         dataset=dataset,
         date_list=all_dates,
         keep_bits=keep_bits,
-        profile=product_stack.get_rasterio_profile(),
+        profile=profile,
         units=reader.units,
+        subsample=subsample,
     )
     if all(Path(f).exists() for f in writer.files):
         return
@@ -250,6 +267,7 @@ class GeotiffStackWriter:
     keep_bits: int | None = 9
     dtype: DTypeLike | None = None
     units: str | None = None
+    subsample: int | None = None
 
     def __post_init__(self):
         if self.profile is None:
@@ -274,6 +292,10 @@ class GeotiffStackWriter:
                 del self.profile[key]
 
     def __setitem__(self, key, value):
+        # Apply subsampling if specified
+        if self.subsample is not None:
+            value = self._coarsen_with_nanmedian(value, self.subsample)
+
         # Check if we have a floating point raster
         if self.keep_bits is not None and np.issubdtype(value.dtype, np.floating):
             round_mantissa(value, keep_bits=self.keep_bits)
@@ -337,6 +359,40 @@ class GeotiffStackWriter:
         output_dir.mkdir(exist_ok=True, parents=True)
         return cls(files=out_paths, **kwargs)
 
+    def _coarsen_with_nanmedian(self, data: np.ndarray, factor: int) -> np.ndarray:
+        """Coarsen data using nanmedian to avoid propagating single NaN pixels.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Input 2D array to coarsen
+        factor : int
+            Coarsening factor (e.g., 2 for 2x2 -> 1 pixel)
+
+        Returns
+        -------
+        np.ndarray
+            Coarsened array with nanmedian aggregation
+
+        """
+        rows, cols = data.shape
+        new_rows = rows // factor
+        new_cols = cols // factor
+
+        # Trim data to be evenly divisible by factor
+        trimmed_data = data[: new_rows * factor, : new_cols * factor]
+
+        # Reshape to group pixels into blocks
+        reshaped = trimmed_data.reshape(new_rows, factor, new_cols, factor)
+
+        # Take nanmedian across the factor dimensions
+        # ignore the RuntimeWarning: All-NaN slice encountered for all nan pixels
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+            coarsened = np.nanmedian(reshaped, axis=(1, 3))
+
+        return coarsened
+
     def make_overviews(self, resampling: Resampling = Resampling.average):
         for f in self.files:
             with rio.open(f, "r+") as dst:
@@ -355,15 +411,44 @@ def extract_quality_layers(
     save_mean: bool = True,
     mean_type: Literal["harmonic", "arithmetic"] = "harmonic",
     make_overviews: bool = True,
+    subsample: int | None = None,
 ) -> None:
-    """Extract quality layers from the displacement products."""
+    """Extract quality layers from the displacement products.
+
+    Parameters
+    ----------
+    output_dir : Path
+        Output directory for quality layers
+    products : DispProductStack
+        Stack of displacement products
+    dataset : str
+        Name of quality dataset to extract
+    save_mean : bool, optional
+        Whether to save mean quality layer, by default True
+    mean_type : Literal["harmonic", "arithmetic"], optional
+        Type of mean to compute, by default "harmonic"
+    make_overviews : bool, optional
+        Whether to make overviews, by default True
+    subsample : int | None, optional
+        Coarsening factor for output resolution, by default None
+
+    """
     reader = HDF5StackReader(products.filenames, dataset)
+    profile = products.get_rasterio_profile()
+    if subsample is not None:
+        # Update profile for coarsened output
+        profile = profile.copy()
+        profile["width"] = profile["width"] // subsample
+        profile["height"] = profile["height"] // subsample
+        profile["transform"] *= Affine.scale(subsample)
+
     writer = GeotiffStackWriter.from_dates(
         output_dir,
         dataset=dataset,
         date_pairs=products.ifg_date_pairs,
-        profile=products.get_rasterio_profile(),
+        profile=profile,
         nodata=NODATA_VALUES.get(dataset, np.nan),
+        subsample=subsample,
     )
     if all(Path(f).exists() for f in writer.files):
         return
@@ -378,7 +463,8 @@ def extract_quality_layers(
 
         writer_average = GeotiffStackWriter(
             files=[output_dir / f"average_{dataset}.tif"],
-            profile=products.get_rasterio_profile(),
+            profile=profile,
+            subsample=subsample,
         )
 
     for idx in trange(len(products.filenames)):
@@ -474,6 +560,7 @@ def main(
     nan_policy: str | NaNPolicy = NaNPolicy.propagate,
     reference_point: tuple[int, int] | None = None,
     num_workers: int = 5,
+    subsample: int = 1,
 ):
     """Run the rebase reference script and extract all datasets.
 
@@ -501,6 +588,10 @@ def main(
         Default is None.
     num_workers : int, optional
         Number of workers to use, by default 5
+    subsample : int | None, optional
+        Coarsening factor for output resolution. If provided, applies nanmedian
+        coarsening with the specified factor (e.g., 2 = 2x2 blocks → 1 pixel).
+        Default is None (no coarsening).
 
     """
     output_path = Path(output_dir)
@@ -515,8 +606,25 @@ def main(
                 "blockxsize": 512,
                 "blockysize": 512,
             }
+            new_width = profile["width"] // subsample
+            new_height = profile["height"] // subsample
+            data = src.read(
+                1,
+                out_shape=(
+                    1,
+                    new_height,
+                    new_width,
+                ),
+                resampling=Resampling.mode,
+            )
+
+            # Update profile for coarsened output
+            profile["width"] = new_width
+            profile["height"] = new_height
+            profile["transform"] *= Affine.scale(subsample)
+
             with rio.open(water_mask_path, "w", **profile) as dst:
-                dst.write(src.read(1), 1)
+                dst.write(data, 1)
 
     # Transfer the quality layers (no rebasing needed)
     all_products = DispProductStack.from_file_list(nc_files)
@@ -528,6 +636,9 @@ def main(
                 repeat(all_products),
                 QUALITY_DATASETS,
                 repeat(True),
+                repeat("harmonic"),
+                repeat(True),
+                repeat(subsample),
             ),
         )
 
@@ -539,6 +650,11 @@ def main(
     # Find the reference point
     if reference_point is None:
         reference_point = find_reference_point(coherence_path)
+        # Account for subsampling
+        reference_point = (
+            int(reference_point[0] * subsample),
+            int(reference_point[1] * subsample),
+        )
 
     futures: set[Future] = set()
     mask_dataset = QualityDataset.RECOMMENDED_MASK if apply_mask else None
@@ -556,6 +672,7 @@ def main(
                 apply_ionospheric_corrections=apply_ionospheric_corrections,
                 nan_policy=nan_policy,
                 reference_point=reference_point,
+                subsample=subsample,
             )
         )
         futures.add(
@@ -569,6 +686,7 @@ def main(
                 apply_ionospheric_corrections=False,
                 nan_policy=nan_policy,
                 reference_point=None,
+                subsample=subsample,
             )
         )
 
