@@ -327,7 +327,12 @@ def reformat_stack(
 
 
 def _get_transform(ds: xr.Dataset) -> Affine:
-    return Affine.from_gdal(*map(float, ds.spatial_ref.GeoTransform.split()))
+    """Get the affine transform for the dataset.
+
+    Uses rio.transform() which correctly handles spatially subsetted data,
+    unlike ds.spatial_ref.GeoTransform which doesn't update on subsetting.
+    """
+    return ds.rio.transform()
 
 
 def _to_shard_dict(
