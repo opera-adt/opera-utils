@@ -120,13 +120,13 @@ def _write_timeseries_vds(
         vds.attrs["UNIT"] = "m"
 
 
-def create_reliability_products(
+def create_reliability_mask(
     da_recommended: xr.DataArray,
     out_dir: Path,
     *,
-    threshold_ratio: float = 0.90,
+    reliability_threshold: float = 0.90,
 ) -> None:
-    """Build 2-D reliability layers in MintPy format.
+    """Build 2-D reliability mask in MintPy format.
 
     Parameters
     ----------
@@ -134,8 +134,8 @@ def create_reliability_products(
         Input 3D stack of recommended masks
     out_dir : Path
         Destination folder.
-    threshold_ratio : float, default 0.9
-        Pixel must be valid in >= `threshold_ratio` of epochs to be kept.
+    reliability_threshold : float, default 0.9
+        Pixel must be valid in >= `reliability_threshold` of epochs to be kept.
 
     """
     out_dir.mkdir(exist_ok=True, parents=True)
@@ -145,7 +145,7 @@ def create_reliability_products(
     # Compute density map and reliability mask
     sum_valid = da_recommended.sum(axis=0).astype(np.float32)  # (#y, #x)
     density = sum_valid / nt
-    thresh = int(np.ceil(nt * threshold_ratio))
+    thresh = int(np.ceil(nt * reliability_threshold))
     reliable = (sum_valid >= thresh).astype(np.int8)
 
     # Fetch minimal metadata (just copy attrs from timeseries.h5)
@@ -155,7 +155,7 @@ def create_reliability_products(
     else:
         meta = {"UNIT": "1"}
 
-    percent = int(threshold_ratio * 100)
+    percent = int(reliability_threshold * 100)
 
     # 4a) timeseries_density.h5
     density_meta = meta | {"FILE_TYPE": "timeseriesdensity", "UNIT": "1"}
@@ -178,12 +178,59 @@ def create_reliability_products(
     )
 
 
+def create_static_layers(
+    los_enu_path: Path | str,
+    dem_path: Path | str,
+    meta: dict[str, Any],
+    outdir: Path = Path("mintpy"),
+) -> None:
+    """Create static layer products from reformatted DISP-S1 data.
+
+    Replicates the old run_1 functionality from OPERA application Git.
+
+    Parameters
+    ----------
+    los_enu_path : Path | str
+        Path to the LOS-ENU geometry file.
+    dem_path : Path | str
+        Path to the DEM file.
+    meta : dict[str, Any]
+        Metadata to be written to the static layer files.
+    outdir : Path, optional
+        Output directory for the static layer files.
+        Default is "mintpy".
+
+    """
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    ny, nx = meta["LENGTH"], meta["WIDTH"]
+    # geometryGeo.h5 - static geometry information
+    geometry_meta = meta | {"FILE_TYPE": "geometry"}
+
+    dem = xr.open_dataarray(dem_path).data
+    los_enu_data = xr.open_dataarray(los_enu_path).data
+    np.degrees(np.arccos(los_enu_data[2]))
+    # Placeholder datasets - these should be replaced with actual static layer data
+    geometry_dsets = {
+        "height": (np.float32, (ny, nx), dem.data),  # DEM heights
+        "incidenceAngle": (np.float32, (ny, nx), None),  # Incidence angles
+        "azimuthAngle": (np.float32, (ny, nx), None),  # Azimuth angles
+        "shadowMask": (np.int8, (ny, nx), None),  # Shadow/layover mask
+    }
+
+    _write_hdf5(outdir / "geometryGeo.h5", geometry_dsets, geometry_meta)
+    print("Created geometryGeo.h5 (placeholder - requires DISP-S1-STATIC layers)")
+
+
 def disp_nc_to_mintpy(
     reformatted_nc_path: Path,
     /,
     sample_disp_nc: Path,
+    los_enu_path: Path | str | None = None,
+    dem_path: Path | str | None = None,
     outdir: Path = Path("mintpy"),
     virtual: bool = False,
+    reliability_threshold: float = 0.90,
 ) -> None:
     """Convert a reformatted DISP-S1 NetCDF file to MintPy inputs.
 
@@ -194,6 +241,10 @@ def disp_nc_to_mintpy(
         Result from `opera-utils disp-s1-reformat`
     sample_disp_nc : Path
         Path to one of the sample DISP-S1 NetCDF files.
+    los_enu_path : Path | str, optional
+        Path to the line-of-sight (LOS) 3-band east, north, up file.
+    dem_path : Path | str, optional
+        Path to the DEM file.
     outdir : Path, optional
         Output directory for the MintPy inputs.
         Default is "mintpy".
@@ -205,6 +256,9 @@ def disp_nc_to_mintpy(
         cause problems when reading the files from other directories
         or moving the `timeseries.h5` file.
         Default is False
+    reliability_threshold : float, optional
+        Pixel must be valid in >= `reliability_threshold` of epochs to be kept.
+        Default is 0.90
 
 
     """
@@ -234,7 +288,20 @@ def disp_nc_to_mintpy(
             meta=ts_meta,
             dates=dates,
         )
-    print("Done with timeseries.h5 (virtual link)")
+        print("Done with timeseries.h5 (virtual link)")
+    else:
+        # Copy displacement data directly to avoid VDS issues with MintPy
+        ts_dsets = {
+            "date": (dates.dtype, dates.shape, dates),
+            "bperp": (
+                np.float32,
+                ds["perpendicular_baseline"].shape,
+                ds["perpendicular_baseline"].data.astype(np.float32),
+            ),
+            "timeseries": (np.float32, disp.shape, disp),
+        }
+        _write_hdf5(outdir / "timeseries.h5", ts_dsets, ts_meta)
+        print("Done with timeseries.h5 (copied data)")
 
     # 3. avgSpatialCoh.h5  (use average_temporal_coherence layer)
     if "average_temporal_coherence" in ds:
@@ -247,6 +314,13 @@ def disp_nc_to_mintpy(
     coh_dsets = {"avgSpatialCoh": (np.float32, (ny, nx), avg_coh)}
     _write_hdf5(outdir / "avgSpatialCoh.h5", coh_dsets, coh_meta)
     print("Done with avgSpatialCoh.h5")
+
+    # Create reliability products with 90% threshold
+    create_reliability_mask(
+        da_recommended=ds["recommended_mask"],
+        out_dir=outdir,
+        reliability_threshold=reliability_threshold,
+    )
 
     # TODO: Use dolphin, or mintpy, or xarray to do this in batches
     # 4. velocity.h5  (OLS fit, slope is m / yr)
@@ -269,9 +343,12 @@ def disp_nc_to_mintpy(
     _write_hdf5(outdir / "velocity.h5", vel_dsets, vel_meta)
     print("Done with velocity.h5")
 
-    # 5. geometryGeo.h5
-    # TODO: implement once public DISP-S1-STATIC layers are available
+    # geometryGeo.h5
     # Download UTM DEM/LOS ENU/Layover shadow mask in `opera_utils.disp._download.py`
+    if los_enu_path and dem_path:
+        create_static_layers(los_enu_path, dem_path, ts_meta, outdir)
+    else:
+        print("No LOS-ENU path provided, skipping geometryGeo.h5")
 
     print(f"\nAll done : {outdir.resolve()}\n")
 
