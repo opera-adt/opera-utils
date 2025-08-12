@@ -120,11 +120,70 @@ def _write_timeseries_vds(
         vds.attrs["UNIT"] = "m"
 
 
+def create_reliability_products(
+    da_recommended: xr.DataArray,
+    out_dir: Path,
+    *,
+    threshold_ratio: float = 0.90,
+) -> None:
+    """Build 2-D reliability layers in MintPy format.
+
+    Parameters
+    ----------
+    da_recommended : xr.DataArray
+        Input 3D stack of recommended masks
+    out_dir : Path
+        Destination folder.
+    threshold_ratio : float, default 0.9
+        Pixel must be valid in >= `threshold_ratio` of epochs to be kept.
+
+    """
+    out_dir.mkdir(exist_ok=True, parents=True)
+
+    nt, ny, nx = da_recommended.shape
+
+    # Compute density map and reliability mask
+    sum_valid = da_recommended.sum(axis=0).astype(np.float32)  # (#y, #x)
+    density = sum_valid / nt
+    thresh = int(np.ceil(nt * threshold_ratio))
+    reliable = (sum_valid >= thresh).astype(np.int8)
+
+    # Fetch minimal metadata (just copy attrs from timeseries.h5)
+    if (out_dir / "timeseries.h5").exists():
+        with h5py.File(out_dir / "timeseries.h5", "r") as hf:
+            meta = dict(hf.attrs.items())
+    else:
+        meta = {"UNIT": "1"}
+
+    percent = int(threshold_ratio * 100)
+
+    # 4a) timeseries_density.h5
+    density_meta = meta | {"FILE_TYPE": "timeseriesdensity", "UNIT": "1"}
+    _write_hdf5(
+        out_dir / "timeseries_density.h5",
+        {"timeseriesDensity": (np.float32, (ny, nx), density)},
+        density_meta,
+    )
+
+    mask_meta = meta | {"FILE_TYPE": "mask", "DATA_TYPE": "int8", "UNIT": "1"}
+    _write_hdf5(
+        out_dir / f"recommended_mask_{percent}thresh.h5",
+        {"recommendedMask": (np.int8, (ny, nx), reliable)},
+        mask_meta,
+    )
+
+    print(
+        "reliability products: "
+        f"timeseries_density.h5 & recommended_mask_{percent}thresh.h5"
+    )
+
+
 def disp_nc_to_mintpy(
     reformatted_nc_path: Path,
     /,
     sample_disp_nc: Path,
     outdir: Path = Path("mintpy"),
+    virtual: bool = False,
 ) -> None:
     """Convert a reformatted DISP-S1 NetCDF file to MintPy inputs.
 
@@ -138,6 +197,15 @@ def disp_nc_to_mintpy(
     outdir : Path, optional
         Output directory for the MintPy inputs.
         Default is "mintpy".
+    virtual : bool, optional
+        If True, uses the virtual dataset (VDS) feature of HDF5
+        to avoid copying data from the NetCDF's to the mintpy files.
+        See https://docs.h5py.org/en/stable/vds.html
+        VDS can be quicker to run and use less disk space, but it may
+        cause problems when reading the files from other directories
+        or moving the `timeseries.h5` file.
+        Default is False
+
 
     """
     outdir.mkdir(parents=True, exist_ok=True)
@@ -156,15 +224,16 @@ def disp_nc_to_mintpy(
     ny, nx = disp.shape[1:]
     nt = disp.shape[0]
 
-    # 2. Write timeseries.h5 as a virtual link to the /displacement stack
     ts_meta = _mintpy_metadata(prod)
-    _write_timeseries_vds(
-        out_path=outdir / "timeseries.h5",
-        src_nc=reformatted_nc_path,
-        ds=ds,
-        meta=ts_meta,
-        dates=dates,
-    )
+    if virtual:
+        # Write timeseries.h5 as a virtual link to the /displacement stack
+        _write_timeseries_vds(
+            out_path=outdir / "timeseries.h5",
+            src_nc=reformatted_nc_path,
+            ds=ds,
+            meta=ts_meta,
+            dates=dates,
+        )
     print("Done with timeseries.h5 (virtual link)")
 
     # 3. avgSpatialCoh.h5  (use average_temporal_coherence layer)
@@ -173,6 +242,7 @@ def disp_nc_to_mintpy(
     else:
         avg_coh = ds["temporal_coherence"].mean("time").data.astype(np.float32)
 
+    # TODO: fix these to work in blocks!
     coh_meta = ts_meta | {"FILE_TYPE": "mask", "UNIT": "1"}
     coh_dsets = {"avgSpatialCoh": (np.float32, (ny, nx), avg_coh)}
     _write_hdf5(outdir / "avgSpatialCoh.h5", coh_dsets, coh_meta)
