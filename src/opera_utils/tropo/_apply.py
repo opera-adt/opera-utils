@@ -172,7 +172,9 @@ def apply_tropo(
         if idx == 0:
             date1_datetime = time_str
             if subtract_first_date:
-                day1_correction = los_correction
+                day1_correction = los_correction.copy()
+                # We don't need to write this out
+                continue
 
         # subtract first date, or 0 if not using that option
         los_correction = los_correction - day1_correction

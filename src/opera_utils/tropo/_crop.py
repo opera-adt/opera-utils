@@ -1,8 +1,9 @@
-"""Crop and interpolate OPERA TROPO products for AOI."""
+"""Crop and OPERA TROPO products for an area of interest."""
 
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -11,6 +12,7 @@ import rasterio as rio
 import tyro
 import xarray as xr
 from rasterio.warp import transform_bounds
+from tqdm import tqdm
 
 from ._helpers import (
     MissingTropoError,
@@ -24,6 +26,74 @@ from ._helpers import (
 logger = logging.getLogger(__name__)
 
 
+def _process_one_datetime(
+    dt: datetime,
+    tropo_idx_series: pd.Series,
+    lat_bounds: tuple[float, float],
+    lon_bounds: tuple[float, float],
+    height_max: float,
+    output_dir: Path,
+    skip_time_interpolation: bool,
+) -> tuple[datetime, str]:
+    """Worker: process one datetime and write output file.
+
+    Returns
+    -------
+    tuple[datetime, str]
+        (datetime, status)
+        status is "ok" | "skipped" | "missing" | "error:<msg>"
+
+    """
+    try:
+        dt_pandas = pd.to_datetime(dt).tz_localize(None)
+        time_str = dt_pandas.strftime("%Y%m%dT%H%M%S")
+        output_file = output_dir / f"tropo_cropped_{time_str}.nc"
+
+        if output_file.exists():
+            return (dt, "skipped")
+
+        if not skip_time_interpolation:
+            try:
+                early_url, late_url = _bracket(tropo_idx_series, dt_pandas)
+            except MissingTropoError:
+                return (dt, "missing")
+
+            ds0 = _open_crop(early_url, lat_bounds, lon_bounds, height_max)
+            ds1 = _open_crop(late_url, lat_bounds, lon_bounds, height_max)
+
+            td_interp = _interp_in_time(
+                ds0,
+                ds1,
+                ds0.time.to_pandas().item(),
+                ds1.time.to_pandas().item(),
+                dt_pandas,
+            )
+        else:
+            idx = tropo_idx_series.index.get_indexer([dt_pandas], method="nearest")[0]
+            closest_url = tropo_idx_series.values[idx]
+            ds = _open_crop(closest_url, lat_bounds, lon_bounds, height_max)
+            da_total_delay = _create_total_delay(ds)
+            td_interp = ds.copy()
+            td_interp["total_delay"] = da_total_delay
+
+        # Keep only total_delay and coord variables for output
+        output_ds = xr.Dataset(
+            {
+                "total_delay": td_interp.total_delay,
+                "latitude": td_interp.latitude,
+                "longitude": td_interp.longitude,
+                "height": td_interp.height,
+            }
+        )
+        output_ds.to_netcdf(output_file, engine="h5netcdf")
+
+    except Exception as e:
+        # Return error to main proc; don't raise to avoid stopping all work.
+        return (dt, f"error:{type(e).__name__}: {e}")
+    else:
+        return (dt, "ok")
+
+
 def crop_tropo(
     tropo_urls_file: Path,
     datetimes: list[datetime],
@@ -33,6 +103,7 @@ def crop_tropo(
     skip_time_interpolation: bool = False,
     height_max: float = 10000.0,
     margin_deg: float = 0.3,
+    num_workers: int = 2,
 ) -> None:
     """Crop OPERA TROPO products to AOI and interpolate to specific datetimes.
 
@@ -45,8 +116,7 @@ def crop_tropo(
     aoi_bounds : tuple[float, float, float, float]
         AOI bounding box as (west, south, east, north) in degrees.
     file_bounds : Path | str | None
-        Path to GeoTIFF file containing bounds to crop to.
-        Alternative to `aoi_bounds`.
+        Path to GeoTIFF file containing bounds to crop to (alternative to `aoi_bounds`).
     output_dir : Path
         Directory to save cropped TROPO products.
     skip_time_interpolation : bool
@@ -55,6 +125,8 @@ def crop_tropo(
         Maximum height in meters to include in cropping.
     margin_deg : float
         Additional margin in degrees around AOI bounds.
+    num_workers : int
+        Processes to use. Default: 2
 
     """
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -74,65 +146,55 @@ def crop_tropo(
     # For lat, use north -> south ordering for xarray slicing
     lat_bounds = (north + margin_deg, south - margin_deg)
     lon_bounds = (west - margin_deg, east + margin_deg)
+
     tropo_urls = Path(tropo_urls_file).read_text(encoding="utf-8").splitlines()
     tropo_idx_series = _build_tropo_index(tropo_urls)
 
-    logger.info(f"Processing {len(datetimes)} datetime(s)")
+    if num_workers < 1:
+        msg = "num_workers must be >= 1"
+        raise ValueError(msg)
 
-    for dt in datetimes:
-        dt_pandas = pd.to_datetime(dt).tz_localize(None)
-        time_str = dt_pandas.strftime("%Y%m%dT%H%M%S")
-        output_file = output_dir / f"tropo_cropped_{time_str}.nc"
-        if output_file.exists():
-            logger.info(f"Skipping existing {output_file}")
-            continue
+    logger.info(f"Processing {len(datetimes)} datetime(s) with {num_workers} worker(s)")
 
-        logger.info(f"Processing datetime: {dt_pandas}")
+    # Submit all tasks up front; tqdm tracks completions.
+    futures = []
+    status_counts: dict[str, int] = {"ok": 0, "skipped": 0, "missing": 0, "error": 0}
 
-        if not skip_time_interpolation:
-            try:
-                early_url, late_url = _bracket(tropo_idx_series, dt_pandas)
-            except MissingTropoError:
-                logger.warning(f"No available tropo files for {dt_pandas}")
-                continue
-
-            logger.info(f"Using files: {early_url}, {late_url}")
-
-            # Open and crop the datasets
-            ds0 = _open_crop(early_url, lat_bounds, lon_bounds, height_max)
-            ds1 = _open_crop(late_url, lat_bounds, lon_bounds, height_max)
-
-            # Interpolate in time
-            td_interp = _interp_in_time(
-                ds0,
-                ds1,
-                ds0.time.to_pandas().item(),
-                ds1.time.to_pandas().item(),
-                dt_pandas,
+    with ProcessPoolExecutor(max_workers=num_workers) as ex:
+        for dt in datetimes:
+            futures.append(
+                ex.submit(
+                    _process_one_datetime,
+                    dt,
+                    tropo_idx_series,
+                    lat_bounds,
+                    lon_bounds,
+                    height_max,
+                    output_dir,
+                    skip_time_interpolation,
+                )
             )
-        else:
-            # TODO: could get all these at once really
-            idx = tropo_idx_series.index.get_indexer([dt], method="nearest")[0]
-            closest_url = tropo_idx_series.values[idx]
-            # now we just want the nearest one:
-            ds = _open_crop(closest_url, lat_bounds, lon_bounds, height_max)
-            da_total_delay = _create_total_delay(ds)
-            td_interp = ds.copy()
-            td_interp["total_delay"] = da_total_delay
 
-        # Keep only total_delay for output
-        output_ds = xr.Dataset(
-            {
-                "total_delay": td_interp.total_delay,
-                "latitude": td_interp.latitude,
-                "longitude": td_interp.longitude,
-                "height": td_interp.height,
-            }
-        )
+        for fut in tqdm(
+            as_completed(futures),
+            total=len(futures),
+            desc="TROPO crop+interp",
+            unit="scene",
+        ):
+            dt, status = fut.result()
+            if status.startswith("error:"):
+                status_counts["error"] += 1
+                logger.error(f"{dt}: {status}")
+            else:
+                status_counts[status] = status_counts.get(status, 0) + 1
 
-        # Save the cropped and interpolated data
-        output_ds.to_netcdf(output_file, engine="h5netcdf")
-        logger.info(f"Saved: {output_file}")
+    logger.info(
+        "Done. "
+        f"ok={status_counts['ok']}, "
+        f"skipped={status_counts['skipped']}, "
+        f"missing={status_counts['missing']}, "
+        f"errors={status_counts['error']}"
+    )
 
 
 def main() -> None:
