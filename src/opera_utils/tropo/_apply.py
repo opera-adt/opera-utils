@@ -100,7 +100,9 @@ def _compute_reference_correction(
     if los_up.shape != zenith_delay_2d.shape:
         # reproject/align LOS raster to dem grid just in case
         los_up = los_up.rio.reproject_match(zenith_delay_2d)
-    ref_corr = zenith_delay_2d / los_up
+    # Note the -1: match the line-of-sight convention of DISP
+    # where positive means apparent uplift (decrease in delay)
+    ref_corr = -1 * (zenith_delay_2d / los_up)
     # Attach rio attrs to keep CRS/transform for saving later if needed
     ref_corr = ref_corr.rio.write_crs(dem.rio.crs or "epsg:4326")
     ref_corr.rio.write_transform(dem.rio.transform(), inplace=True)
@@ -154,14 +156,14 @@ def _apply_one(
         if los_up.shape != zenith_delay_2d.shape:
             # reproject/align LOS raster to dem grid just in case
             los_up = los_up.rio.reproject_match(zenith_delay_2d)
-        los_correction = zenith_delay_2d / los_up
+        # Note the -1: match the line-of-sight convention of DISP
+        # where positive means apparent uplift (decrease in delay)
+        los_correction = -1 * (zenith_delay_2d / los_up)
 
         # Subtract reference if given
         if ref_corr_path is not None:
             ref_corr = rxr.open_rasterio(ref_corr_path, masked=True).squeeze()
-            # Note the -1: match the line-of-sight convention of DISP
-            # where positive means apparent uplift (decrease in delay)
-            los_correction = -1 * (los_correction - ref_corr).astype("float32")
+            los_correction = (los_correction - ref_corr).astype("float32")
 
         attrs = {
             "interpolation_method": interp_method,
@@ -185,7 +187,7 @@ def _apply_one(
 
 def _read_los_up(incidence_angle_path: Path) -> xr.DataArray:
     da = rxr.open_rasterio(incidence_angle_path).squeeze(drop=True)
-    # los "up" unit vecotr is the same as the incidence angle in radians
+    # LOS 'up' component equals cos(incidence). Convert degrees -> radians, then cos.
     return np.cos(np.radians(da))
 
 

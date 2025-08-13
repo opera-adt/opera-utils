@@ -61,12 +61,11 @@ def create_incidence_angle_raster(
         with rasterio.open(out_path, "w", **profile) as dst:
             dst.write(incidence_deg.astype(np.float32).filled(nodata), 1)
             # Set the units attribute as degrees
-            dst.set_band_unit(1, "degrees")
-            dst.set_band_description(
-                1,
+            dst.units = ["degrees"]
+            dst.descriptions = [
                 "Incidence angle between the line-of-sight (LOS) vector and the normal"
-                " to the ellipsoid at the target",
-            )
+                " to the ellipsoid at the target"
+            ]
 
 
 def create_slant_range_raster(
@@ -109,8 +108,8 @@ def create_slant_range_raster(
 
     with rasterio.open(out_path, "w", **profile) as dst:
         dst.write(slant_range.astype(np.float32), 1)
-        dst.set_band_description(1, "Slant range distance (meters)")
-        dst.set_band_units(1, "meters")
+        dst.units = ["meters"]
+        dst.descriptions = ["Slant range distance (meters)"]
 
 
 def run(
