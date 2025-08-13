@@ -1,8 +1,5 @@
-"""NetCDF to Zarr reformatter for displacement product stacks."""
+"""Reformatter for displacement product stacks."""
 
-# /// script
-# dependencies = ['zarr>=3', 'xarray', 'opera_utils[disp]']
-# ///
 from __future__ import annotations
 
 import logging
@@ -21,8 +18,6 @@ from numpy.typing import ArrayLike
 from pyproj import CRS
 from zarr.codecs import BloscCodec
 
-from opera_utils import disp
-
 from ._enums import (
     CorrectionDataset,
     DisplacementDataset,
@@ -30,7 +25,8 @@ from ._enums import (
     ReferenceMethod,
 )
 from ._netcdf import create_virtual_stack
-from ._rebase import NaNPolicy
+from ._product import DispProductStack
+from ._rebase import NaNPolicy, create_rebased_displacement
 from ._reference import (
     _get_reference_row_col,
     get_reference_values,
@@ -158,7 +154,7 @@ def reformat_stack(
     # Multiply the chunk sizes by the shard factors
     out_shard_dict = _to_shard_dict(out_chunks, shard_factors)
 
-    dps = disp.DispProductStack.from_file_list(input_files)
+    dps = DispProductStack.from_file_list(input_files)
     df = dps.to_dataframe()
     reference_datetimes = df.reference_datetime.dt.tz_localize(None)
 
@@ -331,7 +327,12 @@ def reformat_stack(
 
 
 def _get_transform(ds: xr.Dataset) -> Affine:
-    return Affine.from_gdal(*map(float, ds.spatial_ref.GeoTransform.split()))
+    """Get the affine transform for the dataset.
+
+    Uses rio.transform() which correctly handles spatially subsetted data,
+    unlike ds.spatial_ref.GeoTransform which doesn't update on subsetting.
+    """
+    return ds.rio.transform()
 
 
 def _to_shard_dict(
@@ -393,7 +394,7 @@ def _write_rebased_stack(
         )
         da_displacement = da_displacement.where(da_quality_mask)
 
-    da_disp = disp.create_rebased_displacement(
+    da_disp = create_rebased_displacement(
         da_displacement,
         # Need to strip timezone to match the ds.time coordinates
         reference_datetimes=reference_datetimes,
