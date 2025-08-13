@@ -156,11 +156,17 @@ def _apply_one(
             if ref_corr.shape != los_correction.shape:
                 # reproject/align to dem grid just in case
                 ref_corr = ref_corr.rio.reproject_match(los_correction)
-            los_correction = (los_correction - ref_corr).astype("float32")
+            # Note the -1: match the line-of-sight convention of DISP
+            # where positive means apparent uplift (decrease in delay)
+            los_correction = -1 * (los_correction - ref_corr).astype("float32")
 
         attrs = {
             "interpolation_method": interp_method,
             "units": "meters",
+            "line of sight convention": (
+                "Positive means decrease in delay (apparent uplift towards the"
+                " satellite)"
+            ),
         }
         if ref_date_str is not None:
             attrs["reference_date"] = ref_date_str
