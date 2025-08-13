@@ -87,15 +87,19 @@ def _height_to_dem_surface(
 def _compute_reference_correction(
     first_cropped: Path,
     dem_path: Path,
-    los_path: Path,
+    incidence_angle_path: Path,
     interp_method: str,
 ) -> xr.DataArray:
     """Compute the day-1 LOS correction once (serial)."""
     dem = _open_2d(dem_path)
-    los_up = rxr.open_rasterio(los_path).isel(band=2).values
+    los_up = _read_los_up(incidence_angle_path)
 
     ds0 = xr.open_dataset(first_cropped, engine="h5netcdf")
     zenith_delay_2d = _height_to_dem_surface(ds0.total_delay, dem, method=interp_method)
+
+    if los_up.shape != zenith_delay_2d.shape:
+        # reproject/align LOS raster to dem grid just in case
+        los_up = los_up.rio.reproject_match(zenith_delay_2d)
     ref_corr = zenith_delay_2d / los_up
     # Attach rio attrs to keep CRS/transform for saving later if needed
     ref_corr = ref_corr.rio.write_crs(dem.rio.crs or "epsg:4326")
@@ -107,7 +111,7 @@ def _create_reference_correction(
     ref_tropo_file: Path,
     ref_date_str: str,
     dem_path: Path,
-    los_path: Path,
+    incidence_angle_path: Path,
     interp_method: str,
     output_dir: Path,
 ) -> Path:
@@ -117,7 +121,7 @@ def _create_reference_correction(
     else:
         logger.info(f"Computing reference correction for {ref_date_str}")
         ref_corr = _compute_reference_correction(
-            ref_tropo_file, dem_path, los_path, interp_method
+            ref_tropo_file, dem_path, incidence_angle_path, interp_method
         )
         ref_corr.rio.to_raster(ref_corr_path, **GTIFF_KWARGS)
     return ref_corr_path
@@ -126,7 +130,7 @@ def _create_reference_correction(
 def _apply_one(
     cropped_file: Path,
     dem_path: Path,
-    los_path: Path,
+    incidence_angle_path: Path,
     interp_method: str,
     output_file: Path,
     ref_corr_path: Path | None,
@@ -141,21 +145,20 @@ def _apply_one(
             return (date_str, "skipped")
 
         dem = _open_2d(dem_path)
-        los_up = rxr.open_rasterio(los_path).isel(band=2).values
+        los_up = _read_los_up(incidence_angle_path)
 
         ds = xr.open_dataset(cropped_file, engine="h5netcdf")
         zenith_delay_2d = _height_to_dem_surface(
             ds.total_delay, dem, method=interp_method
         )
+        if los_up.shape != zenith_delay_2d.shape:
+            # reproject/align LOS raster to dem grid just in case
+            los_up = los_up.rio.reproject_match(zenith_delay_2d)
         los_correction = zenith_delay_2d / los_up
 
         # Subtract reference if given
         if ref_corr_path is not None:
             ref_corr = rxr.open_rasterio(ref_corr_path, masked=True).squeeze()
-            # Align shapes if tiny border trimming differs
-            if ref_corr.shape != los_correction.shape:
-                # reproject/align to dem grid just in case
-                ref_corr = ref_corr.rio.reproject_match(los_correction)
             # Note the -1: match the line-of-sight convention of DISP
             # where positive means apparent uplift (decrease in delay)
             los_correction = -1 * (los_correction - ref_corr).astype("float32")
@@ -180,10 +183,16 @@ def _apply_one(
         return (date_str, "ok")
 
 
+def _read_los_up(incidence_angle_path: Path) -> xr.DataArray:
+    da = rxr.open_rasterio(incidence_angle_path).squeeze(drop=True)
+    # los "up" unit vecotr is the same as the incidence angle in radians
+    return np.cos(np.radians(da))
+
+
 def apply_tropo(
     cropped_tropo_list: list[Path],
     dem_path: Path,
-    los_path: Path,
+    incidence_angle_path: Path,
     output_dir: Path = Path("tropo_corrections"),
     interp_method: str = "linear",
     subtract_first_date: bool = True,
@@ -197,8 +206,9 @@ def apply_tropo(
         Paths to cropped TROPO NetCDFs from `tropo-crop`.
     dem_path : Path
         DEM GeoTIFF (UTM or WGS84).
-    los_path : Path
-        3-band LOS GeoTIFF (E, N, U). Uses band=3 (index 2) as Up.
+    incidence_angle_path : Path
+        Raster containing ellipsoidal incidence angle (in degrees) for each pixel
+        of `dem_path`.
     output_dir : Path
         Output directory for correction GeoTIFFs.
     interp_method : {"linear", "nearest", "slinear", "cubic", "quintic", "pchip"}
@@ -235,7 +245,7 @@ def apply_tropo(
             Path(files_sorted[0]),
             dates_sorted[0].strftime(fmt),
             dem_path,
-            los_path,
+            incidence_angle_path,
             interp_method,
             output_dir,
         )
@@ -259,7 +269,7 @@ def apply_tropo(
                 _apply_one,
                 Path(cropped_file),
                 dem_path,
-                los_path,
+                incidence_angle_path,
                 interp_method,
                 Path(out_file),
                 ref_corr_path,
