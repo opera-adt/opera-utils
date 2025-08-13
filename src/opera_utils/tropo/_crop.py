@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 def crop_tropo(
     tropo_urls_file: Path,
     datetimes: list[datetime],
-    aoi_bounds: tuple[float, float, float, float] | None,
+    aoi_bounds: tuple[float, float, float, float] | None = None,
     file_bounds: Path | str | None = None,
     output_dir: Path = Path("cropped_tropo"),
     skip_time_interpolation: bool = False,
@@ -101,11 +101,11 @@ def crop_tropo(
                 dt_pandas,
             )
         else:
-            # Getting the before looked like this:
-            early = tropo_idx_series.loc[:dt_pandas]
-            early_url = early.iloc[-1]
+            # TODO: could get all these at once really
+            idx = tropo_idx_series.index.get_indexer([dt], method="nearest")[0]
+            closest_url = tropo_idx_series.values[idx]
             # now we just want the nearest one:
-            ds = _open_crop(early_url, lat_bounds, lon_bounds, height_max)
+            ds = _open_crop(closest_url, lat_bounds, lon_bounds, height_max)
             da_total_delay = _create_total_delay(ds)
             td_interp = ds.copy()
             td_interp["total_delay"] = da_total_delay
