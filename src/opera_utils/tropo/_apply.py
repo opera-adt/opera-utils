@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -103,13 +102,6 @@ def _compute_reference_correction(
     ref_corr = ref_corr.rio.write_crs(dem.rio.crs or "epsg:4326")
     ref_corr.rio.write_transform(dem.rio.transform(), inplace=True)
     return ref_corr
-
-
-def _save_temp_reference(ref_corr: xr.DataArray, tmp_dir: Path) -> Path:
-    """Persist reference correction so workers can read without IPC copies."""
-    tmp_ref = tmp_dir / "tropo_ref_corr.tif"
-    ref_corr.rio.to_raster(tmp_ref, **GTIFF_KWARGS)
-    return tmp_ref
 
 
 def _apply_one(
@@ -225,69 +217,62 @@ def apply_tropo(
     ref_date_str: str | None = None
 
     # Precompute reference correction once if requested
-    tmp_dir_ctx = tempfile.TemporaryDirectory(prefix="tropo_ref_")
-    tmp_dir = Path(tmp_dir_ctx.name)
-    try:
-        if subtract_first_date:
-            ref_date_str = dates_sorted[0][0].strftime(fmt)
-            logger.info(f"Computing reference correction for {ref_date_str}")
-            ref_corr = _compute_reference_correction(
-                Path(files_sorted[0]), dem_path, los_path, interp_method
+    if subtract_first_date:
+        ref_date_str = dates_sorted[0][0].strftime(fmt)
+        logger.info(f"Computing reference correction for {ref_date_str}")
+        ref_corr = _compute_reference_correction(
+            Path(files_sorted[0]), dem_path, los_path, interp_method
+        )
+        ref_corr_path = output_dir / f"ref_tropo_correction_{ref_date_str}.tif"
+        ref_corr.rio.to_raster(ref_corr_path, **GTIFF_KWARGS)
+
+    # Plan work outputs
+    out_paths: list[Path] = []
+    for d in dates_sorted:
+        date_str = d[0].strftime(fmt)
+        out_path = output_dir / f"tropo_correction_{date_str}.tif"
+        out_paths.append(out_path)
+
+    logger.info(f"Processing {len(dates_sorted)} date(s) with {num_workers} worker(s)")
+    status_counts = {"ok": 0, "skipped": 0, "skipped_ref": 0, "error": 0}
+
+    with ProcessPoolExecutor(max_workers=num_workers) as ex:
+        futures = [
+            ex.submit(
+                _apply_one,
+                Path(cropped_file),
+                dem_path,
+                los_path,
+                interp_method,
+                Path(out_file),
+                ref_corr_path,
+                write_first,
+                ref_date_str,
+                fmt=fmt,
             )
-            ref_corr_path = _save_temp_reference(ref_corr, tmp_dir)
+            for cropped_file, out_file in zip(files_sorted[1:], out_paths[1:])
+        ]
 
-        # Plan work outputs
-        out_paths: list[Path] = []
-        for d in dates_sorted:
-            date_str = d[0].strftime(fmt)
-            out_path = output_dir / f"tropo_correction_{date_str}.tif"
-            out_paths.append(out_path)
+        for fut in tqdm(
+            as_completed(futures),
+            total=len(futures),
+            desc="TROPO apply",
+            unit="scene",
+        ):
+            date_str, status = fut.result()
+            if status.startswith("error:"):
+                status_counts["error"] += 1
+                logger.error(f"{date_str}: {status}")
+            else:
+                status_counts[status] = status_counts.get(status, 0) + 1
 
-        logger.info(
-            f"Processing {len(dates_sorted)} date(s) with {num_workers} worker(s)"
-        )
-        status_counts = {"ok": 0, "skipped": 0, "skipped_ref": 0, "error": 0}
-
-        with ProcessPoolExecutor(max_workers=num_workers) as ex:
-            futures = [
-                ex.submit(
-                    _apply_one,
-                    Path(cropped_file),
-                    dem_path,
-                    los_path,
-                    interp_method,
-                    Path(out_file),
-                    ref_corr_path,
-                    write_first,
-                    ref_date_str,
-                    fmt=fmt,
-                )
-                for cropped_file, out_file in zip(files_sorted[1:], out_paths[1:])
-            ]
-
-            for fut in tqdm(
-                as_completed(futures),
-                total=len(futures),
-                desc="TROPO apply",
-                unit="scene",
-            ):
-                date_str, status = fut.result()
-                if status.startswith("error:"):
-                    status_counts["error"] += 1
-                    logger.error(f"{date_str}: {status}")
-                else:
-                    status_counts[status] = status_counts.get(status, 0) + 1
-
-        logger.info(
-            "Done. "
-            f"ok={status_counts['ok']}, "
-            f"skipped={status_counts['skipped']}, "
-            f"skipped_ref={status_counts['skipped_ref']}, "
-            f"errors={status_counts['error']}"
-        )
-    finally:
-        # Clean up temp ref file
-        tmp_dir_ctx.cleanup()
+    logger.info(
+        "Done. "
+        f"ok={status_counts['ok']}, "
+        f"skipped={status_counts['skipped']}, "
+        f"skipped_ref={status_counts['skipped_ref']}, "
+        f"errors={status_counts['error']}"
+    )
 
 
 def main() -> None:
