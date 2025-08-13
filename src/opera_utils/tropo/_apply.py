@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -17,7 +16,7 @@ from rasterio.enums import Resampling
 from scipy.interpolate import RegularGridInterpolator
 from tqdm.auto import tqdm
 
-from opera_utils import get_dates
+from opera_utils import get_dates, sort_files_by_date
 
 from ._helpers import _open_2d
 
@@ -114,17 +113,6 @@ def _save_temp_reference(ref_corr: xr.DataArray, tmp_dir: Path) -> Path:
     return tmp_ref
 
 
-def _out_name(
-    output_dir: Path,
-    date_str: str,
-    ref_str: str | None,
-    include_ref_in_filename: bool,
-) -> Path:
-    if include_ref_in_filename and ref_str:
-        return output_dir / f"tropo_correction_{ref_str}_{date_str}.tif"
-    return output_dir / f"tropo_correction_{date_str}.tif"
-
-
 def _apply_one(
     cropped_file: Path,
     dem_path: Path,
@@ -186,11 +174,6 @@ def _apply_one(
         return (date_str, "ok")
 
 
-def _sort_by_date(paths: Iterable[Path]) -> list[Path]:
-    fmt = "%Y%m%dT%H%M%S"
-    return sorted(paths, key=lambda p: get_dates(p, fmt=fmt)[0])
-
-
 def apply_tropo(
     cropped_tropo_list: list[Path],
     dem_path: Path,
@@ -199,7 +182,6 @@ def apply_tropo(
     interp_method: str = "linear",
     subtract_first_date: bool = True,
     write_first: bool = False,
-    include_ref_in_filename: bool = False,
     num_workers: int | None = None,
 ) -> None:
     """Apply tropospheric corrections using DEM and LOS geometry (parallel).
@@ -221,9 +203,6 @@ def apply_tropo(
     write_first : bool
         If True and subtract_first_date=True, also write the first date.
         Default False (skip writing near-zero first frame).
-    include_ref_in_filename : bool
-        If True and subtract_first_date=True, include reference date in filename:
-        `tropo_correction_{ref}_{date}.tif`.
     num_workers : int | None
         Number of processes. Default: min(len(dates), os.cpu_count()).
 
@@ -234,7 +213,10 @@ def apply_tropo(
 
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    dates_sorted = _sort_by_date(cropped_tropo_list)
+    fmt = "%Y%m%dT%H%M%S"
+    files_sorted, dates_sorted = sort_files_by_date(
+        cropped_tropo_list, file_date_fmt=fmt
+    )
     if not dates_sorted:
         logger.info("No inputs provided.")
         return
@@ -245,24 +227,21 @@ def apply_tropo(
     # Precompute reference correction once if requested
     tmp_dir_ctx = tempfile.TemporaryDirectory(prefix="tropo_ref_")
     tmp_dir = Path(tmp_dir_ctx.name)
-    fmt = "%Y%m%dT%H%M%S"
     try:
         if subtract_first_date:
-            ref_date_str = get_dates(dates_sorted[0], fmt=fmt)[0].strftime(fmt)
+            ref_date_str = dates_sorted[0][0].strftime(fmt)
             logger.info(f"Computing reference correction for {ref_date_str}")
             ref_corr = _compute_reference_correction(
-                dates_sorted[0], dem_path, los_path, interp_method
+                Path(files_sorted[0]), dem_path, los_path, interp_method
             )
             ref_corr_path = _save_temp_reference(ref_corr, tmp_dir)
 
         # Plan work items and outputs
         items: list[tuple[Path, Path]] = []
-        for p in dates_sorted:
-            date_str = get_dates(p, fmt=fmt)[0].strftime(fmt)
-            out_path = _out_name(
-                output_dir, date_str, ref_date_str, include_ref_in_filename
-            )
-            items.append((p, out_path))
+        for p in files_sorted:
+            date_str = dates_sorted[0][0].strftime(fmt)
+            out_path = output_dir / f"tropo_correction_{date_str}.tif"
+            items.append((Path(p), out_path))
 
         # Parallel execution
         cpu = os.cpu_count() or 1
@@ -276,11 +255,11 @@ def apply_tropo(
             futures = [
                 ex.submit(
                     _apply_one,
-                    cropped_file,
+                    Path(cropped_file),
                     dem_path,
                     los_path,
                     interp_method,
-                    out_file,
+                    Path(out_file),
                     ref_corr_path,
                     write_first,
                     ref_date_str,
