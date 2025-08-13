@@ -219,12 +219,15 @@ def apply_tropo(
     # Precompute reference correction once if requested
     if subtract_first_date:
         ref_date_str = dates_sorted[0][0].strftime(fmt)
-        logger.info(f"Computing reference correction for {ref_date_str}")
-        ref_corr = _compute_reference_correction(
-            Path(files_sorted[0]), dem_path, los_path, interp_method
-        )
         ref_corr_path = output_dir / f"reference_tropo_correction_{ref_date_str}.tif"
-        ref_corr.rio.to_raster(ref_corr_path, **GTIFF_KWARGS)
+        if ref_corr_path.exists():
+            logger.info(f"Reference correction already exists: {ref_corr_path}")
+        else:
+            logger.info(f"Computing reference correction for {ref_date_str}")
+            ref_corr = _compute_reference_correction(
+                Path(files_sorted[0]), dem_path, los_path, interp_method
+            )
+            ref_corr.rio.to_raster(ref_corr_path, **GTIFF_KWARGS)
 
     # Plan work outputs
     out_paths: list[Path] = []
