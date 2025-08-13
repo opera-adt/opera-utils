@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -182,7 +181,7 @@ def apply_tropo(
     interp_method: str = "linear",
     subtract_first_date: bool = True,
     write_first: bool = False,
-    num_workers: int | None = None,
+    num_workers: int = 2,
 ) -> None:
     """Apply tropospheric corrections using DEM and LOS geometry (parallel).
 
@@ -203,8 +202,9 @@ def apply_tropo(
     write_first : bool
         If True and subtract_first_date=True, also write the first date.
         Default False (skip writing near-zero first frame).
-    num_workers : int | None
-        Number of processes. Default: min(len(dates), os.cpu_count()).
+    num_workers : int
+        Number of processes.
+        Default is 2.
 
     """
     if interp_method not in {"linear", "nearest"}:
@@ -236,19 +236,16 @@ def apply_tropo(
             )
             ref_corr_path = _save_temp_reference(ref_corr, tmp_dir)
 
-        # Plan work items and outputs
-        items: list[tuple[Path, Path]] = []
-        for p in files_sorted:
-            date_str = dates_sorted[0][0].strftime(fmt)
+        # Plan work outputs
+        out_paths: list[Path] = []
+        for d in dates_sorted:
+            date_str = d[0].strftime(fmt)
             out_path = output_dir / f"tropo_correction_{date_str}.tif"
-            items.append((Path(p), out_path))
+            out_paths.append(out_path)
 
-        # Parallel execution
-        cpu = os.cpu_count() or 1
-        if num_workers is None or num_workers < 1:
-            num_workers = min(len(items), cpu)
-
-        logger.info(f"Processing {len(items)} date(s) with {num_workers} worker(s)")
+        logger.info(
+            f"Processing {len(dates_sorted)} date(s) with {num_workers} worker(s)"
+        )
         status_counts = {"ok": 0, "skipped": 0, "skipped_ref": 0, "error": 0}
 
         with ProcessPoolExecutor(max_workers=num_workers) as ex:
@@ -265,7 +262,7 @@ def apply_tropo(
                     ref_date_str,
                     fmt=fmt,
                 )
-                for cropped_file, out_file in items
+                for cropped_file, out_file in zip(files_sorted[1:], out_paths[1:])
             ]
 
             for fut in tqdm(
