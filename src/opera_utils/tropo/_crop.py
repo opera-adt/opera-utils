@@ -7,8 +7,10 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import rasterio as rio
 import tyro
 import xarray as xr
+from rasterio.warp import transform_bounds
 
 from ._helpers import (
     MissingTropoError,
@@ -24,8 +26,9 @@ logger = logging.getLogger(__name__)
 
 def crop_tropo(
     tropo_urls_file: Path,
-    aoi_bounds: tuple[float, float, float, float],
     datetimes: list[datetime],
+    aoi_bounds: tuple[float, float, float, float] | None,
+    file_bounds: Path | str | None = None,
     output_dir: Path = Path("cropped_tropo"),
     skip_time_interpolation: bool = False,
     height_max: float = 10000.0,
@@ -36,10 +39,13 @@ def crop_tropo(
     ----------
     tropo_urls_file : Path
         File containing list of TROPO product URLs/paths (one per line).
-    aoi_bounds : tuple[float, float, float, float]
-        AOI bounding box as (west, south, east, north) in degrees.
     datetimes : list[datetime]
         List of datetime objects to get corrections for.
+    aoi_bounds : tuple[float, float, float, float]
+        AOI bounding box as (west, south, east, north) in degrees.
+    file_bounds : Path | str | None
+        Path to GeoTIFF file containing bounds to crop to.
+        Alternative to `aoi_bounds`.
     output_dir : Path
         Directory to save cropped TROPO products.
     skip_time_interpolation : bool
@@ -50,6 +56,17 @@ def crop_tropo(
     """
     output_dir.mkdir(exist_ok=True, parents=True)
 
+    if file_bounds is not None:
+        if aoi_bounds is not None:
+            msg = "Cannot specify both aoi_bounds and file_bounds"
+            raise ValueError(msg)
+
+        with rio.open(file_bounds) as src:
+            aoi_bounds = src.bounds
+            if src.crs != "epsg:4326":
+                aoi_bounds = transform_bounds(src.crs, "epsg:4326", *aoi_bounds)
+
+    assert aoi_bounds is not None
     west, south, east, north = aoi_bounds
     lat_bounds = (north, south)  # north, south for xarray slicing
     lon_bounds = (west, east)
