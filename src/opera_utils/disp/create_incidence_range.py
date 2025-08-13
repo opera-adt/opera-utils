@@ -61,7 +61,7 @@ def create_incidence_angle_raster(
         with rasterio.open(out_path, "w", **profile) as dst:
             dst.write(incidence_deg.astype(np.float32).filled(nodata), 1)
             # Set the units attribute as degrees
-            dst.set_band_units(1, "degrees")
+            dst.set_band_unit(1, "degrees")
             dst.set_band_description(
                 1,
                 "Incidence angle between the line-of-sight (LOS) vector and the normal"
