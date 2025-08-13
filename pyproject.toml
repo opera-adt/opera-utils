@@ -68,11 +68,13 @@ disp = [
   "s3fs",
   "tqdm",
   "rasterio",
+  "rioxarray",
   "xarray",
   "zarr>=3",
 ]
-cslc = ["asf_search"]
-all = ["opera-utils[cslc,disp,geopandas]"]
+tropo = ["opera-utils[disp]"]
+asf = ["asf_search"]
+all = ["opera-utils[asf,disp,geopandas]"]
 
 test = [
   "asf_search",
