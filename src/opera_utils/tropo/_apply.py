@@ -8,7 +8,6 @@ from pathlib import Path
 
 import numpy as np
 import rioxarray as rxr
-import tyro
 import xarray as xr
 from rasterio.enums import Resampling
 from scipy.interpolate import RegularGridInterpolator
@@ -104,6 +103,26 @@ def _compute_reference_correction(
     return ref_corr
 
 
+def _create_reference_correction(
+    ref_tropo_file: Path,
+    ref_date_str: str,
+    dem_path: Path,
+    los_path: Path,
+    interp_method: str,
+    output_dir: Path,
+) -> Path:
+    ref_corr_path = output_dir / f"reference_tropo_correction_{ref_date_str}.tif"
+    if ref_corr_path.exists():
+        logger.info(f"Reference correction already exists: {ref_corr_path}")
+    else:
+        logger.info(f"Computing reference correction for {ref_date_str}")
+        ref_corr = _compute_reference_correction(
+            ref_tropo_file, dem_path, los_path, interp_method
+        )
+        ref_corr.rio.to_raster(ref_corr_path, **GTIFF_KWARGS)
+    return ref_corr_path
+
+
 def _apply_one(
     cropped_file: Path,
     dem_path: Path,
@@ -111,7 +130,6 @@ def _apply_one(
     interp_method: str,
     output_file: Path,
     ref_corr_path: Path | None,
-    write_first: bool,
     ref_date_str: str | None,
     fmt: str = "%Y%m%dT%H%M%S",
 ) -> tuple[str, str]:
@@ -148,15 +166,6 @@ def _apply_one(
             attrs["reference_date"] = ref_date_str
 
         los_correction.rio.update_attrs(attrs, inplace=True)
-
-        # If this is the reference date and user asked not to write it, skip.
-        if (
-            (ref_date_str is not None)
-            and (date_str == ref_date_str)
-            and (not write_first)
-        ):
-            return (date_str, "skipped_ref")
-
         los_correction.rio.to_raster(output_file, **GTIFF_KWARGS)
 
     except Exception as e:
@@ -172,7 +181,6 @@ def apply_tropo(
     output_dir: Path = Path("tropo_corrections"),
     interp_method: str = "linear",
     subtract_first_date: bool = True,
-    write_first: bool = False,
     num_workers: int = 2,
 ) -> None:
     """Apply tropospheric corrections using DEM and LOS geometry (parallel).
@@ -187,52 +195,52 @@ def apply_tropo(
         3-band LOS GeoTIFF (E, N, U). Uses band=3 (index 2) as Up.
     output_dir : Path
         Output directory for correction GeoTIFFs.
-    interp_method : {"linear", "nearest"}
+    interp_method : {"linear", "nearest", "slinear", "cubic", "quintic", "pchip"}
         RegularGridInterpolator method.
     subtract_first_date : bool
         If True, subtract day-1 correction from every date.
-    write_first : bool
-        If True and subtract_first_date=True, also write the first date.
-        Default False (skip writing near-zero first frame).
     num_workers : int
         Number of processes.
         Default is 2.
 
     """
-    if interp_method not in {"linear", "nearest"}:
-        msg = "interp_method must be 'linear' or 'nearest' for RegularGridInterpolator"
+    if not cropped_tropo_list:
+        msg = "No inputs provided."
+        raise ValueError(msg)
+    methods = {"linear", "nearest", "slinear", "cubic", "quintic", "pchip"}
+    if interp_method not in methods:
+        msg = f"interp_method must be in {methods} for RegularGridInterpolator"
         raise ValueError(msg)
 
     output_dir.mkdir(exist_ok=True, parents=True)
 
     fmt = "%Y%m%dT%H%M%S"
-    files_sorted, dates_sorted = sort_files_by_date(
+    files_sorted, date_tups_sorted = sort_files_by_date(
         cropped_tropo_list, file_date_fmt=fmt
     )
-    if not dates_sorted:
-        logger.info("No inputs provided.")
-        return
+    dates_sorted = [d[0] for d in date_tups_sorted]
 
     ref_corr_path: Path | None = None
     ref_date_str: str | None = None
 
     # Precompute reference correction once if requested
     if subtract_first_date:
-        ref_date_str = dates_sorted[0][0].strftime(fmt)
-        ref_corr_path = output_dir / f"reference_tropo_correction_{ref_date_str}.tif"
-        if ref_corr_path.exists():
-            logger.info(f"Reference correction already exists: {ref_corr_path}")
-        else:
-            logger.info(f"Computing reference correction for {ref_date_str}")
-            ref_corr = _compute_reference_correction(
-                Path(files_sorted[0]), dem_path, los_path, interp_method
-            )
-            ref_corr.rio.to_raster(ref_corr_path, **GTIFF_KWARGS)
+        ref_corr_path = _create_reference_correction(
+            Path(files_sorted[0]),
+            dates_sorted[0].strftime(fmt),
+            dem_path,
+            los_path,
+            interp_method,
+            output_dir,
+        )
+        # Shift to ignore the first reference date now
+        dates_sorted = dates_sorted[1:]
+        files_sorted = files_sorted[1:]
 
     # Plan work outputs
     out_paths: list[Path] = []
     for d in dates_sorted:
-        date_str = d[0].strftime(fmt)
+        date_str = d.strftime(fmt)
         out_path = output_dir / f"tropo_correction_{date_str}.tif"
         out_paths.append(out_path)
 
@@ -249,17 +257,16 @@ def apply_tropo(
                 interp_method,
                 Path(out_file),
                 ref_corr_path,
-                write_first,
                 ref_date_str,
                 fmt=fmt,
             )
-            for cropped_file, out_file in zip(files_sorted[1:], out_paths[1:])
+            for cropped_file, out_file in zip(files_sorted, out_paths, strict=True)
         ]
 
         for fut in tqdm(
             as_completed(futures),
             total=len(futures),
-            desc="TROPO apply",
+            desc="Interpolating tropospheric corrections",
             unit="scene",
         ):
             date_str, status = fut.result()
@@ -276,12 +283,3 @@ def apply_tropo(
         f"skipped_ref={status_counts['skipped_ref']}, "
         f"errors={status_counts['error']}"
     )
-
-
-def main() -> None:
-    """CLI entry point for tropo-apply command."""
-    tyro.cli(apply_tropo)
-
-
-if __name__ == "__main__":
-    main()
