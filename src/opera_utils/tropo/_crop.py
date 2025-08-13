@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pandas as pd
 import rasterio as rio
-import tyro
 import xarray as xr
 from rasterio.warp import transform_bounds
 from tqdm import tqdm
@@ -195,12 +194,3 @@ def crop_tropo(
         f"missing={status_counts['missing']}, "
         f"errors={status_counts['error']}"
     )
-
-
-def main() -> None:
-    """CLI entry point for tropo-crop command."""
-    tyro.cli(crop_tropo)
-
-
-if __name__ == "__main__":
-    main()

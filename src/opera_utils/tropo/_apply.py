@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
-import time
+import os
+import tempfile
+from collections.abc import Iterable
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -16,9 +19,7 @@ from tqdm.auto import tqdm
 
 from opera_utils import get_dates
 
-from ._helpers import (
-    _open_2d,
-)
+from ._helpers import _open_2d
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ GTIFF_KWARGS = {
 
 
 def _height_to_dem_surface(
-    td_3d: xr.DataArray,
+    da_tropo_cube: xr.DataArray,
     dem: xr.DataArray,
     method: str = "linear",
 ) -> xr.DataArray:
@@ -40,35 +41,34 @@ def _height_to_dem_surface(
 
     Parameters
     ----------
-    td_3d : xr.DataArray
-        3D tropospheric delay with dimensions (height, lat/y, lon/x).
+    da_tropo_cube : xr.DataArray
+        3D tropospheric delay with dims (height, lat/y, lon/x).
     dem : xr.DataArray
         DEM with surface heights.
-    method : str
+    method : {"linear", "nearest"}
         Interpolation method for RegularGridInterpolator.
 
     Returns
     -------
     xr.DataArray
-        2D tropospheric delay at DEM surface.
+        2D tropospheric delay at DEM surface (same grid as `dem`).
 
     """
     # Ensure consistent coordinate naming
-    if "latitude" in td_3d.dims:
-        td_3d = td_3d.rename(latitude="y", longitude="x")
+    if "latitude" in da_tropo_cube.dims:
+        da_tropo_cube = da_tropo_cube.rename(latitude="y", longitude="x")
 
     # Reproject to DEM CRS if needed
-    if dem.rio.crs and td_3d.rio.crs != dem.rio.crs:
-        if td_3d.rio.crs is None:
-            td_3d = td_3d.rio.write_crs("epsg:4326")
-
-        td_utm = td_3d.rio.reproject(dem.rio.crs, resampling=Resampling.cubic)
+    if dem.rio.crs and da_tropo_cube.rio.crs != dem.rio.crs:
+        if da_tropo_cube.rio.crs is None:
+            da_tropo_cube = da_tropo_cube.rio.write_crs("epsg:4326")
+        td_utm = da_tropo_cube.rio.reproject(dem.rio.crs, resampling=Resampling.cubic)
         # Trim edges to avoid interpolation artifacts
         td_utm = td_utm.isel(x=slice(2, -2), y=slice(2, -2))
     else:
-        td_utm = td_3d
+        td_utm = da_tropo_cube
 
-    # Set up RegularGridInterpolator
+    # Build interpolator
     rgi = RegularGridInterpolator(
         (td_utm.height.values, td_utm.y.values, td_utm.x.values),
         td_utm.values,
@@ -77,25 +77,118 @@ def _height_to_dem_surface(
         fill_value=np.nan,
     )
 
-    # Create coordinate meshes for interpolation
-    yy, xx = np.meshgrid(dem.y, dem.x, indexing="ij")
+    # Coordinates for DEM grid
+    yy, xx = np.meshgrid(dem.y.values, dem.x.values, indexing="ij")
 
-    # Interpolate to DEM surface
-    interp_points = np.column_stack(
-        [
-            dem.values.ravel(),  # height values from DEM
-            yy.ravel(),  # y coordinates
-            xx.ravel(),  # x coordinates
-        ]
-    )
+    pts = np.column_stack([dem.values.ravel(), yy.ravel(), xx.ravel()])
+    vals = rgi(pts)
 
-    interp_values = rgi(interp_points)
-
-    # Reshape and create output array
     out = dem.copy()
-    out.values[:] = interp_values.reshape(dem.shape).astype("float32")
-
+    out.values[:] = vals.reshape(dem.shape).astype("float32")
     return out
+
+
+def _compute_reference_correction(
+    first_cropped: Path,
+    dem_path: Path,
+    los_path: Path,
+    interp_method: str,
+) -> xr.DataArray:
+    """Compute the day-1 LOS correction once (serial)."""
+    dem = _open_2d(dem_path)
+    los_up = rxr.open_rasterio(los_path).isel(band=2).values
+
+    ds0 = xr.open_dataset(first_cropped, engine="h5netcdf")
+    zenith_delay_2d = _height_to_dem_surface(ds0.total_delay, dem, method=interp_method)
+    ref_corr = zenith_delay_2d / los_up
+    # Attach rio attrs to keep CRS/transform for saving later if needed
+    ref_corr = ref_corr.rio.write_crs(dem.rio.crs or "epsg:4326")
+    ref_corr.rio.write_transform(dem.rio.transform(), inplace=True)
+    return ref_corr
+
+
+def _save_temp_reference(ref_corr: xr.DataArray, tmp_dir: Path) -> Path:
+    """Persist reference correction so workers can read without IPC copies."""
+    tmp_ref = tmp_dir / "tropo_ref_corr.tif"
+    ref_corr.rio.to_raster(tmp_ref, **GTIFF_KWARGS)
+    return tmp_ref
+
+
+def _out_name(
+    output_dir: Path,
+    date_str: str,
+    ref_str: str | None,
+    include_ref_in_filename: bool,
+) -> Path:
+    if include_ref_in_filename and ref_str:
+        return output_dir / f"tropo_correction_{ref_str}_{date_str}.tif"
+    return output_dir / f"tropo_correction_{date_str}.tif"
+
+
+def _apply_one(
+    cropped_file: Path,
+    dem_path: Path,
+    los_path: Path,
+    interp_method: str,
+    output_file: Path,
+    ref_corr_path: Path | None,
+    write_first: bool,
+    ref_date_str: str | None,
+    fmt: str = "%Y%m%dT%H%M%S",
+) -> tuple[str, str]:
+    """Worker for one date. Returns (date_str, status)."""
+    try:
+        date_str = get_dates(cropped_file, fmt=fmt)[0].strftime(fmt)
+
+        if output_file.exists():
+            return (date_str, "skipped")
+
+        dem = _open_2d(dem_path)
+        los_up = rxr.open_rasterio(los_path).isel(band=2).values
+
+        ds = xr.open_dataset(cropped_file, engine="h5netcdf")
+        zenith_delay_2d = _height_to_dem_surface(
+            ds.total_delay, dem, method=interp_method
+        )
+        los_correction = zenith_delay_2d / los_up
+
+        # Subtract reference if given
+        if ref_corr_path is not None:
+            ref_corr = rxr.open_rasterio(ref_corr_path, masked=True).squeeze()
+            # Align shapes if tiny border trimming differs
+            if ref_corr.shape != los_correction.shape:
+                # reproject/align to dem grid just in case
+                ref_corr = ref_corr.rio.reproject_match(los_correction)
+            los_correction = (los_correction - ref_corr).astype("float32")
+
+        attrs = {
+            "interpolation_method": interp_method,
+            "units": "meters",
+        }
+        if ref_date_str is not None:
+            attrs["reference_date"] = ref_date_str
+
+        los_correction.rio.update_attrs(attrs, inplace=True)
+
+        # If this is the reference date and user asked not to write it, skip.
+        if (
+            (ref_date_str is not None)
+            and (date_str == ref_date_str)
+            and (not write_first)
+        ):
+            return (date_str, "skipped_ref")
+
+        los_correction.rio.to_raster(output_file, **GTIFF_KWARGS)
+
+    except Exception as e:
+        return (str(cropped_file), f"error:{type(e).__name__}: {e}")
+    else:
+        return (date_str, "ok")
+
+
+def _sort_by_date(paths: Iterable[Path]) -> list[Path]:
+    fmt = "%Y%m%dT%H%M%S"
+    return sorted(paths, key=lambda p: get_dates(p, fmt=fmt)[0])
 
 
 def apply_tropo(
@@ -103,87 +196,122 @@ def apply_tropo(
     dem_path: Path,
     los_path: Path,
     output_dir: Path = Path("tropo_corrections"),
-    interp_method: str = "cubic",
+    interp_method: str = "linear",
     subtract_first_date: bool = True,
+    write_first: bool = False,
+    include_ref_in_filename: bool = False,
+    num_workers: int | None = None,
 ) -> None:
-    """Apply tropospheric corrections using DEM and LOS geometry.
+    """Apply tropospheric corrections using DEM and LOS geometry (parallel).
 
     Parameters
     ----------
     cropped_tropo_list : list[Path]
-        List of cropped TROPO product paths resulting from `tropo-crop`.
+        Paths to cropped TROPO NetCDFs from `tropo-crop`.
     dem_path : Path
-        Path to DEM GeoTIFF (can be UTM or WGS84).
+        DEM GeoTIFF (UTM or WGS84).
     los_path : Path
-        Path to 3-band LOS GeoTIFF with E,N,U components.
+        3-band LOS GeoTIFF (E, N, U). Uses band=3 (index 2) as Up.
     output_dir : Path
-        Directory to save correction GeoTIFFs.
-    interp_method : str
-        Interpolation method for RegularGridInterpolator.
-        Options are  "linear", "nearest", "slinear", "cubic", "quintic" and "pchip"
-        Default is "cubic".
+        Output directory for correction GeoTIFFs.
+    interp_method : {"linear", "nearest"}
+        RegularGridInterpolator method.
     subtract_first_date : bool
-        Whether to subtract the first date from the time series of corrections.
-        This is useful for applying to a single-reference displacement time series.
-        Default is True.
+        If True, subtract day-1 correction from every date.
+    write_first : bool
+        If True and subtract_first_date=True, also write the first date.
+        Default False (skip writing near-zero first frame).
+    include_ref_in_filename : bool
+        If True and subtract_first_date=True, include reference date in filename:
+        `tropo_correction_{ref}_{date}.tif`.
+    num_workers : int | None
+        Number of processes. Default: min(len(dates), os.cpu_count()).
 
     """
+    if interp_method not in {"linear", "nearest"}:
+        msg = "interp_method must be 'linear' or 'nearest' for RegularGridInterpolator"
+        raise ValueError(msg)
+
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    # Load DEM and LOS
-    logger.info(f"Loading DEM from {dem_path}")
-    dem = _open_2d(dem_path)
+    dates_sorted = _sort_by_date(cropped_tropo_list)
+    if not dates_sorted:
+        logger.info("No inputs provided.")
+        return
 
-    logger.info(f"Loading LOS from {los_path}")
-    los_up = rxr.open_rasterio(los_path).isel(band=2).values
+    ref_corr_path: Path | None = None
+    ref_date_str: str | None = None
 
-    logger.info(f"Processing {len(cropped_tropo_list)} datetime(s)")
+    # Precompute reference correction once if requested
+    tmp_dir_ctx = tempfile.TemporaryDirectory(prefix="tropo_ref_")
+    tmp_dir = Path(tmp_dir_ctx.name)
+    fmt = "%Y%m%dT%H%M%S"
+    try:
+        if subtract_first_date:
+            ref_date_str = get_dates(dates_sorted[0], fmt=fmt)[0].strftime(fmt)
+            logger.info(f"Computing reference correction for {ref_date_str}")
+            ref_corr = _compute_reference_correction(
+                dates_sorted[0], dem_path, los_path, interp_method
+            )
+            ref_corr_path = _save_temp_reference(ref_corr, tmp_dir)
 
-    attrs = {
-        "interpolation_method": interp_method,
-        "subtract_first_date": subtract_first_date,
-        "units": "meters",
-    }
-    day1_correction = 0
+        # Plan work items and outputs
+        items: list[tuple[Path, Path]] = []
+        for p in dates_sorted:
+            date_str = get_dates(p, fmt=fmt)[0].strftime(fmt)
+            out_path = _out_name(
+                output_dir, date_str, ref_date_str, include_ref_in_filename
+            )
+            items.append((p, out_path))
 
-    for idx, cropped_file in tqdm(list(enumerate(cropped_tropo_list))):
-        start_time = time.time()
-        fmt = "%Y%m%dT%H%M%S"
-        time_str = get_dates(cropped_file, fmt=fmt)[0].strftime(fmt)
-        output_file = output_dir / f"tropo_correction_{time_str}.tif"
-        if output_file.exists():
-            logger.info(f"Skipping existing {output_file}")
-            continue
+        # Parallel execution
+        cpu = os.cpu_count() or 1
+        if num_workers is None or num_workers < 1:
+            num_workers = min(len(items), cpu)
 
-        logger.info(f"Processing: {cropped_file}")
+        logger.info(f"Processing {len(items)} date(s) with {num_workers} worker(s)")
+        status_counts = {"ok": 0, "skipped": 0, "skipped_ref": 0, "error": 0}
 
-        # Open and crop the datasets
-        ds = xr.open_dataset(cropped_file, engine="h5netcdf")
+        with ProcessPoolExecutor(max_workers=num_workers) as ex:
+            futures = [
+                ex.submit(
+                    _apply_one,
+                    cropped_file,
+                    dem_path,
+                    los_path,
+                    interp_method,
+                    out_file,
+                    ref_corr_path,
+                    write_first,
+                    ref_date_str,
+                    fmt=fmt,
+                )
+                for cropped_file, out_file in items
+            ]
 
-        # Interpolate to DEM surface
-        logger.info("Interpolating to DEM surface")
-        zenith_delay_2d = _height_to_dem_surface(
-            ds.total_delay, dem, method=interp_method
+            for fut in tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc="TROPO apply",
+                unit="scene",
+            ):
+                date_str, status = fut.result()
+                if status.startswith("error:"):
+                    status_counts["error"] += 1
+                    logger.error(f"{date_str}: {status}")
+                else:
+                    status_counts[status] = status_counts.get(status, 0) + 1
+
+        logger.info(
+            "Done. "
+            f"ok={status_counts['ok']}, "
+            f"skipped={status_counts['skipped']}, "
+            f"skipped_ref={status_counts['skipped_ref']}, "
+            f"errors={status_counts['error']}"
         )
-
-        # Apply LOS correction
-        logger.info("Applying LOS correction")
-        los_correction = zenith_delay_2d / los_up
-        if idx == 0:
-            date1_datetime = time_str
-            if subtract_first_date:
-                day1_correction = los_correction.copy()
-                # We don't need to write this out
-                continue
-
-        # subtract first date, or 0 if not using that option
-        los_correction = los_correction - day1_correction
-        attrs |= {"reference_date": date1_datetime}
-        los_correction.rio.update_attrs(attrs, inplace=True)
-
-        # Save the correction
-        los_correction.rio.to_raster(output_file, **GTIFF_KWARGS)
-        logger.info(f"Finished {output_file} in {time.time() - start_time:.2f}")
+    finally:
+        # Clean up temp ref file
+        tmp_dir_ctx.cleanup()
 
 
 def main() -> None:
