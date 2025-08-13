@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -93,7 +92,6 @@ def apply_tropo(
     cropped_tropo_list: list[Path],
     dem_path: Path,
     los_path: Path,
-    datetimes: list[datetime],
     output_dir: Path = Path("tropo_corrections"),
     interp_method: str = "cubic",
     subtract_first_date: bool = True,
@@ -108,8 +106,6 @@ def apply_tropo(
         Path to DEM GeoTIFF (can be UTM or WGS84).
     los_path : Path
         Path to 3-band LOS GeoTIFF with E,N,U components.
-    datetimes : list[datetime]
-        List of datetime objects to get corrections for.
     output_dir : Path
         Directory to save correction GeoTIFFs.
     interp_method : str
@@ -131,7 +127,7 @@ def apply_tropo(
     logger.info(f"Loading LOS from {los_path}")
     los_up = rxr.open_rasterio(los_path).isel(band=2).values
 
-    logger.info(f"Processing {len(datetimes)} datetime(s)")
+    logger.info(f"Processing {len(cropped_tropo_list)} datetime(s)")
 
     day1_correction = 0
 
