@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +12,7 @@ import tyro
 import xarray as xr
 from rasterio.enums import Resampling
 from scipy.interpolate import RegularGridInterpolator
+from tqdm.auto import tqdm
 
 from opera_utils import get_dates
 
@@ -19,6 +21,14 @@ from ._helpers import (
 )
 
 logger = logging.getLogger(__name__)
+
+GTIFF_KWARGS = {
+    "compress": "deflate",
+    "tiled": True,
+    "predictor": 2,
+    "dtype": "float32",
+    "nbits": 16,
+}
 
 
 def _height_to_dem_surface(
@@ -129,9 +139,15 @@ def apply_tropo(
 
     logger.info(f"Processing {len(cropped_tropo_list)} datetime(s)")
 
+    attrs = {
+        "interpolation_method": interp_method,
+        "subtract_first_date": subtract_first_date,
+        "units": "meters",
+    }
     day1_correction = 0
 
-    for idx, cropped_file in enumerate(cropped_tropo_list):
+    for idx, cropped_file in tqdm(list(enumerate(cropped_tropo_list))):
+        start_time = time.time()
         fmt = "%Y%m%dT%H%M%S"
         time_str = get_dates(cropped_file, fmt=fmt)[0].strftime(fmt)
         output_file = output_dir / f"tropo_correction_{time_str}.tif"
@@ -153,15 +169,19 @@ def apply_tropo(
         # Apply LOS correction
         logger.info("Applying LOS correction")
         los_correction = zenith_delay_2d / los_up
-        if idx == 0 and subtract_first_date:
-            day1_correction = los_correction
+        if idx == 0:
+            date1_datetime = time_str
+            if subtract_first_date:
+                day1_correction = los_correction
 
         # subtract first date, or 0 if not using that option
         los_correction = los_correction - day1_correction
+        attrs |= {"reference_date": date1_datetime}
+        los_correction.rio.update_attrs(attrs, inplace=True)
 
         # Save the correction
-        los_correction.rio.to_raster(output_file, compress="lzw")
-        logger.info(f"Saved: {output_file}")
+        los_correction.rio.to_raster(output_file, **GTIFF_KWARGS)
+        logger.info(f"Finished {output_file} in {time.time() - start_time:.2f}")
 
 
 def main() -> None:
