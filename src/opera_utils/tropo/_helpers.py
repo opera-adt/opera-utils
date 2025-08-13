@@ -85,6 +85,10 @@ def _open_crop(
     return ds.load()  # pull the small cube into memory
 
 
+def _create_total_delay(ds: xr.Dataset) -> xr.DataArray:
+    return (ds.hydrostatic_delay + ds.wet_delay).squeeze("time", drop=True)
+
+
 def _interp_in_time(
     ds0: xr.Dataset,
     ds1: xr.Dataset,
@@ -94,11 +98,9 @@ def _interp_in_time(
 ) -> xr.Dataset:
     """Linear time interpolation of total_delay cube."""
     w = (t - t0) / (t1 - t0)
-    td0 = ds0.hydrostatic_delay + ds0.wet_delay
-    td1 = ds1.hydrostatic_delay + ds1.wet_delay
-    # keeps (height, lat, lon)
-    td0 = (ds0.hydrostatic_delay + ds0.wet_delay).squeeze("time", drop=True)
-    td1 = (ds1.hydrostatic_delay + ds1.wet_delay).squeeze("time", drop=True)
+    # keep only (height, lat, lon)
+    td0 = _create_total_delay(ds0)
+    td1 = _create_total_delay(ds1)
     out = ds0.copy(deep=True)
     out["total_delay"] = (1.0 - w) * td0 + w * td1
     return out
