@@ -32,6 +32,7 @@ def crop_tropo(
     output_dir: Path = Path("cropped_tropo"),
     skip_time_interpolation: bool = False,
     height_max: float = 10000.0,
+    margin_deg: float = 0.3,
 ) -> None:
     """Crop OPERA TROPO products to AOI and interpolate to specific datetimes.
 
@@ -52,6 +53,8 @@ def crop_tropo(
         Skip time interpolation and use nearest file.
     height_max : float
         Maximum height in meters to include in cropping.
+    margin_deg : float
+        Additional margin in degrees around AOI bounds.
 
     """
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -68,8 +71,9 @@ def crop_tropo(
 
     assert aoi_bounds is not None
     west, south, east, north = aoi_bounds
-    lat_bounds = (north, south)  # north, south for xarray slicing
-    lon_bounds = (west, east)
+    # For lat, use north -> south ordering for xarray slicing
+    lat_bounds = (north + margin_deg, south - margin_deg)
+    lon_bounds = (west - margin_deg, east + margin_deg)
     tropo_urls = Path(tropo_urls_file).read_text(encoding="utf-8").splitlines()
     tropo_idx_series = _build_tropo_index(tropo_urls)
 
