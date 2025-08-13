@@ -81,6 +81,12 @@ def crop_tropo(
 
     for dt in datetimes:
         dt_pandas = pd.to_datetime(dt).tz_localize(None)
+        time_str = dt_pandas.strftime("%Y%m%dT%H%M%S")
+        output_file = output_dir / f"tropo_cropped_{time_str}.nc"
+        if output_file.exists():
+            logger.info(f"Skipping existing {output_file}")
+            continue
+
         logger.info(f"Processing datetime: {dt_pandas}")
 
         if not skip_time_interpolation:
@@ -114,10 +120,6 @@ def crop_tropo(
             td_interp = ds.copy()
             td_interp["total_delay"] = da_total_delay
 
-        # Save the cropped and interpolated data
-        time_str = dt_pandas.strftime("%Y%m%dT%H%M%S")
-        output_file = output_dir / f"tropo_cropped_{time_str}.nc"
-
         # Keep only total_delay for output
         output_ds = xr.Dataset(
             {
@@ -128,6 +130,7 @@ def crop_tropo(
             }
         )
 
+        # Save the cropped and interpolated data
         output_ds.to_netcdf(output_file, engine="h5netcdf")
         logger.info(f"Saved: {output_file}")
 

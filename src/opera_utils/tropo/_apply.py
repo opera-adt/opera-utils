@@ -132,6 +132,13 @@ def apply_tropo(
     day1_correction = 0
 
     for idx, cropped_file in enumerate(cropped_tropo_list):
+        fmt = "%Y%m%dT%H%M%S"
+        time_str = get_dates(cropped_file, fmt=fmt)[0].strftime(fmt)
+        output_file = output_dir / f"tropo_correction_{time_str}.tif"
+        if output_file.exists():
+            logger.info(f"Skipping existing {output_file}")
+            continue
+
         logger.info(f"Processing: {cropped_file}")
 
         # Open and crop the datasets
@@ -153,10 +160,6 @@ def apply_tropo(
         los_correction = los_correction - day1_correction
 
         # Save the correction
-        fmt = "%Y%m%dT%H%M%S"
-        time_str = get_dates(cropped_file, fmt=fmt)[0].strftime(fmt)
-        output_file = output_dir / f"tropo_correction_{time_str}.tif"
-
         los_correction.rio.to_raster(output_file, compress="lzw")
         logger.info(f"Saved: {output_file}")
 
