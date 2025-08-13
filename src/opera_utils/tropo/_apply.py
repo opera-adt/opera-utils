@@ -7,54 +7,19 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import rioxarray as rxr
 import tyro
 import xarray as xr
 from rasterio.enums import Resampling
 from scipy.interpolate import RegularGridInterpolator
 
+from opera_utils import get_dates
+
 from ._helpers import (
-    MissingTropoError,
-    _bracket,
-    _build_tropo_index,
-    _interp_in_time,
     _open_2d,
-    _open_crop,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _apply_los_correction(
-    zenith_delay: xr.DataArray,
-    los_enu: xr.DataArray,
-) -> xr.DataArray:
-    """Apply line-of-sight correction to zenith delay.
-
-    Parameters
-    ----------
-    zenith_delay : xr.DataArray
-        Zenith tropospheric delay in meters.
-    los_enu : xr.DataArray
-        3-band LOS unit vector with bands [E, N, U].
-
-    Returns
-    -------
-    xr.DataArray
-        LOS tropospheric delay in meters.
-
-    """
-    # Extract the up component (band 3, index 2)
-    los_up = los_enu.isel(band=2)  # U component
-
-    # Apply cosine correction: LOS_delay = zenith_delay / cos(incidence_angle)
-    # where cos(incidence_angle) = los_up (the vertical component)
-    # Avoid division by very small numbers
-    los_up_safe = los_up.where(np.abs(los_up) > 0.01, 0.01)
-
-    los_delay = zenith_delay / los_up_safe
-    return los_delay
 
 
 def _height_to_dem_surface(
@@ -125,19 +90,20 @@ def _height_to_dem_surface(
 
 
 def apply_tropo(
-    tropo_urls_file: Path,
+    cropped_tropo_list: list[Path],
     dem_path: Path,
     los_path: Path,
     datetimes: list[datetime],
     output_dir: Path = Path("tropo_corrections"),
-    height_margin: float = 500.0,
+    interp_method: str = "cubic",
+    subtract_first_date: bool = True,
 ) -> None:
     """Apply tropospheric corrections using DEM and LOS geometry.
 
     Parameters
     ----------
-    tropo_urls_file : Path
-        File containing list of TROPO product URLs/paths (one per line).
+    cropped_tropo_list : list[Path]
+        List of cropped TROPO product paths resulting from `tropo-crop`.
     dem_path : Path
         Path to DEM GeoTIFF (can be UTM or WGS84).
     los_path : Path
@@ -146,8 +112,14 @@ def apply_tropo(
         List of datetime objects to get corrections for.
     output_dir : Path
         Directory to save correction GeoTIFFs.
-    height_margin : float
-        Additional height margin in meters above DEM max.
+    interp_method : str
+        Interpolation method for RegularGridInterpolator.
+        Options are  "linear", "nearest", "slinear", "cubic", "quintic" and "pchip"
+        Default is "cubic".
+    subtract_first_date : bool
+        Whether to subtract the first date from the time series of corrections.
+        This is useful for applying to a single-reference displacement time series.
+        Default is True.
 
     """
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -157,62 +129,36 @@ def apply_tropo(
     dem = _open_2d(dem_path)
 
     logger.info(f"Loading LOS from {los_path}")
-    los_enu = rxr.open_rasterio(los_path)
-
-    # Get DEM bounds for cropping TROPO data
-    if dem.rio.crs != "epsg:4326":
-        dem_bounds_4326 = dem.rio.transform_bounds("epsg:4326")
-    else:
-        dem_bounds_4326 = dem.rio.bounds()
-
-    # Add margin to bounds
-    margin_deg = 0.1  # degrees
-    west, south, east, north = dem_bounds_4326
-    lat_bounds = (north + margin_deg, south - margin_deg)
-    lon_bounds = (west - margin_deg, east + margin_deg)
-
-    h_max = float(dem.max())
-
-    tropo_urls = Path(tropo_urls_file).read_text(encoding="utf-8").splitlines()
-    tropo_idx_series = _build_tropo_index(tropo_urls)
+    los_up = rxr.open_rasterio(los_path).isel(band=2).values
 
     logger.info(f"Processing {len(datetimes)} datetime(s)")
 
-    for dt in datetimes:
-        dt_pandas = pd.to_datetime(dt).tz_localize(None)
-        logger.info(f"Processing datetime: {dt_pandas}")
+    day1_correction = 0
 
-        try:
-            early_url, late_url = _bracket(tropo_idx_series, dt_pandas)
-        except MissingTropoError:
-            logger.warning(f"No available tropo files for {dt_pandas}")
-            continue
-
-        logger.info(f"Using files: {early_url}, {late_url}")
+    for idx, cropped_file in enumerate(cropped_tropo_list):
+        logger.info(f"Processing: {cropped_file}")
 
         # Open and crop the datasets
-        ds0 = _open_crop(early_url, lat_bounds, lon_bounds, h_max, height_margin)
-        ds1 = _open_crop(late_url, lat_bounds, lon_bounds, h_max, height_margin)
-
-        # Interpolate in time
-        td_interp = _interp_in_time(
-            ds0,
-            ds1,
-            ds0.time.to_pandas().item(),
-            ds1.time.to_pandas().item(),
-            dt_pandas,
-        )
+        ds = xr.open_dataset(cropped_file, engine="h5netcdf")
 
         # Interpolate to DEM surface
         logger.info("Interpolating to DEM surface")
-        zenith_delay_2d = _height_to_dem_surface(td_interp.total_delay, dem)
+        zenith_delay_2d = _height_to_dem_surface(
+            ds.total_delay, dem, method=interp_method
+        )
 
         # Apply LOS correction
         logger.info("Applying LOS correction")
-        los_correction = _apply_los_correction(zenith_delay_2d, los_enu)
+        los_correction = zenith_delay_2d / los_up
+        if idx == 0 and subtract_first_date:
+            day1_correction = los_correction
+
+        # subtract first date, or 0 if not using that option
+        los_correction = los_correction - day1_correction
 
         # Save the correction
-        time_str = dt_pandas.strftime("%Y%m%dT%H%M%S")
+        fmt = "%Y%m%dT%H%M%S"
+        time_str = get_dates(cropped_file, fmt=fmt)[0].strftime(fmt)
         output_file = output_dir / f"tropo_correction_{time_str}.tif"
 
         los_correction.rio.to_raster(output_file, compress="lzw")
