@@ -73,7 +73,6 @@ def _open_crop(
     h_max: float,
 ) -> xr.Dataset:
     """Lazy-open a single L4 file and subset to bbox+height."""
-    logger.info(f"Cropping {url}")
     ds = xr.open_dataset(url, engine="h5netcdf")
     lat_max, lat_min = lat_bounds  # note south-to-north ordering in slice
     lon_min, lon_max = lon_bounds

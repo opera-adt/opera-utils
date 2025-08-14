@@ -33,8 +33,30 @@ def _process_one_datetime(
     height_max: float,
     output_dir: Path,
     skip_time_interpolation: bool,
+    debug: bool = False,
 ) -> tuple[datetime, str]:
     """Worker: process one datetime and write output file.
+
+    Parameters
+    ----------
+    dt : datetime
+        Datetime to process.
+    tropo_idx_series : pd.Series
+        Series of TROPO product URLs/paths.
+    lat_bounds : tuple[float, float]
+        Latitude bounds as (north, south) in degrees.
+    lon_bounds : tuple[float, float]
+        Longitude bounds as (west, east) in degrees.
+    height_max : float
+        Maximum height in meters to include in cropping.
+        Higher values with smaller atmospheric delay are ignored.
+    output_dir : Path
+        Directory to save cropped TROPO products.
+    skip_time_interpolation : bool
+        Skip time interpolation and use nearest file.
+    debug : bool
+        Debug mode. If True, write debug info during processing.
+        Default: False.
 
     Returns
     -------
@@ -57,7 +79,11 @@ def _process_one_datetime(
             except MissingTropoError:
                 return (dt, "missing")
 
+            if debug:
+                tqdm.write(f"Cropping {early_url}")
             ds0 = _open_crop(early_url, lat_bounds, lon_bounds, height_max)
+            if debug:
+                tqdm.write(f"Cropping {late_url}")
             ds1 = _open_crop(late_url, lat_bounds, lon_bounds, height_max)
 
             td_interp = _interp_in_time(
