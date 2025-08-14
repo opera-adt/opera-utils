@@ -68,13 +68,12 @@ disp = [
   "s3fs",
   "tqdm",
   "rasterio",
-  "rioxarray",
   "xarray",
   "zarr>=3",
 ]
-tropo = ["opera-utils[disp]"]
+tropo = ["opera-utils[disp]", "rioxarray", "scipy"]
 asf = ["asf_search"]
-all = ["opera-utils[asf,disp,geopandas]"]
+all = ["opera-utils[tropo,asf,disp,geopandas]"]
 
 test = [
   "asf_search",
