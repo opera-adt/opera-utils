@@ -159,6 +159,16 @@ def cli_app() -> None:
 
     except ImportError:
         pass
+
+    try:
+        from opera_utils.tropo._apply import apply_tropo
+        from opera_utils.tropo._crop import crop_tropo
+
+        cli_dict["tropo-crop"] = crop_tropo
+        cli_dict["tropo-apply"] = apply_tropo
+
+    except ImportError:
+        pass
     tyro.extras.subcommand_cli_from_dict(
         cli_dict,
         prog="opera-utils",
