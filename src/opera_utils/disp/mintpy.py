@@ -204,7 +204,7 @@ def create_static_layers(
     """
     outdir.mkdir(parents=True, exist_ok=True)
 
-    ny, nx = meta["LENGTH"], meta["WIDTH"]
+    ny, nx = int(meta["LENGTH"]), int(meta["WIDTH"])
     geometry_meta = meta | {"FILE_TYPE": "geometry"}
 
     los_enu_data = xr.open_dataarray(los_enu_path).data
