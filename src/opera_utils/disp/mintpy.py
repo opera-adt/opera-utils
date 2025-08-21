@@ -240,6 +240,7 @@ def disp_nc_to_mintpy(
     reformatted_nc_path: Path,
     /,
     sample_disp_nc: Path,
+    geometry_dir: Path | str | None = None,
     los_enu_path: Path | str | None = None,
     dem_path: Path | str | None = None,
     layover_shadow_mask_path: Path | str | None = None,
@@ -256,6 +257,9 @@ def disp_nc_to_mintpy(
         Result from `opera-utils disp-s1-reformat`
     sample_disp_nc : Path
         Path to one of the sample DISP-S1 NetCDF files.
+    geometry_dir : Path | str, optional
+        Path to a directory containing the LOS ENU, DEM, and layover/shadow mask files.
+        Alternative to specifying the individual files separately.
     los_enu_path : Path | str, optional
         Path to the line-of-sight (LOS) 3-band east, north, up file.
     dem_path : Path | str, optional
@@ -362,6 +366,13 @@ def disp_nc_to_mintpy(
 
     # geometryGeo.h5
     # Download UTM DEM/LOS ENU/Layover shadow mask in `opera_utils.disp._download.py`
+    if geometry_dir:
+        los_enu_path = next(Path(geometry_dir).glob("*los_enu.tif"))
+        dem_path = next(Path(geometry_dir).glob("*dem.tif"))
+        layover_shadow_mask_path = next(
+            Path(geometry_dir).glob("*layover_shadow_mask.tif")
+        )
+
     if los_enu_path:
         create_static_layers(
             los_enu_path,
