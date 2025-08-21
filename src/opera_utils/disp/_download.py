@@ -3,6 +3,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+import fsspec
 import h5py
 import requests
 import xarray as xr
@@ -54,31 +55,33 @@ def process_file(
         logger.info(f"Skipped (exists): {outname}")
         return outpath
 
-    with tempfile.NamedTemporaryFile(suffix=".nc") as tf:
-        temp_path = Path(tf.name)
-        if url.startswith("s3://"):
-            # For S3 urls, it's fast to just open with xarray on the fsspec object
-            with open_file(url) as in_f:
-                _extract_subset(in_f, outpath=outpath, rows=rows, cols=cols)
-                # out_f.write(in_f.read())
-        else:
+    if Path(url).exists():
+        # For local files, it's fast to just open with xarray on the fsspec object
+        _extract_subset(url, outpath=outpath, rows=rows, cols=cols)
+    elif url.startswith("s3://"):
+        # For S3 urls, it's fast to just open with xarray on the fsspec object
+        with open_file(url) as in_f:
+            _extract_subset(in_f, outpath=outpath, rows=rows, cols=cols)
+    else:
+        with tempfile.NamedTemporaryFile(suffix=".nc") as tf:
+            temp_path = Path(tf.name)
             # HTTPS seems to run much more slowly
             if session is None:
                 session = requests.Session()
                 username, password = get_earthdata_username_password()
-                session.auth = (username, password)
-            response = session.get(url)
-            response.raise_for_status()
-            with open(temp_path, "wb") as out_f:
-                out_f.write(response.content)
-            _extract_subset(temp_path, outpath=outpath, rows=rows, cols=cols)
+            session.auth = (username, password)
+        response = session.get(url)
+        response.raise_for_status()
+        with open(temp_path, "wb") as out_f:
+            out_f.write(response.content)
+        _extract_subset(temp_path, outpath=outpath, rows=rows, cols=cols)
 
         logger.debug(f"Done: {outname}")
     return outpath
 
 
 def _extract_subset(
-    input_obj,
+    input_obj: Path | str | fsspec.core.OpenFile,
     outpath: Path | str,
     rows: slice | None,
     cols: slice | None,
@@ -112,6 +115,19 @@ def _extract_subset(
         # See https://github.com/pydata/xarray/issues/10389
         with h5py.File(input_obj) as hf, h5py.File(outpath, "a") as dest_hf:
             hf.copy(group, dest_hf, name=group)
+
+
+def _get_rowcol_slice(
+    dps: DispProductStack, bbox: tuple[float, float, float, float] | None
+) -> tuple[slice | None, slice | None]:
+    if bbox is not None:
+        p = dps.products[0]
+        lon_left, lat_bottom, lon_right, lat_top = bbox
+        row_start, col_start = p.lonlat_to_rowcol(lon_left, lat_top)
+        row_stop, col_stop = p.lonlat_to_rowcol(lon_right, lat_bottom)
+        return slice(row_start, row_stop), slice(col_start, col_stop)
+    else:
+        return None, None
 
 
 def _run_file(
@@ -197,17 +213,8 @@ def run_download(
 
     dps = DispProductStack(results)
 
-    if bbox is not None:
-        p = dps.products[0]
-        lon_left, lat_bottom, lon_right, lat_top = bbox
-        row_start, col_start = p.lonlat_to_rowcol(lon_left, lat_top)
-        row_stop, col_stop = p.lonlat_to_rowcol(lon_right, lat_bottom)
-        rows = slice(row_start, row_stop)
-        cols = slice(col_start, col_stop)
-    else:
-        rows, cols = None, None
+    rows, cols = _get_rowcol_slice(dps, bbox)
     logger.info(f"Subsetting to Rows: {rows}, cols: {cols}")
-
     jobs = [
         (filename, rows, cols, output_dir, session)
         for idx, filename in enumerate(dps.filenames)
