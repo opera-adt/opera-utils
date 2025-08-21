@@ -69,12 +69,12 @@ def process_file(
             if session is None:
                 session = requests.Session()
                 username, password = get_earthdata_username_password()
-            session.auth = (username, password)
-        response = session.get(url)
-        response.raise_for_status()
-        with open(temp_path, "wb") as out_f:
-            out_f.write(response.content)
-        _extract_subset(temp_path, outpath=outpath, rows=rows, cols=cols)
+                session.auth = (username, password)
+            response = session.get(url)
+            response.raise_for_status()
+            with open(temp_path, "wb") as out_f:
+                out_f.write(response.content)
+            _extract_subset(temp_path, outpath=outpath, rows=rows, cols=cols)
 
         logger.debug(f"Done: {outname}")
     return outpath
