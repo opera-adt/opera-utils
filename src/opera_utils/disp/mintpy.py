@@ -180,22 +180,23 @@ def create_reliability_mask(
 
 def create_static_layers(
     los_enu_path: Path | str,
-    dem_path: Path | str,
     meta: dict[str, Any],
+    layover_shadow_mask_path: Path | str | None = None,
+    dem_path: Path | str | None = None,
     outdir: Path = Path("mintpy"),
 ) -> None:
     """Create static layer products from reformatted DISP-S1 data.
-
-    Replicates the old run_1 functionality from OPERA application Git.
 
     Parameters
     ----------
     los_enu_path : Path | str
         Path to the LOS-ENU geometry file.
-    dem_path : Path | str
-        Path to the DEM file.
     meta : dict[str, Any]
         Metadata to be written to the static layer files.
+    dem_path : Path | str, optional
+        Path to the DEM file.
+    layover_shadow_mask_path : Path | str | None, optional
+        Path to the layover/shadow mask file.
     outdir : Path, optional
         Output directory for the static layer files.
         Default is "mintpy".
@@ -203,31 +204,46 @@ def create_static_layers(
     """
     outdir.mkdir(parents=True, exist_ok=True)
 
-    ny, nx = meta["LENGTH"], meta["WIDTH"]
-    # geometryGeo.h5 - static geometry information
+    ny, nx = int(meta["LENGTH"]), int(meta["WIDTH"])
     geometry_meta = meta | {"FILE_TYPE": "geometry"}
 
-    dem = xr.open_dataarray(dem_path).data
     los_enu_data = xr.open_dataarray(los_enu_path).data
-    np.degrees(np.arccos(los_enu_data[2]))
-    # Placeholder datasets - these should be replaced with actual static layer data
+    east, north, up = los_enu_data
+    # Incidence angle is the angle between the line-of-sight (LOS) vector and
+    # the normal to the ellipsoid at the target
+    incidence_angle = np.degrees(np.arccos(up))
+
+    # Calculate azimuth angle from East and North components
+    # See calc_azimuth_from_east_north_obs for reference
+    azimuth_angle = -1 * np.rad2deg(np.arctan2(east, north)) % 360
+
+    if dem_path is not None:
+        dem = xr.open_dataarray(dem_path).data
+    else:
+        dem = np.zeros((ny, nx), dtype=np.float32)
+    if layover_shadow_mask_path is not None:
+        shadow_mask = xr.open_dataarray(layover_shadow_mask_path).data
+    else:
+        shadow_mask = np.zeros((ny, nx), dtype=np.int8)
     geometry_dsets = {
         "height": (np.float32, (ny, nx), dem.data),  # DEM heights
-        "incidenceAngle": (np.float32, (ny, nx), None),  # Incidence angles
-        "azimuthAngle": (np.float32, (ny, nx), None),  # Azimuth angles
-        "shadowMask": (np.int8, (ny, nx), None),  # Shadow/layover mask
+        "incidenceAngle": (np.float32, (ny, nx), incidence_angle),
+        "azimuthAngle": (np.float32, (ny, nx), azimuth_angle),
+        "shadowMask": (np.int8, (ny, nx), shadow_mask),
     }
 
     _write_hdf5(outdir / "geometryGeo.h5", geometry_dsets, geometry_meta)
-    print("Created geometryGeo.h5 (placeholder - requires DISP-S1-STATIC layers)")
+    print("Created geometryGeo.h5.")
 
 
 def disp_nc_to_mintpy(
     reformatted_nc_path: Path,
     /,
     sample_disp_nc: Path,
+    geometry_dir: Path | str | None = None,
     los_enu_path: Path | str | None = None,
     dem_path: Path | str | None = None,
+    layover_shadow_mask_path: Path | str | None = None,
     outdir: Path = Path("mintpy"),
     virtual: bool = False,
     reliability_threshold: float = 0.90,
@@ -241,10 +257,15 @@ def disp_nc_to_mintpy(
         Result from `opera-utils disp-s1-reformat`
     sample_disp_nc : Path
         Path to one of the sample DISP-S1 NetCDF files.
+    geometry_dir : Path | str, optional
+        Path to a directory containing the LOS ENU, DEM, and layover/shadow mask files.
+        Alternative to specifying the individual files separately.
     los_enu_path : Path | str, optional
         Path to the line-of-sight (LOS) 3-band east, north, up file.
     dem_path : Path | str, optional
         Path to the DEM file.
+    layover_shadow_mask_path : Path | str, optional
+        Path to the layover/shadow mask file.
     outdir : Path, optional
         Output directory for the MintPy inputs.
         Default is "mintpy".
@@ -345,8 +366,21 @@ def disp_nc_to_mintpy(
 
     # geometryGeo.h5
     # Download UTM DEM/LOS ENU/Layover shadow mask in `opera_utils.disp._download.py`
-    if los_enu_path and dem_path:
-        create_static_layers(los_enu_path, dem_path, ts_meta, outdir)
+    if geometry_dir:
+        los_enu_path = next(Path(geometry_dir).glob("*los_enu.tif"))
+        dem_path = next(Path(geometry_dir).glob("*dem.tif"))
+        layover_shadow_mask_path = next(
+            Path(geometry_dir).glob("*layover_shadow_mask.tif")
+        )
+
+    if los_enu_path:
+        create_static_layers(
+            los_enu_path,
+            ts_meta,
+            dem_path=dem_path,
+            layover_shadow_mask_path=layover_shadow_mask_path,
+            outdir=outdir,
+        )
     else:
         print("No LOS-ENU path provided, skipping geometryGeo.h5")
 
