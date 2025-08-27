@@ -468,6 +468,8 @@ def extract_quality_layers(
         )
 
     for idx in trange(len(products.filenames)):
+        if Path(writer.files[idx]).exists():
+            continue
         cur_data = reader[idx]
         writer[idx] = cur_data
 
@@ -596,6 +598,7 @@ def main(
     """
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True, parents=True)
+    nc_files = sorted(nc_files)
 
     # Transfer the water mask
     water_mask_path = output_path / "water_mask.tif"
@@ -629,17 +632,19 @@ def main(
     # Transfer the quality layers (no rebasing needed)
     all_products = DispProductStack.from_file_list(nc_files)
     with multiprocessing.Pool(num_workers) as pool:
-        pool.starmap(
-            extract_quality_layers,
-            zip(
-                repeat(output_dir),
-                repeat(all_products),
-                QUALITY_DATASETS,
-                repeat(True),
-                repeat("harmonic"),
-                repeat(True),
-                repeat(subsample),
-            ),
+        list(
+            pool.starmap(
+                extract_quality_layers,
+                zip(
+                    repeat(output_dir),
+                    repeat(all_products),
+                    QUALITY_DATASETS,
+                    repeat(True),
+                    repeat("harmonic"),
+                    repeat(True),
+                    repeat(subsample),
+                ),
+            )
         )
 
     # Load in the coherence dataset
