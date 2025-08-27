@@ -289,12 +289,13 @@ def run_search_cli(
         burst_ids=burst_ids,
         product=product,
         check_missing_data=check_missing_data,
-        max_results=5_000,
+        max_results=10_000,
     )
     if check_missing_data:
         res, options = results
     else:
         res, options = results, None
+
     if exclude_months is not None:
         res = [
             r
@@ -304,14 +305,14 @@ def run_search_cli(
         ]
 
     if check_missing_data:
-        res, options = results
         logger.info("Filtering to top option:")
+        assert options is not None
         print_with_rich(options)
         # Pick top one to print
         urls = options[0].inputs
         get_urls(res, type_=url_type)
     else:
-        urls = get_urls(results, type_=url_type)
+        urls = get_urls(res, type_=url_type)
 
     print("\n".join(urls))
     return urls
