@@ -22,7 +22,6 @@ DEFAULT_RASTERIO_PROFILE = {
     "tiled": True,
     "compress": "deflate",
     "predictor": 2,
-    "nbits": 16,
 }
 
 
