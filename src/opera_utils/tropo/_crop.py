@@ -58,65 +58,57 @@ def _process_one_datetime(
         Debug mode. If True, write debug info during processing.
         Default: False.
 
-    Returns
-    -------
     tuple[datetime, str]
         (datetime, status)
         status is "ok" | "skipped" | "missing" | "error:<msg>"
 
     """
-    try:
-        dt_pandas = pd.to_datetime(dt).tz_localize(None)
-        time_str = dt_pandas.strftime("%Y%m%dT%H%M%S")
-        output_file = output_dir / f"tropo_cropped_{time_str}.nc"
+    dt_pandas = pd.to_datetime(dt).tz_localize(None)
+    time_str = dt_pandas.strftime("%Y%m%dT%H%M%S")
+    output_file = output_dir / f"tropo_cropped_{time_str}.nc"
 
-        if output_file.exists():
-            return (dt, "skipped")
+    if output_file.exists():
+        return (dt, "skipped")
 
-        if not skip_time_interpolation:
-            try:
-                early_url, late_url = _bracket(tropo_idx_series, dt_pandas)
-            except MissingTropoError:
-                return (dt, "missing")
+    if not skip_time_interpolation:
+        try:
+            early_url, late_url = _bracket(tropo_idx_series, dt_pandas)
+        except MissingTropoError:
+            return (dt, "missing")
 
-            if debug:
-                tqdm.write(f"Cropping {early_url}")
-            ds0 = _open_crop(early_url, lat_bounds, lon_bounds, height_max)
-            if debug:
-                tqdm.write(f"Cropping {late_url}")
-            ds1 = _open_crop(late_url, lat_bounds, lon_bounds, height_max)
+        if debug:
+            tqdm.write(f"Cropping {early_url}")
+        ds0 = _open_crop(early_url, lat_bounds, lon_bounds, height_max)
+        if debug:
+            tqdm.write(f"Cropping {late_url}")
+        ds1 = _open_crop(late_url, lat_bounds, lon_bounds, height_max)
 
-            td_interp = _interp_in_time(
-                ds0,
-                ds1,
-                ds0.time.to_pandas().item(),
-                ds1.time.to_pandas().item(),
-                dt_pandas,
-            )
-        else:
-            idx = tropo_idx_series.index.get_indexer([dt_pandas], method="nearest")[0]
-            closest_url = tropo_idx_series.values[idx]
-            ds = _open_crop(closest_url, lat_bounds, lon_bounds, height_max)
-            da_total_delay = _create_total_delay(ds)
-            td_interp = ds.copy()
-            td_interp["total_delay"] = da_total_delay
-
-        # Keep only total_delay and coord variables for output
-        output_ds = xr.Dataset(
-            {
-                "total_delay": td_interp.total_delay,
-                "latitude": td_interp.latitude,
-                "longitude": td_interp.longitude,
-                "height": td_interp.height,
-            }
+        td_interp = _interp_in_time(
+            ds0,
+            ds1,
+            ds0.time.to_pandas().item(),
+            ds1.time.to_pandas().item(),
+            dt_pandas,
         )
-        output_ds.to_netcdf(output_file, engine="h5netcdf")
-
-    except Exception as e:
-        # Return error to main proc; don't raise to avoid stopping all work.
-        return (dt, f"error:{type(e).__name__}: {e}")
     else:
-        return (dt, "ok")
+        idx = tropo_idx_series.index.get_indexer([dt_pandas], method="nearest")[0]
+        closest_url = tropo_idx_series.values[idx]
+        ds = _open_crop(closest_url, lat_bounds, lon_bounds, height_max)
+        da_total_delay = _create_total_delay(ds)
+        td_interp = ds.copy()
+        td_interp["total_delay"] = da_total_delay
+
+    # Keep only total_delay and coord variables for output
+    output_ds = xr.Dataset(
+        {
+            "total_delay": td_interp.total_delay,
+            "latitude": td_interp.latitude,
+            "longitude": td_interp.longitude,
+            "height": td_interp.height,
+        }
+    )
+    output_ds.to_netcdf(output_file, engine="h5netcdf")
+    return (dt, "ok")
 
 
 def crop_tropo(
@@ -185,33 +177,46 @@ def crop_tropo(
     futures = []
     status_counts: dict[str, int] = {"ok": 0, "skipped": 0, "missing": 0, "error": 0}
 
-    with ProcessPoolExecutor(max_workers=num_workers) as ex:
-        for dt in datetimes:
-            futures.append(
-                ex.submit(
-                    _process_one_datetime,
-                    dt,
-                    tropo_idx_series,
-                    lat_bounds,
-                    lon_bounds,
-                    height_max,
-                    output_dir,
-                    skip_time_interpolation,
+    if num_workers > 1:
+        with ProcessPoolExecutor(max_workers=num_workers) as ex:
+            for dt in datetimes:
+                futures.append(
+                    ex.submit(
+                        _process_one_datetime,
+                        dt,
+                        tropo_idx_series,
+                        lat_bounds,
+                        lon_bounds,
+                        height_max,
+                        output_dir,
+                        skip_time_interpolation,
+                    )
                 )
-            )
 
-        for fut in tqdm(
-            as_completed(futures),
-            total=len(futures),
-            desc="TROPO crop+interp",
-            unit="scene",
-        ):
-            dt, status = fut.result()
-            if status.startswith("error:"):
-                status_counts["error"] += 1
-                logger.error(f"{dt}: {status}")
-            else:
-                status_counts[status] = status_counts.get(status, 0) + 1
+            for fut in tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc="TROPO crop+interp",
+                unit="scene",
+            ):
+                dt, status = fut.result()
+                if status.startswith("error:"):
+                    status_counts["error"] += 1
+                    logger.error(f"{dt}: {status}")
+                else:
+                    status_counts[status] = status_counts.get(status, 0) + 1
+
+    else:
+        for dt in datetimes:
+            _process_one_datetime(
+                dt,
+                tropo_idx_series,
+                lat_bounds,
+                lon_bounds,
+                height_max,
+                output_dir,
+                skip_time_interpolation,
+            )
 
     logger.info(
         "Done. "

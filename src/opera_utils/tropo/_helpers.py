@@ -46,22 +46,46 @@ def _open_2d(filename: str | Path) -> xr.DataArray:
 def _build_tropo_index(urls: list[str]) -> pd.Series:
     """Return Series(url, index=datetime UTC)."""
     times = [get_dates(u, fmt="%Y%m%dT%H%M%S")[0] for u in urls]
-    return pd.Series(urls, index=pd.to_datetime(times, utc=True).tz_localize(None))
+    series = pd.Series(urls, index=pd.to_datetime(times, utc=True).tz_localize(None))
+    return series.sort_index()
 
 
 def _bracket(url_series: pd.Series, ts: pd.Timestamp) -> tuple[str, str]:
-    """Return (earlier, later) urls within ±6 h; raises if missing."""
-    # Last url/date before `ts`
-    early = url_series.loc[:ts]
-    early_date = early.index[-1]
-    early_url = early.iloc[-1]
-    # First url/date after `ts`
-    late = url_series.loc[ts:]
-    late_date = late.index[0]
-    late_url = late.iloc[0]
-    if (ts - early_date) > TROPO_INTERVAL or (late_date - ts) > TROPO_INTERVAL:
-        msg = f"No tropo product within ±6 h of {ts}"
+    """Return (earlier, later) URLs bracketing `ts` within +/-6 h; raises if missing."""
+    if not isinstance(url_series.index, pd.DatetimeIndex):
+        msg = "url_series must have a DatetimeIndex"
+        raise TypeError(msg)
+
+    # require monotonic increasing index
+    if not url_series.index.is_monotonic_increasing:
+        msg = "url_series must be sorted by index for _bracket"
+        raise ValueError(msg)
+
+    idx = url_series.index
+    n = len(idx)
+
+    # insertion point: first position where ts could be inserted to keep order
+    i = idx.searchsorted(ts, side="left")
+
+    # early = last item <= ts (i-1), late = first item >= ts (i)
+    if i == 0 or i == n:
+        # one side missing entirely
+        msg = f"No tropo product within +/- 6h of {ts}"
         raise MissingTropoError(msg)
+
+    early_pos = i - 1
+    late_pos = i
+
+    early_date = idx[early_pos]
+    late_date = idx[late_pos]
+    early_url = url_series.iloc[early_pos]
+    late_url = url_series.iloc[late_pos]
+
+    # Enforce the 6 h tolerance (assuming TROPO_INTERVAL = pd.Timedelta("6H"))
+    if (ts - early_date) > TROPO_INTERVAL or (late_date - ts) > TROPO_INTERVAL:
+        msg = f"No tropo product within +/- 6h of {ts}"
+        raise MissingTropoError(msg)
+
     return early_url, late_url
 
 
