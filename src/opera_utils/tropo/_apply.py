@@ -67,7 +67,7 @@ def _height_to_dem_surface(
     # Build interpolator
     rgi = RegularGridInterpolator(
         (td_utm.height.values, td_utm.y.values, td_utm.x.values),
-        td_utm.values,
+        np.nan_to_num(td_utm.values),
         method=method,
         bounds_error=False,
         fill_value=np.nan,
