@@ -25,3 +25,4 @@ dependencies:
   - tqdm
   - dask
   - zarr
+  - rioxarray

@@ -68,6 +68,7 @@ disp = [
   "s3fs",
   "tqdm",
   "rasterio",
+  "rioxarray",
   "xarray",
   "zarr>=3",
 ]
