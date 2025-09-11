@@ -3,17 +3,69 @@ from __future__ import annotations
 import netrc
 import os
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
-from functools import cache
+from functools import lru_cache
+from typing import Any, Callable, Generic, TypeVar, cast
 
 import requests
-from typing_extensions import Self
+from typing_extensions import ParamSpec, Self
 
 __all__ = [
     "AWSCredentials",
     "get_earthdata_username_password",
     "get_temporary_aws_credentials",
 ]
+
+
+P = ParamSpec("P")
+R_co = TypeVar("R_co", covariant=True)
+
+
+class _TTLCacheWrapper(Generic[P, R_co]):
+    """Callable object with TTL + LRU behavior and cache helpers."""
+
+    def __init__(self, func: Callable[P, R_co], ttl: timedelta, maxsize: int) -> None:
+        # typeshed says lru_cache wrapper expects Hashable args/kwargs;
+        # we accept that at runtime, but cast here so mypy does
+        # not force P to be Hashable.
+        self._cached: Callable[P, R_co] = cast(
+            Callable[P, R_co], lru_cache(maxsize=maxsize)(func)
+        )
+        self._ttl = ttl
+        self._expiration = datetime.now() + ttl
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R_co:
+        if datetime.now() >= self._expiration:
+            self._cached.cache_clear()  # type: ignore[attr-defined]
+            self._expiration = datetime.now() + self._ttl
+        return self._cached(*args, **kwargs)
+
+    def cache_clear(self) -> None:
+        """Clear the cache and reset TTL."""
+        self._cached.cache_clear()  # type: ignore[attr-defined]
+        self._expiration = datetime.now() + self._ttl
+
+    def cache_info(self) -> Any:
+        return self._cached.cache_info()  # type: ignore[attr-defined]
+
+
+def timed_lru_cache(
+    seconds: int, maxsize: int = 128
+) -> Callable[[Callable[P, R_co]], _TTLCacheWrapper[P, R_co]]:
+    """Cache the result of a function for `seconds`.
+
+    The returned object is callable and also has `.cache_clear()` and `.cache_info()`.
+    """
+    if seconds <= 0:
+        msg = "seconds must be > 0"
+        raise ValueError(msg)
+    ttl = timedelta(seconds=seconds)
+
+    def decorator(func: Callable[P, R_co]) -> _TTLCacheWrapper[P, R_co]:
+        return _TTLCacheWrapper(func, ttl=ttl, maxsize=maxsize)
+
+    return decorator
 
 
 class EarthdataLoginError(Exception):
@@ -133,7 +185,8 @@ class AWSCredentials:
         )
 
 
-@cache
+# Expire after 50 minutes
+@timed_lru_cache(seconds=50 * 60)
 def get_temporary_aws_credentials(
     endpoint: ASFCredentialEndpoints = ASFCredentialEndpoints.OPERA,
     earthdata_username: str | None = None,

@@ -127,9 +127,7 @@ def test_get_temporary_aws_credentials_error(monkeypatch):
     monkeypatch.setattr(requests, "get", mock_requests_get)
 
     with pytest.raises(requests.exceptions.HTTPError, match="Test error"):
-        get_temporary_aws_credentials.__wrapped__(
-            ASFCredentialEndpoints.OPERA, None, None
-        )
+        get_temporary_aws_credentials._cached(ASFCredentialEndpoints.OPERA, None, None)
 
 
 def test_get_earthdata_username_password_direct():
