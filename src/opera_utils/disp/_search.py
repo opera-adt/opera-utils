@@ -63,7 +63,7 @@ def search(
     search_url = f"https://cmr.{edl_host}.nasa.gov/search/granules.umm_json"
     params: dict[str, int | str | list[str]] = {
         "short_name": "OPERA_L3_DISP-S1_V1",
-        "page_size": 2000,
+        "page_size": 500,
     }
     # Optionally narrow search by frame id, product version
     product_filters: list[str] = []
