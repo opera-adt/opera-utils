@@ -87,13 +87,14 @@ def test_compass_regex():
 
 
 def test_compressed_file_regex():
-    filename = "OPERA_L2_COMPRESSED-CSLC-S1_T124-264305-IW1_20171209T000000Z_20170916T000000Z_20171209T000000Z_20250521T121130Z_VV_v1.0.h5"
+    filename = "OPERA_L2_COMPRESSED-CSLC-S1_F12345_T124-264305-IW1_20171209T000000Z_20170916T000000Z_20171209T000000Z_20250521T121130Z_VV_v1.0.h5"
     result = parse_filename(filename)
     expected = {
         "project": "OPERA",
         "level": "L2",
         "is_compressed": "COMPRESSED-",
         "product_type": "CSLC-S1",
+        "frame_id": "F12345",
         "burst_id": "t124_264305_iw1",
         "start_datetime": datetime.datetime(
             2017, 12, 9, 0, 0, tzinfo=datetime.timezone.utc
@@ -107,6 +108,12 @@ def test_compressed_file_regex():
         "product_version": "1.0",
     }
     assert result == expected
+
+    filename_old = "OPERA_L2_COMPRESSED-CSLC-S1_T124-264305-IW1_20171209T000000Z_20170916T000000Z_20171209T000000Z_20250521T121130Z_VV_v1.0.h5"
+    result2 = parse_filename(filename_old)
+    expected2 = expected.copy()
+    expected2["frame_id"] = None
+    assert result2 == expected2
 
 
 def test_get_radar_wavelength():
