@@ -35,6 +35,7 @@ COMPRESSED_CSLC_S1_FILE_REGEX = (
     r"(?P<level>L2)_"
     r"(?P<is_compressed>COMPRESSED-)?"
     r"(?P<product_type>CSLC-S1)_"
+    r"(?P<frame_id>F\d+)?_?"
     r"(?P<burst_id>T\d{3}-\d+-IW\d)_"
     r"(?P<start_datetime>\d{8}T\d{6}Z)_"
     r"(?P<ministack_start_datetime>\d{8}T\d{6}Z)_"
