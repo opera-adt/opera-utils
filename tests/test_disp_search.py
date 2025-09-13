@@ -101,7 +101,7 @@ def test_search_with_mock_response(cmr_response_json):
         args, kwargs = mock_get.call_args
         assert args[0] == "https://cmr.earthdata.nasa.gov/search/granules.umm_json"
         assert kwargs["params"]["short_name"] == "OPERA_L3_DISP-S1_V1"
-        assert kwargs["params"]["page_size"] == 2000
+        assert kwargs["params"]["page_size"] == 500
         assert "int,FRAME_NUMBER,11116" in kwargs["params"]["attribute[]"]
         assert "float,PRODUCT_VERSION,1.0" in kwargs["params"]["attribute[]"]
 
