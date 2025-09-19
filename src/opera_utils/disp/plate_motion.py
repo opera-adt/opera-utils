@@ -35,7 +35,11 @@ Examples
 
 References
 ----------
-Mintpy Euler Pole and plate_motion scripts.
+Mintpy Euler Pole and plate_motion scripts:
+https://github.com/insarlab/MintPy/blob/3fcf395b9ebaf6a9b12dc5d29d175fb0fa649e9f/src/mintpy/plate_motion.py
+Stephenson, O. L., Liu, Y. K., Yunjun, Z., Simons, M., Rosen, P. and Xu, X., (2022),
+    The Impact of Plate Motions on Long-Wavelength InSAR-Derived Velocity Fields,
+    Geophys. Res. Lett. 49, e2022GL099835, doi:10.1029/2022GL099835.
 
 """
 
