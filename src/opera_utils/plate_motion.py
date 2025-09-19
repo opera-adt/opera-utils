@@ -256,7 +256,7 @@ def _build_euler_from_inputs(plate_name: PlateName) -> EulerPole:
 
 
 def run(
-    los_enu_path: Path | str,
+    los_enu_path: str,
     plate_name: PlateName,
     out: str | None = "rotation_los_enu.tif",
     match_file: Path | str | None = None,
