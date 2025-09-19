@@ -259,6 +259,7 @@ def run(
     los_enu_path: Path | str,
     plate_name: PlateName,
     out: str | None = "rotation_los_enu.tif",
+    match_file: Path | str | None = None,
     subsample: int = 10,
 ) -> None:
     """Compute plate-motion computation in the radar line-of-sight.
@@ -271,22 +272,30 @@ def run(
         Name of plate in ITRF2014 table
     out : str, optional
         Output LOS velocity GeoTIFF
+    match_file : Path | str, optional
+        If provided, outputs `out` to match the size and projection of `match_file`.
+        Otherwise, uses `subsample` and outputs in EPSG:4326.
     subsample : int
         Decimation factor to apply in x and y before computation.
         Default is 10 (Output is 100x smaller than `los_enu_path`)
 
     """
     da_los_enu = rxr.open_rasterio(los_enu_path, default_name="los_enu")
-    # los_enu, proc_enu = _read_tif(los_enu_path)
-    da_los_enu = da_los_enu[:, ::subsample, ::subsample].astype("float32")
-    da_los_enu_latlon = da_los_enu.rio.reproject("epsg:4326")
+    assert not isinstance(da_los_enu, list)
+
+    if match_file is not None:
+        da_match = rxr.open_rasterio(match_file)
+        da_los_enu_warped = da_los_enu.rio.reproject_match(da_match)
+    else:
+        da_los_enu = da_los_enu[:, ::subsample, ::subsample].astype("float32")
+        da_los_enu_warped = da_los_enu.rio.reproject("epsg:4326")
 
     # Create EulerPole if given
     euler = _build_euler_from_inputs(plate_name)
 
     # Coordinates for DEM grid
     lon, lat = np.meshgrid(
-        da_los_enu_latlon.y.values, da_los_enu_latlon.x.values, indexing="ij"
+        da_los_enu_warped.y.values, da_los_enu_warped.x.values, indexing="ij"
     )
     lon = lon.astype("float32")
     lat = lat.astype("float32")
@@ -295,7 +304,7 @@ def run(
     ve_rot, vn_rot, vu_rot = euler.velocity_enu_m_per_yr(lat, lon, alt_m=0.0)
     v_enu = np.stack([ve_rot, vn_rot, vu_rot])
 
-    da_v_los = np.sum(v_enu * da_los_enu_latlon, axis=0)
+    da_v_los = np.sum(v_enu * da_los_enu_warped, axis=0)
     da_v_los.attrs["units"] = "meters / year"
     da_v_los.rio.write_nodata(0).rio.to_raster(
         out, dtype="float32", tiled="yes", compress="deflate"
