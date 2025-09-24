@@ -64,7 +64,9 @@ class TropoProduct:
 
         # URLs
         https_url = _pick_related_url(umm, kind="GET DATA", startswith="https")
-        s3_url = _pick_related_url(umm, kind="GET DATA", startswith="s3")
+        s3_url = _pick_related_url(
+            umm, kind="GET DATA VIA DIRECT ACCESS", startswith="s3"
+        )
         browse_png_url = _pick_related_url(
             umm, kind="GET RELATED VISUALIZATION", endswith=".png"
         )

@@ -5,7 +5,7 @@ import logging
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 import requests
 
@@ -13,6 +13,15 @@ logger = logging.getLogger("opera_utils")
 
 # CMR short name for TROPO v1
 TROPO_SHORT_NAME = "OPERA_L4_TROPO-ZENITH_V1"
+
+
+Kind = Literal[
+    "GET DATA",
+    "GET DATA VIA DIRECT ACCESS",
+    "EXTENDED METADATA",
+    "GET RELATED VISUALIZATION",
+    "VIEW RELATED INFORMATION",  # s3 temporary credential url
+]
 
 
 class UrlType(str, Enum):
@@ -95,7 +104,7 @@ def _cmr_search(
 def _pick_related_url(
     umm: dict[str, Any],
     *,
-    kind: str,
+    kind: Kind,
     startswith: str | None = None,
     endswith: str | None = None,
 ) -> str | None:
