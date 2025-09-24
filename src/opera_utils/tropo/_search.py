@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 from opera_utils._cmr import UrlType, _cmr_search
 
 from ._product import TropoProduct
 
-__all__ = ["search_tropo"]
+__all__ = ["search"]
 
 logger = logging.getLogger("opera_utils")
 
@@ -15,7 +15,7 @@ logger = logging.getLogger("opera_utils")
 TROPO_SHORT_NAME = "OPERA_L4_TROPO-ZENITH_V1"
 
 
-def search_tropo(
+def search(
     *,
     product_version: str | None = None,
     start_datetime: datetime | None = None,
@@ -28,9 +28,7 @@ def search_tropo(
 
     Notes
     -----
-    - TROPO granules are global 6-hour fields; we match on their *begin* time falling
-      within the requested temporal window (after CMR's coarse temporal prefilter).
-    - If no start/end are given, CMR's full record is returned (can be large).
+    If no start/end are given, CMR's full record is returned (can be large).
 
     Examples
     --------
@@ -58,14 +56,9 @@ def search_tropo(
         use_uat=use_uat,
     )
 
-    # Parse and do precise temporal filtering by begin time (inclusive)
+    # Parse and do precise temporal filtering by start time (inclusive)
     prods = [TropoProduct.from_umm(u) for u in umms]
-    if start_datetime or end_datetime:
-        s = start_datetime or datetime(1900, 1, 1, tzinfo=timezone.utc)
-        e = end_datetime or datetime(2100, 1, 1, tzinfo=timezone.utc)
-        prods = [p for p in prods if s <= p.begin <= e]
-
-    prods.sort(key=lambda p: p.begin)
+    prods.sort(key=lambda p: p.start)
 
     if print_urls:
         for p in prods:
