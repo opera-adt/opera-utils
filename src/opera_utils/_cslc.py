@@ -17,8 +17,6 @@ from pyproj import CRS, Transformer
 from shapely import geometry, ops, wkt
 
 try:
-    from isce3.core import DateTime, Orbit, StateVector
-
     HAS_ICE3 = True
 except ImportError:
     HAS_ICE3 = False
@@ -388,9 +386,11 @@ def get_cslc_orbit(h5file: Filename):
         Orbit object.
 
     """
-    if not HAS_ICE3:
+    try:
+        from isce3.core import DateTime, Orbit, StateVector  # noqa: PLC0415
+    except ImportError as e:
         msg = "isce3 must be installed to use this function"
-        raise ImportError(msg)
+        raise ImportError(msg) from e
 
     times, positions, velocities, reference_epoch = get_orbit_arrays(h5file)
     orbit_svs = []
