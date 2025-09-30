@@ -95,9 +95,20 @@ def _open_crop(
     lat_bounds: tuple[float, float],
     lon_bounds: tuple[float, float],
     h_max: float,
+    use_netrc: bool = True,
 ) -> xr.Dataset:
     """Lazy-open a single L4 file and subset to bbox+height."""
-    ds = xr.open_dataset(url, engine="h5netcdf")
+    if use_netrc:
+        # Netrc authentication for Earthdata
+        backend_kwargs = {'storage_options': {
+					    'client_kwargs': {'trust_env': True }}  # Use .netrc
+                        }
+    else:
+       backend_kwargs = {} 
+
+    ds = xr.open_dataset(url, engine="h5netcdf",
+			             backend_kwargs=backend_kwargs)                         
+
     lat_max, lat_min = lat_bounds  # note south-to-north ordering in slice
     lon_min, lon_max = lon_bounds
     ds = ds.sel(
