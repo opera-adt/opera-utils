@@ -240,7 +240,6 @@ class DispProductStack:
             for p in self.products:
                 date_pair_groups[p.reference_datetime, p.secondary_datetime].append(p)
 
-            # Filter duplicates
             filtered_products = []
             removed_count = 0
             for _date_pair, group in date_pair_groups.items():
