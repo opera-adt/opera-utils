@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from collections import Counter
+import warnings
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -232,14 +233,48 @@ class DispProductStack:
         if len({p.frame_id for p in self.products}) != 1:
             msg = "All products must have the same frame_id"
             raise ValueError(msg)
-        # Check for duplicates
+        # Check for duplicates and filter them
         if len(set(self.ifg_date_pairs)) != len(self.products):
+            # Group products by their date pairs
+            date_pair_groups = defaultdict(list)
+            for p in self.products:
+                date_pair_groups[p.reference_datetime, p.secondary_datetime].append(p)
+
+            filtered_products = []
+            removed_count = 0
+            for _date_pair, group in date_pair_groups.items():
+                if len(group) > 1:
+                    # Sort by version (descending) then generation_datetime (descending)
+                    sorted_group = sorted(
+                        group,
+                        # keep most latest version, then most recent generation time
+                        key=lambda p: (p.version, p.generation_datetime),
+                        reverse=True,
+                    )
+                    filtered_products.append(sorted_group[0])
+                    removed_count += len(group) - 1
+                else:
+                    filtered_products.append(group[0])
+
+            # Issue warning
             version_count = Counter(p.version for p in self.products)
-            msg = "All products must have unique reference and secondary dates."
-            msg += f" Got {len(set(self.ifg_date_pairs))} unique pairs: "
-            msg += f"but {len(self.products)} products."
+            msg = (
+                f"Found {removed_count} duplicate product(s) with same"
+                " reference/secondary dates. "
+            )
+            msg += "Keeping most recent version and generation time. "
+            msg += (
+                f"Original: {len(self.products)} products, Filtered:"
+                f" {len(filtered_products)} products. "
+            )
             msg += f"Versions: {version_count.most_common()}"
-            raise ValueError(msg)
+            warnings.warn(msg, UserWarning, stacklevel=2)
+
+            # Update products list with filtered version, maintaining sort order
+            self.products = sorted(
+                filtered_products,
+                key=lambda p: (p.reference_datetime, p.secondary_datetime),
+            )
         # TODO: SORT!
 
     @classmethod

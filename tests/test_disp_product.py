@@ -197,21 +197,78 @@ class TestDispProductStack:
         ):
             DispProductStack(products=[prod1, prod_diff_frame])
 
-    def test_init_duplicate_date_pairs_error(self):
-        """Test ValueError on init if date pairs are duplicated."""
-        prod1 = DispProduct.from_filename(FILE_1)
-        prod4_dup = DispProduct.from_filename(FILE_4)  # Same dates, diff version
-        with pytest.raises(
-            ValueError,
-            match="All products must have unique reference and secondary dates",
-        ):
-            DispProductStack(products=[prod1, prod4_dup])
+    def test_init_duplicate_date_pairs_filters_by_version(self):
+        """Test that duplicate date pairs are filtered, keeping the higher version."""
+        prod1 = DispProduct.from_filename(FILE_1)  # v1.0
+        prod4_dup = DispProduct.from_filename(FILE_4)  # v1.1, same dates
 
-        with pytest.raises(
-            ValueError,
-            match="All products must have unique reference and secondary dates",
+        # Should issue warning and filter, keeping v1.1
+        with pytest.warns(
+            UserWarning, match="duplicate product.*same reference/secondary dates"
         ):
-            DispProductStack.from_file_list([FILE_1, FILE_4])
+            stack = DispProductStack(products=[prod1, prod4_dup])
+
+        assert len(stack.products) == 1
+        assert stack.products[0].version == "1.1"
+        assert stack.products[0].generation_datetime == datetime(
+            2025, 3, 19, 22, 27, 53, tzinfo=timezone.utc
+        )
+
+    def test_init_duplicate_date_pairs_filters_by_generation_time(self):
+        """Test filtering duplicates with same version by generation time."""
+        # Same dates, same version, different generation times
+        file_old = "OPERA_L3_DISP-S1_IW_F08889_VV_20211124T002928Z_20211218T002927Z_v1.0_20251026T233348Z.nc"
+        file_new = "OPERA_L3_DISP-S1_IW_F08889_VV_20211124T002928Z_20211218T002927Z_v1.0_20251027T023406Z.nc"
+
+        with pytest.warns(
+            UserWarning, match="duplicate product.*same reference/secondary dates"
+        ):
+            stack = DispProductStack.from_file_list([file_old, file_new])
+
+        assert len(stack.products) == 1
+        # Should keep the one with more recent generation time
+        assert stack.products[0].generation_datetime == datetime(
+            2025, 10, 27, 2, 34, 6, tzinfo=timezone.utc
+        )
+        assert stack.products[0].filename == file_new
+
+    def test_init_multiple_duplicates_filtered(self):
+        """Test filtering multiple pairs of duplicates."""
+        # Two pairs of duplicates with same dates but different generation times
+        file_pair1_old = "OPERA_L3_DISP-S1_IW_F08889_VV_20211124T002928Z_20211218T002927Z_v1.0_20251026T233348Z.nc"
+        file_pair1_new = "OPERA_L3_DISP-S1_IW_F08889_VV_20211124T002928Z_20211218T002927Z_v1.0_20251027T023406Z.nc"
+        file_pair2_old = "OPERA_L3_DISP-S1_IW_F08889_VV_20211124T002928Z_20211230T002926Z_v1.0_20251026T233348Z.nc"
+        file_pair2_new = "OPERA_L3_DISP-S1_IW_F08889_VV_20211124T002928Z_20211230T002926Z_v1.0_20251027T023406Z.nc"
+
+        files = [file_pair1_old, file_pair1_new, file_pair2_old, file_pair2_new]
+
+        with pytest.warns(
+            UserWarning, match="Found 2 duplicate product.*Filtered: 2 products"
+        ):
+            stack = DispProductStack.from_file_list(files)
+
+        # Should have only 2 products (one from each pair, the newer generation time)
+        assert len(stack.products) == 2
+
+        # Check we kept the newer generation times
+        assert all(
+            p.generation_datetime
+            == datetime(2025, 10, 27, 2, 34, 6, tzinfo=timezone.utc)
+            for p in stack.products
+        )
+
+        # Check we have the expected date pairs
+        expected_pairs = [
+            (
+                datetime(2021, 11, 24, 0, 29, 28, tzinfo=timezone.utc),
+                datetime(2021, 12, 18, 0, 29, 27, tzinfo=timezone.utc),
+            ),
+            (
+                datetime(2021, 11, 24, 0, 29, 28, tzinfo=timezone.utc),
+                datetime(2021, 12, 30, 0, 29, 26, tzinfo=timezone.utc),
+            ),
+        ]
+        assert stack.ifg_date_pairs == expected_pairs
 
     def test_stack_properties(self):
         """Test properties that delegate to the first product."""
