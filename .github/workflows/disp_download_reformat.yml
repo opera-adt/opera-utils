@@ -58,7 +58,7 @@ jobs:
     steps:
       # Checkout repo (needed for pixi.toml and/or local packages)
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       # Earthdata credentials (if your commands hit NASA HTTPS)
       - name: Configure ~/.netrc for Earthdata
