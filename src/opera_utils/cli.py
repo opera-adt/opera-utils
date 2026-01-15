@@ -151,10 +151,10 @@ def cli_app() -> None:
     try:
         from opera_utils.disp._download import run_download
         from opera_utils.disp._reformat import reformat_stack
-        from opera_utils.disp._search import search
+        from opera_utils.disp._search import search as search_disp
 
         cli_dict["disp-s1-download"] = run_download
-        cli_dict["disp-s1-search"] = partial(search, print_urls=True)
+        cli_dict["disp-s1-search"] = partial(search_disp, print_urls=True)
         cli_dict["disp-s1-reformat"] = reformat_stack
 
     except ImportError:
@@ -163,7 +163,9 @@ def cli_app() -> None:
     try:
         from opera_utils.tropo._apply import apply_tropo
         from opera_utils.tropo._crop import crop_tropo
+        from opera_utils.tropo._search import search as search_tropo
 
+        cli_dict["tropo-search"] = search_tropo
         cli_dict["tropo-crop"] = crop_tropo
         cli_dict["tropo-apply"] = apply_tropo
 

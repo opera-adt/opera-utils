@@ -14,8 +14,7 @@ import logging
 import warnings
 from datetime import datetime, timezone
 
-import requests
-
+from opera_utils._cmr import _cmr_search
 from opera_utils.disp._product import DispProduct, UrlType
 
 __all__ = ["search"]
@@ -59,8 +58,6 @@ def search(
         List of products matching the search criteria
 
     """
-    edl_host = "uat.earthdata" if use_uat else "earthdata"
-    search_url = f"https://cmr.{edl_host}.nasa.gov/search/granules.umm_json"
     params: dict[str, int | str | list[str]] = {
         "short_name": "OPERA_L3_DISP-S1_V1",
         "page_size": 500,
@@ -93,32 +90,18 @@ def search(
         product_filters.append(f"int,FRAME_NUMBER,{frame_id}")
     else:
         warnings.warn("No `frame_id` specified: search may be large", stacklevel=1)
+    results = _cmr_search(
+        short_name="OPERA_L3_DISP-S1_V1",
+        start_datetime=start_datetime,
+        end_datetime=end_datetime,
+        attributes=product_filters,
+        use_uat=use_uat,
+    )
+    products = [DispProduct.from_umm(r, url_type=url_type) for r in results]
 
-    headers: dict[str, str] = {}
-    products: list[DispProduct] = []
-    while True:
-        response = requests.get(search_url, params=params, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        cur_products = [
-            DispProduct.from_umm(item["umm"], url_type=url_type)
-            for item in data["items"]
-        ]
-        # CMR filters apply to both the reference and secondary time (as of 2025-03-29)
-        # We want to filter just by the secondary time
-        products.extend(
-            [
-                g
-                for g in cur_products
-                if start_datetime <= g.secondary_datetime <= end_datetime
-            ]
-        )
-
-        if "CMR-Search-After" not in response.headers:
-            break
-
-        headers["CMR-Search-After"] = response.headers["CMR-Search-After"]
-
+    products = [
+        p for p in products if start_datetime <= p.secondary_datetime <= end_datetime
+    ]
     # Return sorted list of products
     products = sorted(products, key=lambda g: (g.frame_id, g.secondary_datetime))
     if print_urls:
