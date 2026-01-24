@@ -1,0 +1,188 @@
+# NISAR GSLC subset download, on demand
+name: nisar_gslc_download
+run-name: ${{ inputs.workflow_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      track_frame:
+        type: string
+        description: >-
+          Track/frame ID in format "CCC_RRR_D_TTT" (cycle_relOrbit_dir_trackFrame).
+          Example: "004_076_A_022"
+        required: false
+        default: ''
+      cycle_number:
+        type: number
+        description: Cycle number to filter by
+        required: false
+      relative_orbit_number:
+        type: number
+        description: Relative orbit number to filter by
+        required: false
+      rows:
+        type: string
+        description: >-
+          Row subset as "start stop" (e.g., "30000 31000")
+        required: false
+        default: ''
+      cols:
+        type: string
+        description: >-
+          Column subset as "start stop" (e.g., "15000 16000")
+        required: false
+        default: ''
+      frequency:
+        type: string
+        description: Frequency band to extract (A or B)
+        required: true
+        default: 'A'
+      polarizations:
+        type: string
+        description: >-
+          Polarizations to extract, comma-separated (e.g., "HH,VV").
+          Leave empty for all available.
+        required: false
+        default: ''
+      start_datetime:
+        type: string
+        description: Start date (YYYY-MM-DD)
+        required: false
+        default: ''
+      end_datetime:
+        type: string
+        description: End date (YYYY-MM-DD)
+        required: false
+        default: ''
+      short_name:
+        type: string
+        description: CMR collection short name
+        required: false
+        default: 'NISAR_L2_GSLC_BETA_V1'
+      num_workers:
+        type: number
+        description: Parallel download workers
+        required: false
+        default: 4
+      workflow_name:
+        type: string
+        description: Custom run name
+        required: false
+        default: 'nisar_gslc_download'
+
+jobs:
+  nisar_gslc_download:
+    name: ${{ inputs.workflow_name }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      # Checkout repo (needed for pixi.toml and/or local packages)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # Earthdata credentials (if your commands hit NASA HTTPS)
+      - name: Configure ~/.netrc for Earthdata
+        uses: extractions/netrc@v2
+        with:
+          machine: urs.earthdata.nasa.gov
+          username: ${{ secrets.EARTHDATA_USERNAME }}
+          password: ${{ secrets.EARTHDATA_PASSWORD }}
+
+      - name: Setup environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          environment-name: opera_utils-env
+          generate-run-shell: false
+          condarc: |
+            channels:
+              - conda-forge
+      - name: Install
+        run: |
+          pip install .[nisar]
+
+      # Run the NISAR GSLC download command
+      - name: Download NISAR GSLC subset
+        run: |
+          set -eo pipefail
+          export NUM_WORKERS=${{ inputs.num_workers }}
+
+          # Build the command with optional arguments
+          CMD="opera-utils nisar-gslc-download --output-dir gslc_subsets"
+
+          # Add track_frame if provided
+          if [ -n "${{ inputs.track_frame }}" ]; then
+            CMD="$CMD --track-frame ${{ inputs.track_frame }}"
+          fi
+
+          # Add cycle_number if provided
+          if [ -n "${{ inputs.cycle_number }}" ]; then
+            CMD="$CMD --cycle-number ${{ inputs.cycle_number }}"
+          fi
+
+          # Add relative_orbit_number if provided
+          if [ -n "${{ inputs.relative_orbit_number }}" ]; then
+            CMD="$CMD --relative-orbit-number ${{ inputs.relative_orbit_number }}"
+          fi
+
+          # Add row subset if provided
+          if [ -n "${{ inputs.rows }}" ]; then
+            ROWS="${{ inputs.rows }}"
+            CMD="$CMD --rows $ROWS"
+          fi
+
+          # Add column subset if provided
+          if [ -n "${{ inputs.cols }}" ]; then
+            COLS="${{ inputs.cols }}"
+            CMD="$CMD --cols $COLS"
+          fi
+
+          # Add frequency
+          CMD="$CMD --frequency ${{ inputs.frequency }}"
+
+          # Add polarizations if provided
+          if [ -n "${{ inputs.polarizations }}" ]; then
+            # Convert comma-separated to repeated args
+            IFS=',' read -ra POLS <<< "${{ inputs.polarizations }}"
+            for pol in "${POLS[@]}"; do
+              CMD="$CMD --polarizations $pol"
+            done
+          fi
+
+          # Add datetime filters if provided
+          if [ -n "${{ inputs.start_datetime }}" ]; then
+            CMD="$CMD --start-datetime ${{ inputs.start_datetime }}"
+          fi
+          if [ -n "${{ inputs.end_datetime }}" ]; then
+            CMD="$CMD --end-datetime ${{ inputs.end_datetime }}"
+          fi
+
+          # Add short_name
+          CMD="$CMD --short-name ${{ inputs.short_name }}"
+
+          # Add num_workers
+          CMD="$CMD --num-workers $NUM_WORKERS"
+
+          echo "Running: $CMD"
+          eval $CMD
+
+          # Zip the results
+          if [ -d "gslc_subsets" ] && [ "$(ls -A gslc_subsets)" ]; then
+            echo "Zipping results..."
+            zip -1 -r gslc_subsets.zip gslc_subsets/
+            echo "ARTIFACT_PATH=gslc_subsets.zip" >> $GITHUB_ENV
+          else
+            echo "No files downloaded"
+            echo "ARTIFACT_PATH=gslc_subsets" >> $GITHUB_ENV
+          fi
+
+      # Upload the final artefact (path determined by previous step)
+      - name: Upload Result
+        uses: actions/upload-artifact@v5
+        with:
+          name: gslc_subsets
+          path: ${{ env.ARTIFACT_PATH }}
+          retention-days: 5

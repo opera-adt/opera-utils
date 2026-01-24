@@ -169,6 +169,16 @@ def cli_app() -> None:
 
     except ImportError:
         pass
+
+    try:
+        from opera_utils.nisar._download import run_download as nisar_download
+        from opera_utils.nisar._search import search as nisar_search
+
+        cli_dict["nisar-gslc-download"] = nisar_download
+        cli_dict["nisar-gslc-search"] = partial(nisar_search, print_urls=True)
+
+    except ImportError:
+        pass
     tyro.extras.subcommand_cli_from_dict(
         cli_dict,
         prog="opera-utils",
