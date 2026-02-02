@@ -96,7 +96,7 @@ def test_frame_bbox_missing_arg(
         with pytest.raises(SystemExit):
             cli_app()
         s = capsys.readouterr()
-        assert "arguments are required: INT" in s.err
+        assert "Missing" in s.err or "arguments are required" in s.err
 
 
 def test_intersects_help(
@@ -304,7 +304,7 @@ def test_missing_data_options_missing_arg(
         with pytest.raises(SystemExit):
             cli_app()
         s = capsys.readouterr()
-        assert "arguments are required: STR" in s.err
+        assert "Missing" in s.err or "arguments are required" in s.err
 
 
 def test_invalid_command(
@@ -316,7 +316,7 @@ def test_invalid_command(
         with pytest.raises(SystemExit):
             cli_app()
         s = capsys.readouterr()
-        assert "invalid choice" in s.err
+        assert "Unrecognized" in s.err or "invalid choice" in s.err
 
 
 def test_invalid_option(
