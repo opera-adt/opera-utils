@@ -9,7 +9,19 @@ on:
         type: string
         description: >-
           Track/frame ID in format "CCC_RRR_D_TTT" (cycle_relOrbit_dir_trackFrame).
-          Example: "004_076_A_022"
+          Example: "004_076_A_022". Note: includes cycle, so only for specific granule.
+        required: false
+        default: ''
+      track_frame_number:
+        type: number
+        description: >-
+          Track frame number (e.g., 8). Stays constant for repeat passes.
+          More useful than track_frame for finding time series.
+        required: false
+      orbit_direction:
+        type: string
+        description: >-
+          Orbit direction: "A" for ascending, "D" for descending
         required: false
         default: ''
       cycle_number:
@@ -30,6 +42,13 @@ on:
         type: string
         description: >-
           Column subset as "start stop" (e.g., "15000 16000")
+        required: false
+        default: ''
+      bbox:
+        type: string
+        description: >-
+          Bounding box as "west south east north" in degrees lon/lat
+          (e.g., "-118.5 34.0 -118.0 34.5"). Alternative to rows/cols.
         required: false
         default: ''
       frequency:
@@ -118,6 +137,16 @@ jobs:
             CMD="$CMD --track-frame ${{ inputs.track_frame }}"
           fi
 
+          # Add track_frame_number if provided (more useful for time series)
+          if [ -n "${{ inputs.track_frame_number }}" ]; then
+            CMD="$CMD --track-frame-number ${{ inputs.track_frame_number }}"
+          fi
+
+          # Add orbit_direction if provided
+          if [ -n "${{ inputs.orbit_direction }}" ]; then
+            CMD="$CMD --orbit-direction ${{ inputs.orbit_direction }}"
+          fi
+
           # Add cycle_number if provided
           if [ -n "${{ inputs.cycle_number }}" ]; then
             CMD="$CMD --cycle-number ${{ inputs.cycle_number }}"
@@ -138,6 +167,12 @@ jobs:
           if [ -n "${{ inputs.cols }}" ]; then
             COLS="${{ inputs.cols }}"
             CMD="$CMD --cols $COLS"
+          fi
+
+          # Add bbox if provided (alternative to rows/cols)
+          if [ -n "${{ inputs.bbox }}" ]; then
+            BBOX="${{ inputs.bbox }}"
+            CMD="$CMD --bbox $BBOX"
           fi
 
           # Add frequency

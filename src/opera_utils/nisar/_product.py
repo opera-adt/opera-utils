@@ -12,6 +12,7 @@ from typing import Any
 
 import h5py
 import numpy as np
+import pyproj
 from typing_extensions import Self
 
 from opera_utils.constants import (
@@ -20,23 +21,19 @@ from opera_utils.constants import (
     NISAR_GSLC_GRIDS,
     NISAR_GSLC_IDENTIFICATION,
     NISAR_POLARIZATIONS,
+    UrlType,
 )
 
 __all__ = [
     "GslcProduct",
-    "UrlType",
     "OrbitDirection",
+    "OutOfBoundsError",
+    "UrlType",
 ]
 
 
-class UrlType(str, Enum):
-    """Choices for the URL type for product access."""
-
-    S3 = "s3"
-    HTTPS = "https"
-
-    def __str__(self) -> str:
-        return str(self.value)
+class OutOfBoundsError(ValueError):
+    """Exception raised when coordinates are outside the image bounds."""
 
 
 class OrbitDirection(str, Enum):
@@ -130,9 +127,7 @@ class GslcProduct:
         """Get the full version string."""
         return f"{self.major_version}.{self.minor_version:03d}"
 
-    def get_dataset_path(
-        self, frequency: str = "A", polarization: str = "HH"
-    ) -> str:
+    def get_dataset_path(self, frequency: str = "A", polarization: str = "HH") -> str:
         """Get the HDF5 dataset path for a specific frequency and polarization.
 
         Parameters
@@ -182,11 +177,7 @@ class GslcProduct:
         freq_group = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
         if freq_group not in h5file:
             return []
-        return [
-            name
-            for name in h5file[freq_group].keys()
-            if name in NISAR_POLARIZATIONS
-        ]
+        return [name for name in h5file[freq_group] if name in NISAR_POLARIZATIONS]
 
     def get_available_frequencies(self, h5file: h5py.File) -> list[str]:
         """Get available frequencies from an open HDF5 file.
@@ -217,7 +208,7 @@ class GslcProduct:
             if NISAR_GSLC_IDENTIFICATION not in hf:
                 return {}
             id_group = hf[NISAR_GSLC_IDENTIFICATION]
-            return {key: id_group[key][()] for key in id_group.keys()}
+            return {key: id_group[key][()] for key in id_group}
 
     @property
     def bounding_polygon(self) -> str | None:
@@ -285,6 +276,111 @@ class GslcProduct:
     def __fspath__(self) -> str:
         return os.fspath(self.filename)
 
+    def get_epsg(self, h5file: h5py.File, frequency: str = "A") -> int:
+        """Get the EPSG code from an open HDF5 file.
+
+        Parameters
+        ----------
+        h5file : h5py.File
+            Open HDF5 file handle.
+        frequency : str
+            Frequency band. Default is "A".
+
+        Returns
+        -------
+        int
+            The EPSG code for the coordinate system.
+
+        """
+        freq_path = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
+        # The projection dataset contains the EPSG code as a scalar integer
+        if "projection" in h5file[freq_path]:
+            return int(h5file[freq_path]["projection"][()])
+        msg = f"No projection dataset found in {freq_path}"
+        raise ValueError(msg)
+
+    def get_coordinates(
+        self, h5file: h5py.File, frequency: str = "A"
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Get the x and y coordinate arrays from an open HDF5 file.
+
+        Parameters
+        ----------
+        h5file : h5py.File
+            Open HDF5 file handle.
+        frequency : str
+            Frequency band. Default is "A".
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            The (x_coordinates, y_coordinates) arrays.
+
+        """
+        freq_path = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
+        x_coords = h5file[freq_path]["xCoordinates"][:]
+        y_coords = h5file[freq_path]["yCoordinates"][:]
+        return x_coords, y_coords
+
+    def lonlat_to_rowcol(
+        self,
+        h5file: h5py.File,
+        lon: float,
+        lat: float,
+        frequency: str = "A",
+    ) -> tuple[int, int]:
+        """Convert lon/lat to row/col indices.
+
+        Parameters
+        ----------
+        h5file : h5py.File
+            Open HDF5 file handle.
+        lon : float
+            Longitude in degrees.
+        lat : float
+            Latitude in degrees.
+        frequency : str
+            Frequency band. Default is "A".
+
+        Returns
+        -------
+        tuple[int, int]
+            Row and column indices.
+
+        Raises
+        ------
+        OutOfBoundsError
+            If the coordinates are outside the image bounds.
+
+        """
+        epsg = self.get_epsg(h5file, frequency)
+        x_coords, y_coords = self.get_coordinates(h5file, frequency)
+
+        # Transform lon/lat to projected coordinates
+        transformer = pyproj.Transformer.from_crs(
+            "EPSG:4326", f"EPSG:{epsg}", always_xy=True
+        )
+        x, y = transformer.transform(lon, lat)
+
+        # Find the nearest column (x_coords are typically increasing)
+        col = int(np.searchsorted(x_coords, x))
+        # y_coords are typically decreasing (north to south)
+        # searchsorted expects increasing, so we search in reverse
+        if y_coords[0] > y_coords[-1]:
+            row = int(np.searchsorted(-y_coords, -y))
+        else:
+            row = int(np.searchsorted(y_coords, y))
+
+        # Bounds check
+        if col < 0 or col >= len(x_coords) or row < 0 or row >= len(y_coords):
+            msg = (
+                f"Coordinates ({lon}, {lat}) -> ({row=}, {col=}) are out of bounds. "
+                f"Image size: ({len(y_coords)}, {len(x_coords)})"
+            )
+            raise OutOfBoundsError(msg)
+
+        return row, col
+
     @classmethod
     def from_umm(
         cls, umm_data: dict[str, Any], url_type: UrlType = UrlType.HTTPS
@@ -342,11 +438,14 @@ def _get_download_url(
         msg = f"Unknown protocol {protocol}; must be https or s3"
         raise ValueError(msg)
 
+    # For NISAR, we want the .h5 file, not the .xml or other files
     for url in umm_data.get("RelatedUrls", []):
-        if url["Type"].startswith("GET DATA") and url["URL"].startswith(str(protocol)):
-            # For NISAR, we want the .h5 file, not the .xml or other files
-            if url["URL"].endswith(".h5"):
-                return url["URL"]
+        if (
+            url["Type"].startswith("GET DATA")
+            and url["URL"].startswith(str(protocol))
+            and url["URL"].endswith(".h5")
+        ):
+            return url["URL"]
 
     # Fallback: try any URL with the protocol
     for url in umm_data.get("RelatedUrls", []):

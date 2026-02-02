@@ -3,32 +3,26 @@
 from __future__ import annotations
 
 import logging
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
 import h5py
-import numpy as np
-import requests
+from shapely import from_wkt
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 
 from opera_utils.constants import (
-    NISAR_FREQUENCIES,
     NISAR_GSLC_GRIDS,
-    NISAR_GSLC_IDENTIFICATION,
-    NISAR_GSLC_METADATA,
     NISAR_POLARIZATIONS,
 )
-from opera_utils.credentials import get_earthdata_username_password
 
 from ._product import GslcProduct, UrlType
-from ._remote import open_file
+from ._remote import open_h5
 from ._search import search
 
 logger = logging.getLogger("opera_utils")
 
-__all__ = ["run_download", "process_file"]
+__all__ = ["process_file", "run_download"]
 
 
 def process_file(
@@ -38,7 +32,6 @@ def process_file(
     output_dir: Path,
     frequency: str = "A",
     polarizations: list[str] | None = None,
-    session: requests.Session | None = None,
 ) -> Path:
     """Download and subset a single NISAR GSLC product.
 
@@ -57,8 +50,6 @@ def process_file(
     polarizations : list[str] | None
         List of polarizations to extract (e.g. ["HH", "VV"]).
         If None, extracts all available polarizations.
-    session : requests.Session | None
-        Authenticated Session to use for downloading the product.
 
     Returns
     -------
@@ -75,41 +66,24 @@ def process_file(
     if Path(url).exists():
         # For local files, directly extract subset
         _extract_subset(
-            url, outpath=outpath, rows=rows, cols=cols,
-            frequency=frequency, polarizations=polarizations
+            url,
+            outpath=outpath,
+            rows=rows,
+            cols=cols,
+            frequency=frequency,
+            polarizations=polarizations,
         )
-    elif url.startswith("s3://"):
-        # For S3 urls, use fsspec
-        with open_file(url) as in_f:
-            _extract_subset(
-                in_f, outpath=outpath, rows=rows, cols=cols,
-                frequency=frequency, polarizations=polarizations
-            )
     else:
-        # HTTPS: download to temp file first for better performance
-        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tf:
-            temp_path = Path(tf.name)
-            if session is None:
-                session = requests.Session()
-                username, password = get_earthdata_username_password()
-                session.auth = (username, password)
-            logger.info(f"Downloading {url}...")
-            response = session.get(url, stream=True)
-            response.raise_for_status()
-            total_size = int(response.headers.get("content-length", 0))
-            with (
-                open(temp_path, "wb") as out_f,
-                tqdm(total=total_size, unit="B", unit_scale=True, desc="Downloading") as pbar,
-            ):
-                for chunk in response.iter_content(chunk_size=8192):
-                    out_f.write(chunk)
-                    pbar.update(len(chunk))
-
-            _extract_subset(
-                temp_path, outpath=outpath, rows=rows, cols=cols,
-                frequency=frequency, polarizations=polarizations
+        # For remote urls (S3 or HTTPS), use open_h5 with cloud-optimized settings
+        with open_h5(url) as src:
+            _extract_subset_from_h5(
+                src,
+                outpath=outpath,
+                rows=rows,
+                cols=cols,
+                frequency=frequency,
+                polarizations=polarizations,
             )
-            temp_path.unlink()  # Clean up temp file
 
     logger.debug(f"Done: {outname}")
     return outpath
@@ -124,12 +98,12 @@ def _extract_subset(
     polarizations: list[str] | None = None,
     chunks: tuple[int, int] = (256, 256),
 ) -> None:
-    """Extract a spatial subset from a GSLC HDF5 file.
+    """Extract a spatial subset from a local GSLC HDF5 file.
 
     Parameters
     ----------
     input_obj : Path | str
-        Input HDF5 file path or file-like object.
+        Input HDF5 file path.
     outpath : Path | str
         Output HDF5 file path.
     rows : slice | None
@@ -144,27 +118,58 @@ def _extract_subset(
         Chunk size for output datasets.
 
     """
+    with h5py.File(input_obj, "r") as src:
+        _extract_subset_from_h5(
+            src, outpath, rows, cols, frequency, polarizations, chunks, str(input_obj)
+        )
+
+
+def _extract_subset_from_h5(
+    src: h5py.File,
+    outpath: Path | str,
+    rows: slice | None,
+    cols: slice | None,
+    frequency: str = "A",
+    polarizations: list[str] | None = None,
+    chunks: tuple[int, int] = (256, 256),
+    source_name: str = "remote",
+) -> None:
+    """Extract a spatial subset from an open HDF5 file handle.
+
+    Parameters
+    ----------
+    src : h5py.File
+        Open HDF5 file handle.
+    outpath : Path | str
+        Output HDF5 file path.
+    rows : slice | None
+        Row slice for subsetting. None means all rows.
+    cols : slice | None
+        Column slice for subsetting. None means all cols.
+    frequency : str
+        Frequency band to extract ("A" or "B"). Default is "A".
+    polarizations : list[str] | None
+        List of polarizations to extract. None means all available.
+    chunks : tuple[int, int]
+        Chunk size for output datasets.
+    source_name : str
+        Name of source file for metadata.
+
+    """
     row_slice = rows if rows is not None else slice(None)
     col_slice = cols if cols is not None else slice(None)
 
-    with h5py.File(input_obj, "r") as src, h5py.File(outpath, "w") as dst:
-        # Copy identification metadata
-        if NISAR_GSLC_IDENTIFICATION in src:
-            src.copy(NISAR_GSLC_IDENTIFICATION, dst, name=NISAR_GSLC_IDENTIFICATION)
-
-        # Copy metadata if present
-        if NISAR_GSLC_METADATA in src:
-            src.copy(NISAR_GSLC_METADATA, dst, name=NISAR_GSLC_METADATA)
+    with h5py.File(outpath, "w") as dst:
+        # Note: We skip copying identification/metadata groups for remote files
+        # because h5py's copy() doesn't work well with fsspec byte-range access.
+        # The essential georeferencing info is in the frequency group.
 
         # Get available polarizations for the frequency
         freq_path = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
-        if freq_path not in src:
-            msg = f"Frequency {frequency} not found in {input_obj}"
-            raise ValueError(msg)
+        assert freq_path in src, f"Frequency {frequency} not found"
 
         available_pols = [
-            name for name in src[freq_path].keys()
-            if name in NISAR_POLARIZATIONS
+            name for name in src[freq_path] if name in NISAR_POLARIZATIONS
         ]
 
         if polarizations is None:
@@ -175,16 +180,19 @@ def _extract_subset(
             if missing:
                 logger.warning(f"Polarizations not found: {missing}")
 
-        if not pols_to_extract:
-            msg = f"No polarizations to extract from {input_obj}"
-            raise ValueError(msg)
+        assert pols_to_extract, "No polarizations to extract"
 
         # Create the grids structure
         dst.create_group(NISAR_GSLC_GRIDS)
         dst_freq_group = dst.create_group(freq_path)
 
         # Copy coordinate datasets if present (x, y coordinates)
-        for coord_name in ["xCoordinates", "yCoordinates", "xCoordinateSpacing", "yCoordinateSpacing"]:
+        for coord_name in [
+            "xCoordinates",
+            "yCoordinates",
+            "xCoordinateSpacing",
+            "yCoordinateSpacing",
+        ]:
             if coord_name in src[freq_path]:
                 coord_data = src[freq_path][coord_name]
                 if coord_name in ["xCoordinates", "yCoordinates"]:
@@ -238,19 +246,75 @@ def _extract_subset(
         # Store subset metadata
         dst.attrs["subset_rows"] = str(row_slice)
         dst.attrs["subset_cols"] = str(col_slice)
-        dst.attrs["source_file"] = str(input_obj)
+        dst.attrs["source_file"] = source_name
+
+
+def _get_rowcol_slice(
+    product: GslcProduct,
+    bbox: tuple[float, float, float, float] | None,
+    frequency: str = "A",
+) -> tuple[slice | None, slice | None]:
+    """Convert a bounding box to row/col slices.
+
+    Parameters
+    ----------
+    product : GslcProduct
+        A GSLC product to use for coordinate conversion.
+    bbox : tuple[float, float, float, float] | None
+        Bounding box as (west, south, east, north) in degrees lon/lat.
+    frequency : str
+        Frequency band. Default is "A".
+
+    Returns
+    -------
+    tuple[slice | None, slice | None]
+        Row and column slices for subsetting.
+
+    """
+    if bbox is None:
+        return None, None
+
+    lon_left, lat_bottom, lon_right, lat_top = bbox
+
+    # Need to open the file to get coordinate info
+    with open_h5(str(product.filename)) as h5f:
+        row_start, col_start = product.lonlat_to_rowcol(
+            h5f, lon_left, lat_top, frequency
+        )
+        row_stop, col_stop = product.lonlat_to_rowcol(
+            h5f, lon_right, lat_bottom, frequency
+        )
+
+    # Ensure start < stop
+    if row_start > row_stop:
+        row_start, row_stop = row_stop, row_start
+    if col_start > col_stop:
+        col_start, col_stop = col_stop, col_start
+
+    return slice(row_start, row_stop), slice(col_start, col_stop)
 
 
 def _run_file(
-    args: tuple[str, slice | None, slice | None, Path, str, list[str] | None, requests.Session | None],
+    args: tuple[
+        str,
+        slice | None,
+        slice | None,
+        Path,
+        str,
+        list[str] | None,
+    ],
 ) -> Path:
     """Worker function for parallel processing."""
-    url, rows, cols, output_dir, frequency, polarizations, session = args
-    return process_file(url, rows, cols, output_dir, frequency, polarizations, session)
+    url, rows, cols, output_dir, frequency, polarizations = args
+    return process_file(url, rows, cols, output_dir, frequency, polarizations)
 
 
 def run_download(
+    bbox: tuple[float, float, float, float] | None = None,
+    wkt: str | None = None,
     track_frame: str | None = None,
+    track_frame_number: int | None = None,
+    orbit_direction: str | None = None,
     cycle_number: int | None = None,
     relative_orbit_number: int | None = None,
     start_datetime: datetime | None = None,
@@ -269,12 +333,27 @@ def run_download(
     This function downloads and subsets NISAR GSLC HDF5 products from
     Earthdata and saves them to the local file system.
 
-    Optionally, the files can be cropped using the `rows` and `cols` parameters.
+    The `bbox` parameter serves dual purposes: it filters the CMR search to find
+    products that intersect the bounding box, AND subsets the downloaded files
+    to that region.
 
     Parameters
     ----------
+    bbox : tuple[float, float, float, float] | None
+        Bounding box as (west, south, east, north) in degrees lon/lat.
+        Used for both CMR spatial search and subsetting downloaded files.
+        Cannot be used with `rows`/`cols`.
+    wkt : str | None
+        Well-known text representation of the region of interest.
+        The bounding box of the geometry will be used.
+        Cannot be used with `bbox` or `rows`/`cols`.
     track_frame : str | None
-        Track/frame identifier to search for (e.g. "004_076_A_022").
+        Track/frame identifier (e.g. "004_076_A_022"). Includes cycle number,
+        so only useful for finding a specific granule.
+    track_frame_number : int | None
+        Track frame number (e.g., 8). Stays constant for repeat passes.
+    orbit_direction : str | None
+        Orbit direction: "A" for ascending, "D" for descending.
     cycle_number : int | None
         Cycle number to filter by.
     relative_orbit_number : int | None
@@ -285,8 +364,10 @@ def run_download(
         End datetime of the product search.
     rows : tuple[int, int] | None
         Row range to subset as (start, stop). None means all rows.
+        Cannot be used with `bbox`/`wkt`.
     cols : tuple[int, int] | None
         Column range to subset as (start, stop). None means all cols.
+        Cannot be used with `bbox`/`wkt`.
     frequency : str
         Frequency band to extract ("A" or "B"). Default is "A".
     polarizations : list[str] | None
@@ -310,17 +391,32 @@ def run_download(
     list[Path]
         List of paths to the downloaded and subsetted products.
 
-    """
-    if num_workers == 1:
-        session = requests.session()
-        username, password = get_earthdata_username_password()
-        session.auth = (username, password)
-    else:
-        session = None
+    Examples
+    --------
+    Download by bounding box (searches CMR and subsets to that region):
 
-    # Search for products
+    >>> run_download(bbox=(40.62, 13.56, 40.72, 13.64), polarizations=["HH"])
+
+    """
+    # Validate mutually exclusive subsetting options
+    if (bbox is not None or wkt is not None) and (rows is not None or cols is not None):
+        msg = "Cannot specify both bbox/wkt and rows/cols. Use one or the other."
+        raise ValueError(msg)
+    if bbox is not None and wkt is not None:
+        msg = "Cannot specify both bbox and wkt."
+        raise ValueError(msg)
+
+    # Convert WKT to bbox if provided
+    if wkt is not None:
+        poly = from_wkt(wkt)
+        bbox = poly.bounds  # (minx, miny, maxx, maxy) = (west, south, east, north)
+
+    # Search for products (bbox is used for both CMR search and subsetting)
     results = search(
+        bbox=bbox,
         track_frame=track_frame,
+        track_frame_number=track_frame_number,
+        orbit_direction=orbit_direction,
         cycle_number=cycle_number,
         relative_orbit_number=relative_orbit_number,
         start_datetime=start_datetime,
@@ -335,15 +431,26 @@ def run_download(
         logger.warning("No products found matching search criteria")
         return []
 
-    # Convert row/col tuples to slices
-    row_slice = slice(*rows) if rows is not None else None
-    col_slice = slice(*cols) if cols is not None else None
-
-    logger.info(f"Subsetting to rows: {row_slice}, cols: {col_slice}")
+    # Convert bbox or row/col tuples to slices
+    if bbox is not None:
+        # Use first product to convert bbox to row/col (all products share same grid)
+        row_slice, col_slice = _get_rowcol_slice(results[0], bbox, frequency)
+        logger.info(f"Converted bbox {bbox} to rows: {row_slice}, cols: {col_slice}")
+    else:
+        row_slice = slice(*rows) if rows is not None else None
+        col_slice = slice(*cols) if cols is not None else None
+        logger.info(f"Subsetting to rows: {row_slice}, cols: {col_slice}")
 
     # Build job arguments
     jobs = [
-        (str(product.filename), row_slice, col_slice, output_dir, frequency, polarizations, session)
+        (
+            str(product.filename),
+            row_slice,
+            col_slice,
+            output_dir,
+            frequency,
+            polarizations,
+        )
         for product in results
     ]
     output_dir.mkdir(exist_ok=True, parents=True)

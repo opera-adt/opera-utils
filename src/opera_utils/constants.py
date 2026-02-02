@@ -1,6 +1,18 @@
 from __future__ import annotations
 
 import re
+from enum import Enum
+
+
+class UrlType(str, Enum):
+    """Choices for the URL type for product access (S3 or HTTPS)."""
+
+    S3 = "s3"
+    HTTPS = "https"
+
+    def __str__(self) -> str:
+        return str(self.value)
+
 
 SPEED_OF_LIGHT = 299_792_458
 
