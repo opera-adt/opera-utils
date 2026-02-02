@@ -72,10 +72,12 @@ NISAR_FILE_REGEX = (
 )
 
 # Full NISAR GSLC filename regex (for the real-world product naming convention)
-# Example: NISAR_L2_PR_GSLC_004_076_A_022_2005_QPDH_A_20251103T110514_20251103T110549_X05007_N_F_J_001.h5
-# Format: NISAR_L2_<mode>_GSLC_<cycleNumber>_<relOrbitNumber>_<orbitDir>_<trackFrameNumber>_
-#         <subSwathID>_<pols>_<lookDir>_<startDateTime>_<endDateTime>_<compositeReleaseID>_
-#         <processingLevel>_<coverageIndicator>_<majorVersion>_<minorVersion>.h5
+# Example:
+# NISAR_L2_PR_GSLC_004_076_A_022_2005_QPDH_A_20251103T110514_20251103T110549_X05007_N_F_J_001.h5  # noqa: E501
+# Format: NISAR_L2_<mode>_GSLC_<cycleNumber>_<relOrbitNumber>_<orbitDir>_
+#         <trackFrameNumber>_<subSwathID>_<pols>_<lookDir>_<startDateTime>_
+#         <endDateTime>_<compositeReleaseID>_<processingLevel>_
+#         <coverageIndicator>_<majorVersion>_<minorVersion>.h5
 NISAR_GSLC_FILE_REGEX = re.compile(
     r"(?P<project>NISAR)_"
     r"(?P<level>L2)_"
@@ -87,7 +89,7 @@ NISAR_GSLC_FILE_REGEX = re.compile(
     r"(?P<track_frame_number>\d{3})_"
     r"(?P<subswath_id>\d{4})_"
     r"(?P<polarizations>[A-Z]{2,4})_"  # e.g. QPDH (quad-pol dual HV)
-    r"(?P<look_direction>[AD])_"  # A=Ascending (right-looking), D=Descending (left-looking)
+    r"(?P<look_direction>[AD])_"  # A=Right-looking, D=Left-looking
     r"(?P<start_datetime>\d{8}T\d{6})_"
     r"(?P<end_datetime>\d{8}T\d{6})_"
     r"(?P<composite_release_id>[A-Z]\d{5})_"
