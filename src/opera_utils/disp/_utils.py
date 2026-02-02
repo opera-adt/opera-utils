@@ -157,15 +157,39 @@ def _get_netcdf_encoding(
     compression_level: int = 6,
     data_vars: Sequence[str] = [],
 ) -> dict:
-    encoding = {}
-    comp = {"zlib": True, "complevel": compression_level, "chunksizes": chunks}
+    """Build per-variable NetCDF encoding with compression and chunking.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset to generate encoding for.
+    chunks : tuple[int, int, int]
+        Desired chunk sizes for (time, y, x) dimensions.
+    compression_level : int, optional
+        Compression level for zlib (default 6).
+    data_vars : Sequence[str], optional
+        Subset of variables to encode. Defaults to all data_vars in ds.
+
+    Returns
+    -------
+    dict
+        Encoding dict suitable for xarray's to_netcdf().
+
+    """
     if not data_vars:
         data_vars = list(ds.data_vars)
-    encoding = {var: comp for var in data_vars if ds[var].ndim >= 2}
+
+    encoding = {}
     for var in data_vars:
         if ds[var].ndim < 2:
             continue
-        encoding[var] = comp
-        if ds[var].ndim == 2:
-            encoding[var]["chunksizes"] = chunks[-2:]
+        var_chunks = chunks[-2:] if ds[var].ndim == 2 else chunks
+        # Cap chunksizes to actual dimension sizes
+        shape = ds[var].shape
+        capped_chunks = tuple(min(c, s) for c, s in zip(var_chunks, shape))
+        encoding[var] = {
+            "zlib": True,
+            "complevel": compression_level,
+            "chunksizes": capped_chunks,
+        }
     return encoding
