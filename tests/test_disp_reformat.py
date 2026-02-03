@@ -233,3 +233,58 @@ def test_combine_quality_masks_mismatched_lengths():
 
     with pytest.raises(ValueError, match="argument 2 is shorter than argument 1"):
         combine_quality_masks(quality_datasets, thresholds)
+
+
+class TestGetNetcdfEncoding:
+    """Tests for _get_netcdf_encoding."""
+
+    def test_no_dict_aliasing(self):
+        """Each variable must get its own encoding dict."""
+        from opera_utils.disp._utils import _get_netcdf_encoding
+
+        ds = xr.Dataset(
+            {
+                "var3d": (["time", "y", "x"], np.zeros((5, 100, 100))),
+                "var2d": (["y", "x"], np.zeros((100, 100))),
+            }
+        )
+        chunks = (5, 50, 50)
+        encoding = _get_netcdf_encoding(ds, chunks)
+
+        # Mutating one should not affect the other
+        encoding["var3d"]["chunksizes"] = (1, 1, 1)
+        assert encoding["var2d"]["chunksizes"] != (1, 1, 1)
+
+    def test_2d_vs_3d_chunksizes(self):
+        """2D vars get 2-tuple chunks, 3D vars get 3-tuple chunks."""
+        from opera_utils.disp._utils import _get_netcdf_encoding
+
+        ds = xr.Dataset(
+            {
+                "var3d": (["time", "y", "x"], np.zeros((5, 100, 100))),
+                "var2d": (["y", "x"], np.zeros((100, 100))),
+            }
+        )
+        chunks = (5, 50, 50)
+        encoding = _get_netcdf_encoding(ds, chunks)
+
+        assert len(encoding["var3d"]["chunksizes"]) == 3
+        assert len(encoding["var2d"]["chunksizes"]) == 2
+
+    def test_chunksizes_capped_to_shape(self):
+        """Chunksizes must not exceed dimension sizes."""
+        from opera_utils.disp._utils import _get_netcdf_encoding
+
+        ds = xr.Dataset(
+            {
+                "small_3d": (["time", "y", "x"], np.zeros((2, 10, 15))),
+                "small_2d": (["y", "x"], np.zeros((10, 15))),
+            }
+        )
+        # Request chunks larger than the data
+        chunks = (100, 100, 100)
+        encoding = _get_netcdf_encoding(ds, chunks)
+
+        # Chunksizes should be capped to actual shape
+        assert encoding["small_3d"]["chunksizes"] == (2, 10, 15)
+        assert encoding["small_2d"]["chunksizes"] == (10, 15)
