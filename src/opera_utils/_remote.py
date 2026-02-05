@@ -91,7 +91,13 @@ def open_file(
     if fsspec_kwargs is None:
         fsspec_kwargs = {"cache_type": "first"}
     if isinstance(asf_endpoint, str):
-        assert asf_endpoint.upper() in {"OPERA", "OPERA_UAT", "SENTINEL1"}
+        valid_endpoints = {"OPERA", "OPERA_UAT", "SENTINEL1"}
+        if asf_endpoint.upper() not in valid_endpoints:
+            msg = (
+                f"Invalid ASF endpoint {asf_endpoint!r}; must be one of"
+                f" {valid_endpoints}"
+            )
+            raise ValueError(msg)
         asf_endpoint = ASFCredentialEndpoints[asf_endpoint.upper()]
 
     url_str: str = get_url_str(url)
@@ -114,7 +120,19 @@ def open_file(
 
 
 def get_url_str(url: str | PathLike[str]) -> str:
-    """Convert a URL or path to a string, resolving local paths to file URIs."""
+    """Convert a URL or path to a string, resolving local paths to file URIs.
+
+    Parameters
+    ----------
+    url : str | PathLike[str]
+        The URL or local file path to convert.
+
+    Returns
+    -------
+    str
+        The URL as a string. Local `Path` objects are converted to `file://` URIs.
+
+    """
     return fsdecode(url.resolve().as_uri() if isinstance(url, Path) else url)
 
 
