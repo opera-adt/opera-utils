@@ -15,6 +15,7 @@ import numpy as np
 import pyproj
 from typing_extensions import Self
 
+from opera_utils._cmr import get_download_url
 from opera_utils.constants import (
     NISAR_FREQUENCIES,
     NISAR_GSLC_FILE_REGEX,
@@ -401,7 +402,8 @@ class GslcProduct:
             The parsed GslcProduct instance.
 
         """
-        url = _get_download_url(umm_data, protocol=url_type)
+        # For NISAR, prefer .h5 files over .xml or other ancillary files
+        url = get_download_url(umm_data, protocol=url_type, filename_suffix=".h5")
         product = GslcProduct.from_filename(url)
         archive_info = umm_data.get("DataGranule", {}).get(
             "ArchiveAndDistributionInformation", []
@@ -409,48 +411,3 @@ class GslcProduct:
         size_in_bytes = archive_info[0].get("SizeInBytes", 0) if archive_info else None
         product.size_in_bytes = size_in_bytes
         return product
-
-
-def _get_download_url(
-    umm_data: dict[str, Any], protocol: UrlType = UrlType.HTTPS
-) -> str:
-    """Extract a download URL from the product's UMM metadata.
-
-    Parameters
-    ----------
-    umm_data : dict[str, Any]
-        The product's umm metadata dictionary.
-    protocol : UrlType
-        The protocol to use for downloading, either "s3" or "https".
-
-    Returns
-    -------
-    str
-        The download URL.
-
-    Raises
-    ------
-    ValueError
-        If no URL with the specified protocol is found.
-
-    """
-    if protocol not in ["https", "s3"]:
-        msg = f"Unknown protocol {protocol}; must be https or s3"
-        raise ValueError(msg)
-
-    # For NISAR, we want the .h5 file, not the .xml or other files
-    for url in umm_data.get("RelatedUrls", []):
-        if (
-            url["Type"].startswith("GET DATA")
-            and url["URL"].startswith(str(protocol))
-            and url["URL"].endswith(".h5")
-        ):
-            return url["URL"]
-
-    # Fallback: try any URL with the protocol
-    for url in umm_data.get("RelatedUrls", []):
-        if url["Type"].startswith("GET DATA") and url["URL"].startswith(str(protocol)):
-            return url["URL"]
-
-    msg = f"No download URL found for granule {umm_data.get('GranuleUR', 'unknown')}"
-    raise ValueError(msg)

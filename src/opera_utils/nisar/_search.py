@@ -12,7 +12,7 @@ import logging
 import warnings
 from datetime import datetime, timezone
 
-import requests
+from opera_utils._cmr import fetch_cmr_pages
 
 from ._product import GslcProduct, UrlType
 
@@ -148,43 +148,33 @@ def search(
             stacklevel=1,
         )
 
-    headers: dict[str, str] = {}
+    items = fetch_cmr_pages(search_url, params)
+
     products: list[GslcProduct] = []
-
-    while True:
-        response = requests.get(search_url, params=params, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-
-        for item in data.get("items", []):
-            try:
-                product = GslcProduct.from_umm(item["umm"], url_type=url_type)
-                # Filter by track_frame if specified (exact match including cycle)
-                if track_frame is not None and product.track_frame_id != track_frame:
-                    continue
-                # Filter by track_frame_number (stays constant for repeat passes)
-                if (
-                    track_frame_number is not None
-                    and product.track_frame_number != track_frame_number
-                ):
-                    continue
-                # Filter by orbit direction
-                if (
-                    orbit_direction is not None
-                    and str(product.orbit_direction) != orbit_direction.upper()
-                ):
-                    continue
-                # Filter by datetime
-                if start_datetime <= product.start_datetime <= end_datetime:
-                    products.append(product)
-            except (ValueError, KeyError) as e:
-                logger.debug(f"Skipping granule due to parse error: {e}")
+    for item in items:
+        try:
+            product = GslcProduct.from_umm(item["umm"], url_type=url_type)
+            # Filter by track_frame if specified (exact match including cycle)
+            if track_frame is not None and product.track_frame_id != track_frame:
                 continue
-
-        if "CMR-Search-After" not in response.headers:
-            break
-
-        headers["CMR-Search-After"] = response.headers["CMR-Search-After"]
+            # Filter by track_frame_number (stays constant for repeat passes)
+            if (
+                track_frame_number is not None
+                and product.track_frame_number != track_frame_number
+            ):
+                continue
+            # Filter by orbit direction
+            if (
+                orbit_direction is not None
+                and str(product.orbit_direction) != orbit_direction.upper()
+            ):
+                continue
+            # Filter by datetime
+            if start_datetime <= product.start_datetime <= end_datetime:
+                products.append(product)
+        except (ValueError, KeyError) as e:
+            logger.debug(f"Skipping granule due to parse error: {e}")
+            continue
 
     # Return sorted list of products
     products = sorted(products, key=lambda g: (g.track_frame_id, g.start_datetime))
