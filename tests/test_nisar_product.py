@@ -216,9 +216,11 @@ class TestGslcProduct:
             del f[f"{NISAR_GSLC_GRIDS}/frequencyA/projection"]
 
         product = GslcProduct.from_filename(FILE_1)
-        with h5py.File(gslc_h5) as f:
-            with pytest.raises(ValueError, match="No projection dataset found"):
-                product.get_epsg(f)
+        with (
+            h5py.File(gslc_h5) as f,
+            pytest.raises(ValueError, match="No projection dataset found"),
+        ):
+            product.get_epsg(f)
 
     def test_get_coordinates(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)

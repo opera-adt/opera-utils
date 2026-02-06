@@ -47,7 +47,7 @@ class TestGetHttpsFs:
         mock_fs = MagicMock()
         monkeypatch.setattr(
             "opera_utils.nisar._remote.fsspec.filesystem",
-            lambda *a, **kw: mock_fs,
+            lambda *a, **kw: mock_fs,  # noqa: ARG005
         )
 
         fs = get_https_fs()
@@ -91,7 +91,7 @@ class TestOpenFile:
 
         monkeypatch.setattr(
             "opera_utils.nisar._remote.fsspec.filesystem",
-            lambda protocol: mock_fs,
+            lambda protocol: mock_fs,  # noqa: ARG005
         )
 
         result = open_file(test_file)
@@ -106,7 +106,7 @@ class TestOpenFile:
 
         monkeypatch.setattr(
             "opera_utils.nisar._remote.get_https_fs",
-            lambda username, password: mock_fs,
+            lambda username, password: mock_fs,  # noqa: ARG005
         )
 
         result = open_file("https://example.com/data/file.h5")
@@ -140,11 +140,11 @@ class TestOpenH5:
 
         monkeypatch.setattr(
             "opera_utils.nisar._remote.open_file",
-            lambda *a, **kw: mock_byte_stream,
+            lambda *a, **kw: mock_byte_stream,  # noqa: ARG005
         )
         monkeypatch.setattr(
             "opera_utils.nisar._remote.h5py.File",
-            lambda *a, **kw: mock_h5_file,
+            lambda *a, **kw: mock_h5_file,  # noqa: ARG005
         )
 
         result = open_h5("https://example.com/data/file.h5")
@@ -161,7 +161,7 @@ class TestOpenH5:
 
         monkeypatch.setattr(
             "opera_utils.nisar._remote.open_file",
-            lambda *a, **kw: mock_byte_stream,
+            lambda *a, **kw: mock_byte_stream,  # noqa: ARG005
         )
         monkeypatch.setattr("opera_utils.nisar._remote.h5py.File", mock_h5_file)
 
