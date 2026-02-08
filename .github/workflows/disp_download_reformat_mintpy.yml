@@ -97,7 +97,7 @@ jobs:
           mv *.nc output/
 
       - name: Upload results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: mintpy-${{ inputs.output_name }}
           path: output
