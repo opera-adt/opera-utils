@@ -6,7 +6,6 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from enum import Enum
 from functools import cached_property
 from math import nan
 from pathlib import Path
@@ -19,6 +18,7 @@ import pyproj
 from affine import Affine
 from typing_extensions import Self
 
+from opera_utils._cmr import UrlType
 from opera_utils.burst_frame_db import (
     Bbox,
     OrbitPass,
@@ -30,17 +30,7 @@ from opera_utils.constants import DISP_FILE_REGEX
 
 from ._utils import get_frame_coordinates
 
-__all__ = ["DispProduct", "DispProductStack", "UrlType"]
-
-
-class UrlType(str, Enum):
-    """Choices for the orbit direction of a granule."""
-
-    S3 = "s3"
-    HTTPS = "https"
-
-    def __str__(self) -> str:
-        return str(self.value)
+__all__ = ["DispProduct", "DispProductStack"]
 
 
 @dataclass
