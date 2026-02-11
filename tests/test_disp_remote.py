@@ -37,7 +37,7 @@ def test_get_https_fs(monkeypatch):
         return ("test_user", "test_pass")
 
     monkeypatch.setattr(
-        "opera_utils.disp._remote.get_earthdata_username_password", mock_get_creds
+        "opera_utils._remote.get_earthdata_username_password", mock_get_creds
     )
 
     # Mock fsspec.filesystem
@@ -130,7 +130,7 @@ def test_open_h5_https(monkeypatch):
     def mock_get_https_fs(earthdata_username=None, earthdata_password=None, host=None):
         return mock_fs
 
-    monkeypatch.setattr("opera_utils.disp._remote.get_https_fs", mock_get_https_fs)
+    monkeypatch.setattr("opera_utils._remote.get_https_fs", mock_get_https_fs)
 
     # Mock h5py.File
     mock_file = MagicMock()
@@ -162,7 +162,7 @@ def test_open_h5_s3(monkeypatch):
     def mock_get_s3_fs(asf_endpoint="opera"):
         return mock_fs
 
-    monkeypatch.setattr("opera_utils.disp._remote.get_s3_fs", mock_get_s3_fs)
+    monkeypatch.setattr("opera_utils._remote.get_s3_fs", mock_get_s3_fs)
 
     # Mock h5py.File
     mock_file = MagicMock()

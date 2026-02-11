@@ -14,8 +14,7 @@ import logging
 import warnings
 from datetime import datetime, timezone
 
-import requests
-
+from opera_utils._cmr import fetch_cmr_pages
 from opera_utils.disp._product import DispProduct, UrlType
 
 __all__ = ["search"]
@@ -94,30 +93,19 @@ def search(
     else:
         warnings.warn("No `frame_id` specified: search may be large", stacklevel=1)
 
-    headers: dict[str, str] = {}
-    products: list[DispProduct] = []
-    while True:
-        response = requests.get(search_url, params=params, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        cur_products = [
-            DispProduct.from_umm(item["umm"], url_type=url_type)
-            for item in data["items"]
-        ]
-        # CMR filters apply to both the reference and secondary time (as of 2025-03-29)
-        # We want to filter just by the secondary time
-        products.extend(
-            [
-                g
-                for g in cur_products
-                if start_datetime <= g.secondary_datetime <= end_datetime
-            ]
-        )
+    items = fetch_cmr_pages(search_url, params)
 
-        if "CMR-Search-After" not in response.headers:
-            break
-
-        headers["CMR-Search-After"] = response.headers["CMR-Search-After"]
+    # Parse items into DispProduct objects
+    cur_products = [
+        DispProduct.from_umm(item["umm"], url_type=url_type) for item in items
+    ]
+    # CMR filters apply to both the reference and secondary time (as of 2025-03-29)
+    # We want to filter just by the secondary time
+    products = [
+        g
+        for g in cur_products
+        if start_datetime <= g.secondary_datetime <= end_datetime
+    ]
 
     # Return sorted list of products
     products = sorted(products, key=lambda g: (g.frame_id, g.secondary_datetime))
