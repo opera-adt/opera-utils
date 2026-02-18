@@ -6,12 +6,12 @@ import h5py
 import numpy as np
 import pytest
 
-from opera_utils.constants import NISAR_GSLC_GRIDS, NISAR_POLARIZATIONS
 from opera_utils.nisar._download import (
     _extract_subset_from_h5,
     process_file,
     run_download,
 )
+from opera_utils.nisar._product import NISAR_GSLC_GRIDS, NISAR_POLARIZATIONS
 
 FILE_1 = "NISAR_L2_PR_GSLC_004_076_A_022_2005_QPDH_A_20251103T110514_20251103T110549_X05007_N_F_J_001.h5"
 

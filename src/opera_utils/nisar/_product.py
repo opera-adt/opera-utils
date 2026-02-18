@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -16,14 +17,16 @@ import pyproj
 from typing_extensions import Self
 
 from opera_utils._cmr import get_download_url
-from opera_utils.constants import (
-    NISAR_FREQUENCIES,
-    NISAR_GSLC_FILE_REGEX,
-    NISAR_GSLC_GRIDS,
-    NISAR_GSLC_IDENTIFICATION,
-    NISAR_POLARIZATIONS,
-    UrlType,
-)
+from opera_utils.constants import NISAR_SDS_FILE_REGEX, UrlType
+
+# NISAR GSLC HDF5 dataset paths
+NISAR_GSLC_ROOT = "/science/LSAR/GSLC"
+NISAR_GSLC_GRIDS = f"{NISAR_GSLC_ROOT}/grids"
+NISAR_GSLC_IDENTIFICATION = "/science/LSAR/identification"
+
+# Valid polarizations and frequencies for NISAR GSLC
+NISAR_POLARIZATIONS = ("HH", "VV", "HV", "VH", "RH", "RV", "LH", "LV")
+NISAR_FREQUENCIES = ("A", "B")
 
 __all__ = [
     "GslcProduct",
@@ -97,18 +100,31 @@ class GslcProduct:
             If the filename format is invalid.
 
         """
-        if not (match := NISAR_GSLC_FILE_REGEX.match(Path(name).name)):
+        if not (match := re.match(NISAR_SDS_FILE_REGEX, Path(name).name)):
             msg = f"Invalid NISAR GSLC filename format: {name}"
             raise ValueError(msg)
 
-        data: dict[str, Any] = match.groupdict()
-        data["start_datetime"] = _to_datetime(data["start_datetime"])
-        data["end_datetime"] = _to_datetime(data["end_datetime"])
-        data["cycle_number"] = int(data["cycle_number"])
-        data["relative_orbit_number"] = int(data["relative_orbit_number"])
-        data["track_frame_number"] = int(data["track_frame_number"])
-        data["minor_version"] = int(data["minor_version"])
-        data["orbit_direction"] = OrbitDirection(data["orbit_direction"])
+        g = match.groupdict()
+        data: dict[str, Any] = {
+            "project": g["project"],
+            "level": g["level"],
+            "mode": g["processing_type"],
+            "product_type": g["product_type"],
+            "cycle_number": int(g["cycle"]),
+            "relative_orbit_number": int(g["relative_orbit"]),
+            "orbit_direction": OrbitDirection(g["direction"]),
+            "track_frame_number": int(g["frame"]),
+            "subswath_id": g["scene_id"],
+            "polarizations": g["polarization_mode"],
+            "look_direction": g["freq_pol"],
+            "start_datetime": _to_datetime(g["start_datetime"]),
+            "end_datetime": _to_datetime(g["end_datetime"]),
+            "composite_release_id": g["crid"],
+            "processing_level": g["field1"],
+            "coverage_indicator": g["field2"],
+            "major_version": g["field3"],
+            "minor_version": int(g["counter"]),
+        }
 
         if Path(name).exists():
             data["size_in_bytes"] = Path(name).stat().st_size

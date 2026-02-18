@@ -64,7 +64,7 @@ class MockResponse:
 
 class TestSearch:
     def test_basic_search(self, cmr_response_json):
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(cmr_response_json)
             products = search(
                 bbox=(40.0, 13.0, 41.0, 14.0),
@@ -85,7 +85,7 @@ class TestSearch:
         """Results should be sorted by (track_frame_id, start_datetime)."""
         # Reverse the items so they arrive out of order
         cmr_response_json["items"].reverse()
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(cmr_response_json)
             products = search(bbox=(40.0, 13.0, 41.0, 14.0))
 
@@ -97,7 +97,7 @@ class TestSearch:
                 _make_umm_item(FILE_1, protocol="s3"),
             ]
         }
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(response)
             products = search(bbox=(40.0, 13.0, 41.0, 14.0), url_type=UrlType.S3)
 
@@ -106,7 +106,7 @@ class TestSearch:
 
     def test_filter_by_track_frame(self, cmr_response_json):
         """Exact track_frame match filters on the combined ID."""
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(cmr_response_json)
             products = search(
                 bbox=(40.0, 13.0, 41.0, 14.0),
@@ -125,7 +125,7 @@ class TestSearch:
                 _make_umm_item(FILE_DESC),
             ]
         }
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(response)
             products = search(bbox=(40.0, 13.0, 41.0, 14.0), orbit_direction="A")
 
@@ -134,7 +134,7 @@ class TestSearch:
 
     def test_filter_by_temporal_range(self, cmr_response_json):
         """Only products within the datetime range are returned."""
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(cmr_response_json)
             products = search(
                 bbox=(40.0, 13.0, 41.0, 14.0),
@@ -155,7 +155,7 @@ class TestSearch:
         page2_response = MockResponse(
             {"items": [_make_umm_item(FILE_2)]},
         )
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.side_effect = [page1_response, page2_response]
             products = search(bbox=(40.0, 13.0, 41.0, 14.0))
 
@@ -167,13 +167,13 @@ class TestSearch:
 
     def test_no_constraints_warning(self):
         """Warns when no spatial or orbit constraints are specified."""
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse({"items": []})
             with pytest.warns(UserWarning, match="search may be large"):
                 search()
 
     def test_empty_results(self):
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse({"items": []})
             products = search(bbox=(0.0, 0.0, 1.0, 1.0))
 
@@ -181,7 +181,7 @@ class TestSearch:
 
     def test_attribute_filters_in_params(self):
         """CMR attribute filters are built for orbit parameters."""
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse({"items": []})
             search(
                 relative_orbit_number=76,
@@ -197,7 +197,7 @@ class TestSearch:
 
     def test_temporal_param_in_request(self):
         """Start/end datetime is sent to CMR as temporal parameter."""
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse({"items": []})
             search(
                 bbox=(0, 0, 1, 1),
@@ -222,7 +222,7 @@ class TestSearch:
                 _make_umm_item(FILE_1),
             ]
         }
-        with patch("opera_utils.nisar._search.requests.get") as mock_get:
+        with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(response)
             products = search(bbox=(40.0, 13.0, 41.0, 14.0))
 

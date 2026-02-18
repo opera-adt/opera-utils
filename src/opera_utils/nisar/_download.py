@@ -11,10 +11,7 @@ from shapely import from_wkt
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 
-from opera_utils.constants import (
-    NISAR_GSLC_GRIDS,
-    NISAR_POLARIZATIONS,
-)
+from opera_utils.nisar._product import NISAR_GSLC_GRIDS, NISAR_POLARIZATIONS
 
 from ._product import GslcProduct, UrlType
 from ._remote import open_h5
@@ -166,7 +163,9 @@ def _extract_subset_from_h5(
 
         # Get available polarizations for the frequency
         freq_path = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
-        assert freq_path in src, f"Frequency {frequency} not found"
+        if freq_path not in src:
+            msg = f"Frequency {frequency} not found in {source_name}"
+            raise ValueError(msg)
 
         available_pols = [
             name for name in src[freq_path] if name in NISAR_POLARIZATIONS
@@ -180,7 +179,9 @@ def _extract_subset_from_h5(
             if missing:
                 logger.warning(f"Polarizations not found: {missing}")
 
-        assert pols_to_extract, "No polarizations to extract"
+        if not pols_to_extract:
+            msg = f"No polarizations to extract from {source_name}"
+            raise ValueError(msg)
 
         # Create the grids structure
         dst.create_group(NISAR_GSLC_GRIDS)
@@ -395,7 +396,9 @@ def run_download(
     --------
     Download by bounding box (searches CMR and subsets to that region):
 
-    >>> run_download(bbox=(40.62, 13.56, 40.72, 13.64), polarizations=["HH"])
+    >>> run_download(  # doctest: +SKIP
+    ...     bbox=(40.62, 13.56, 40.72, 13.64), polarizations=["HH"]
+    ... )
 
     """
     # Validate mutually exclusive subsetting options

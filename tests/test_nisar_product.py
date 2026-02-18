@@ -12,12 +12,13 @@ import numpy as np
 import pyproj
 import pytest
 
-from opera_utils.constants import NISAR_GSLC_GRIDS, UrlType
+from opera_utils._cmr import get_download_url as _get_download_url
+from opera_utils.constants import UrlType
 from opera_utils.nisar._product import (
+    NISAR_GSLC_GRIDS,
     GslcProduct,
     OrbitDirection,
     OutOfBoundsError,
-    _get_download_url,
     _to_datetime,
 )
 
@@ -303,7 +304,10 @@ class TestGetDownloadUrl:
                 {"URL": "https://example.com/file.h5", "Type": "GET DATA"},
             ]
         }
-        assert _get_download_url(umm, UrlType.HTTPS) == "https://example.com/file.h5"
+        assert (
+            _get_download_url(umm, UrlType.HTTPS, filename_suffix=".h5")
+            == "https://example.com/file.h5"
+        )
 
     def test_falls_back_to_non_h5(self):
         umm = {
@@ -311,7 +315,10 @@ class TestGetDownloadUrl:
                 {"URL": "https://example.com/file.nc", "Type": "GET DATA"},
             ]
         }
-        assert _get_download_url(umm, UrlType.HTTPS) == "https://example.com/file.nc"
+        assert (
+            _get_download_url(umm, UrlType.HTTPS, filename_suffix=".h5")
+            == "https://example.com/file.nc"
+        )
 
     def test_s3_url(self):
         umm = {

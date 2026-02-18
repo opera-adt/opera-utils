@@ -125,7 +125,7 @@ def main():
     looks_row, looks_col = calculate_square_looks(
         x_spacing, y_spacing, target_resolution=60
     )
-    print(f"Multilooking with {looks_row}x{looks_col} looks for ~100m resolution...")
+    print(f"Multilooking with {looks_row}x{looks_col} looks for ~60m resolution...")
     ifg_ml = multilook(ifg, looks_row, looks_col)
     print(f"  Multilooked shape: {ifg_ml.shape}")
 
