@@ -45,6 +45,7 @@ COMPRESSED_CSLC_S1_FILE_REGEX = (
     r"v(?P<product_version>\d+\.\d+)"
 )
 
+# Old simulated NISAR format (kept for backwards compatibility)
 NISAR_FILE_REGEX = (
     r"(?P<project>NISAR)_"
     r"(?P<level>L2)_"
@@ -56,6 +57,31 @@ NISAR_FILE_REGEX = (
     r"(?P<sensor_repeat>NI)_"
     r"(?P<polarization>VV|HH)_"
     r"v(?P<product_version>\d+\.\d+)"
+)
+# Official NISAR SDS naming convention:
+# NISAR_L2_PR_GSLC_002_151_A_011_4005_DHDH_A_20251015T155040_ \
+#                         20251015T155057_X05006_N_P_J_990.h5
+# Format: NISAR_<level>_<proc_type>_<product>_<cycle>_<rel_orbit>_\
+#        <direction>_<frame>_<scene>_<pol_mode>_<?>_<start>_<end>_<crid>_...
+NISAR_SDS_FILE_REGEX = (
+    r"(?P<project>NISAR)_"
+    r"(?P<level>L\d)_"
+    r"(?P<processing_type>[A-Z]{2})_"
+    r"(?P<product_type>GSLC|GCOV|GUNW|RSLC|RIFG|RUNW|GOFF|ROFF)_"
+    r"(?P<cycle>\d{3})_"
+    r"(?P<relative_orbit>\d{3})_"
+    r"(?P<direction>[AD])_"
+    r"(?P<frame>\d{3})_"
+    r"(?P<scene_id>\d{4})_"
+    r"(?P<polarization_mode>[A-Z]{4})_"
+    r"(?P<freq_pol>[A-Z])_"
+    r"(?P<start_datetime>\d{8}T\d{6})_"
+    r"(?P<end_datetime>\d{8}T\d{6})_"
+    r"(?P<crid>[A-Z0-9]{6})_"
+    r"(?P<field1>[A-Z])_"
+    r"(?P<field2>[A-Z])_"
+    r"(?P<field3>[A-Z])_"
+    r"(?P<counter>\d{3})"
 )
 # https://github.com/opera-adt/COMPASS/blob/16a3c1da2a5db69b9e2007d798a1110d3a6c5f9f/src/compass/utils/runconfig.py#L316-L318
 # {burst_id_str}_{date_str}

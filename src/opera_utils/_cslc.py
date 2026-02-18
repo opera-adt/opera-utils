@@ -39,6 +39,7 @@ from .constants import (
     CSLC_S1_FILE_REGEX,
     NISAR_BOUNDING_POLYGON,
     NISAR_FILE_REGEX,
+    NISAR_SDS_FILE_REGEX,
     OPERA_IDENTIFICATION,
 )
 
@@ -104,6 +105,8 @@ def parse_filename(h5_filename: Filename) -> dict[str, str | datetime]:
         return _parse_cslc_product(match)
     elif match := re.match(NISAR_FILE_REGEX, name):
         return _parse_gslc_product(match)
+    elif match := re.match(NISAR_SDS_FILE_REGEX, name):
+        return _parse_nisar_sds_product(match)
     elif match := re.match(COMPASS_FILE_REGEX, name):
         return _parse_compass(match)
     else:
@@ -129,6 +132,24 @@ def _parse_gslc_product(match: re.Match):
     result["generation_datetime"] = datetime.strptime(
         result["generation_datetime"], fmt
     ).replace(tzinfo=timezone.utc)
+    return result
+
+
+def _parse_nisar_sds_product(match: re.Match):
+    """Parse official NISAR SDS product filename format."""
+    result = match.groupdict()
+    # Set sensor to "NI" for NISAR products (used by product.py for input_sensors)
+    result["sensor"] = "NI"
+    # Construct frame_id from relative_orbit and frame
+    result["frame_id"] = f"{result['relative_orbit']}_{result['frame']}"
+    # Parse datetime without Z suffix
+    fmt = "%Y%m%dT%H%M%S"
+    result["start_datetime"] = datetime.strptime(result["start_datetime"], fmt).replace(
+        tzinfo=timezone.utc
+    )
+    result["end_datetime"] = datetime.strptime(result["end_datetime"], fmt).replace(
+        tzinfo=timezone.utc
+    )
     return result
 
 
