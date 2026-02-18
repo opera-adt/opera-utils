@@ -1,8 +1,8 @@
-"""Remote file access for DISP-S1 products.
+"""Remote file access for NISAR GSLC products.
 
 This module re-exports the shared remote access utilities from
-:mod:`opera_utils._remote`. DISP-S1 products use the default
-``asf_endpoint="OPERA"`` for S3 credential retrieval.
+:mod:`opera_utils._remote`. NISAR GSLC products use the same Earthdata
+authentication infrastructure as DISP-S1 products.
 """
 
 from __future__ import annotations
@@ -17,5 +17,5 @@ from opera_utils._remote import (
 
 __all__ = ["get_https_fs", "get_s3_fs", "open_file", "open_h5"]
 
-# Re-export (keep backward-compatible private name used in _download.py)
+# Re-export (keep backward-compatible private name)
 _get_url_str = get_url_str

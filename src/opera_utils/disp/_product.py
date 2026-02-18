@@ -6,7 +6,6 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from enum import Enum
 from functools import cached_property
 from math import nan
 from pathlib import Path
@@ -19,6 +18,7 @@ import pyproj
 from affine import Affine
 from typing_extensions import Self
 
+from opera_utils._cmr import get_download_url
 from opera_utils.burst_frame_db import (
     Bbox,
     OrbitPass,
@@ -26,21 +26,11 @@ from opera_utils.burst_frame_db import (
     get_frame_geojson,
     get_frame_orbit_pass,
 )
-from opera_utils.constants import DISP_FILE_REGEX
+from opera_utils.constants import DISP_FILE_REGEX, UrlType
 
 from ._utils import get_frame_coordinates
 
 __all__ = ["DispProduct", "DispProductStack", "UrlType"]
-
-
-class UrlType(str, Enum):
-    """Choices for the orbit direction of a granule."""
-
-    S3 = "s3"
-    HTTPS = "https"
-
-    def __str__(self) -> str:
-        return str(self.value)
 
 
 @dataclass
@@ -210,7 +200,7 @@ class DispProduct:
             If required temporal extent data is missing.
 
         """
-        url = _get_download_url(umm_data, protocol=url_type)
+        url = get_download_url(umm_data, protocol=url_type)
         product = DispProduct.from_filename(url)
         archive_info = umm_data.get("DataGranule", {}).get(
             "ArchiveAndDistributionInformation", []
@@ -357,41 +347,6 @@ class DispProductStack:
     def to_dataframe(self) -> pd.DataFrame:
         """Create a DataFrame holding the product stack metadata."""
         return pd.DataFrame([asdict(p) for p in self.products])
-
-
-def _get_download_url(
-    umm_data: dict[str, Any], protocol: UrlType = UrlType.HTTPS
-) -> str:
-    """Extract a download URL from the product's UMM metadata.
-
-    Parameters
-    ----------
-    umm_data : dict[str, Any]
-        The product's umm metadata dictionary
-    protocol : UrlType
-        The protocol to use for downloading, either "s3" or "https"
-
-    Returns
-    -------
-    str
-        The download URL
-
-    Raises
-    ------
-    ValueError
-        If no URL with the specified protocol is found or if the protocol is invalid
-
-    """
-    if protocol not in ["https", "s3"]:
-        msg = f"Unknown protocol {protocol}; must be https or s3"
-        raise ValueError(msg)
-
-    for url in umm_data["RelatedUrls"]:
-        if url["Type"].startswith("GET DATA") and url["URL"].startswith(protocol):
-            return url["URL"]
-
-    msg = f"No download URL found for granule {umm_data['GranuleUR']}"
-    raise ValueError(msg)
 
 
 class OutOfBoundsError(ValueError):
