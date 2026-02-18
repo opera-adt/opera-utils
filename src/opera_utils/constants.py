@@ -59,8 +59,10 @@ NISAR_FILE_REGEX = (
     r"v(?P<product_version>\d+\.\d+)"
 )
 # Official NISAR SDS naming convention:
-# NISAR_L2_PR_GSLC_002_151_A_011_4005_DHDH_A_20251015T155040_20251015T155057_X05006_N_P_J_990.h5
-# Format: NISAR_<level>_<proc_type>_<product>_<cycle>_<rel_orbit>_<direction>_<frame>_<scene>_<pol_mode>_<?>_<start>_<end>_<crid>_...
+# NISAR_L2_PR_GSLC_002_151_A_011_4005_DHDH_A_20251015T155040_ \
+#                         20251015T155057_X05006_N_P_J_990.h5
+# Format: NISAR_<level>_<proc_type>_<product>_<cycle>_<rel_orbit>_\
+#        <direction>_<frame>_<scene>_<pol_mode>_<?>_<start>_<end>_<crid>_...
 NISAR_SDS_FILE_REGEX = (
     r"(?P<project>NISAR)_"
     r"(?P<level>L\d)_"
