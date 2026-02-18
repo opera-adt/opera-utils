@@ -13,8 +13,9 @@ import pyproj
 import pytest
 
 from opera_utils._cmr import get_download_url as _get_download_url
-from opera_utils.constants import NISAR_GSLC_GRIDS, UrlType
+from opera_utils.constants import UrlType
 from opera_utils.nisar._product import (
+    NISAR_GSLC_GRIDS,
     GslcProduct,
     OrbitDirection,
     OutOfBoundsError,

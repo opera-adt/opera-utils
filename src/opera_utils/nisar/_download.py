@@ -11,10 +11,7 @@ from shapely import from_wkt
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 
-from opera_utils.constants import (
-    NISAR_GSLC_GRIDS,
-    NISAR_POLARIZATIONS,
-)
+from opera_utils.nisar._product import NISAR_GSLC_GRIDS, NISAR_POLARIZATIONS
 
 from ._product import GslcProduct, UrlType
 from ._remote import open_h5
