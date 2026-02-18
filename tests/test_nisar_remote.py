@@ -1,33 +1,33 @@
-"""Tests for opera_utils.nisar._remote module."""
+"""Tests for opera_utils._remote module."""
 
 from unittest.mock import MagicMock
 
 import pytest
 
-from opera_utils.nisar._remote import (
-    _get_url_str,
+from opera_utils._remote import (
     get_https_fs,
     get_s3_fs,
+    get_url_str,
     open_file,
     open_h5,
 )
 
 
 class TestGetUrlStr:
-    """Tests for _get_url_str function."""
+    """Tests for get_url_str function."""
 
     def test_string_passthrough(self):
         url = "https://example.com/data/file.h5"
-        assert _get_url_str(url) == url
+        assert get_url_str(url) == url
 
     def test_s3_string_passthrough(self):
         url = "s3://bucket/data/file.h5"
-        assert _get_url_str(url) == url
+        assert get_url_str(url) == url
 
     def test_path_to_uri(self, tmp_path):
         test_file = tmp_path / "test.h5"
         test_file.touch()
-        result = _get_url_str(test_file)
+        result = get_url_str(test_file)
         assert result.startswith("file://")
         assert str(test_file) in result
 
@@ -40,13 +40,13 @@ class TestGetHttpsFs:
             return ("test_user", "test_pass")
 
         monkeypatch.setattr(
-            "opera_utils.nisar._remote.get_earthdata_username_password",
+            "opera_utils._remote.get_earthdata_username_password",
             mock_get_creds,
         )
 
         mock_fs = MagicMock()
         monkeypatch.setattr(
-            "opera_utils.nisar._remote.fsspec.filesystem",
+            "opera_utils._remote.fsspec.filesystem",
             lambda *a, **kw: mock_fs,  # noqa: ARG005
         )
 
@@ -64,12 +64,12 @@ class TestGetS3Fs:
         mock_creds.session_token = "token"
 
         monkeypatch.setattr(
-            "opera_utils.nisar._remote.AWSCredentials.from_env",
+            "opera_utils._remote.AWSCredentials.from_env",
             lambda: mock_creds,
         )
 
         mock_s3fs = MagicMock()
-        monkeypatch.setattr("opera_utils.nisar._remote.s3fs.S3FileSystem", mock_s3fs)
+        monkeypatch.setattr("opera_utils._remote.s3fs.S3FileSystem", mock_s3fs)
 
         get_s3_fs()
 
@@ -90,7 +90,7 @@ class TestOpenFile:
         mock_fs.open.return_value = mock_open
 
         monkeypatch.setattr(
-            "opera_utils.nisar._remote.fsspec.filesystem",
+            "opera_utils._remote.fsspec.filesystem",
             lambda protocol: mock_fs,  # noqa: ARG005
         )
 
@@ -105,8 +105,8 @@ class TestOpenFile:
         mock_fs.open.return_value = mock_open
 
         monkeypatch.setattr(
-            "opera_utils.nisar._remote.get_https_fs",
-            lambda username, password: mock_fs,  # noqa: ARG005
+            "opera_utils._remote.get_https_fs",
+            lambda username, password, host=None: mock_fs,  # noqa: ARG005
         )
 
         result = open_file("https://example.com/data/file.h5")
@@ -119,7 +119,10 @@ class TestOpenFile:
         mock_open = MagicMock()
         mock_fs.open.return_value = mock_open
 
-        monkeypatch.setattr("opera_utils.nisar._remote.get_s3_fs", lambda: mock_fs)
+        monkeypatch.setattr(
+            "opera_utils._remote.get_s3_fs",
+            lambda asf_endpoint=None: mock_fs,  # noqa: ARG005
+        )
 
         result = open_file("s3://bucket/data/file.h5")
 
@@ -139,11 +142,11 @@ class TestOpenH5:
         mock_h5_file = MagicMock()
 
         monkeypatch.setattr(
-            "opera_utils.nisar._remote.open_file",
+            "opera_utils._remote.open_file",
             lambda *a, **kw: mock_byte_stream,  # noqa: ARG005
         )
         monkeypatch.setattr(
-            "opera_utils.nisar._remote.h5py.File",
+            "opera_utils._remote.h5py.File",
             lambda *a, **kw: mock_h5_file,  # noqa: ARG005
         )
 
@@ -160,10 +163,10 @@ class TestOpenH5:
             return MagicMock()
 
         monkeypatch.setattr(
-            "opera_utils.nisar._remote.open_file",
+            "opera_utils._remote.open_file",
             lambda *a, **kw: mock_byte_stream,  # noqa: ARG005
         )
-        monkeypatch.setattr("opera_utils.nisar._remote.h5py.File", mock_h5_file)
+        monkeypatch.setattr("opera_utils._remote.h5py.File", mock_h5_file)
 
         open_h5("https://example.com/data/file.h5", page_size=8 * 1024 * 1024)
 

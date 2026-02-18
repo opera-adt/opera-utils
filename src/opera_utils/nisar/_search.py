@@ -113,12 +113,16 @@ def search(
     # If no temporal range is specified, set wide defaults for filtering
     if start_datetime is None:
         start_datetime = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    else:
+    elif start_datetime.tzinfo is None:
         start_datetime = start_datetime.replace(tzinfo=timezone.utc)
+    else:
+        start_datetime = start_datetime.astimezone(timezone.utc)
     if end_datetime is None:
         end_datetime = datetime(2100, 1, 1, tzinfo=timezone.utc)
-    else:
+    elif end_datetime.tzinfo is None:
         end_datetime = end_datetime.replace(tzinfo=timezone.utc)
+    else:
+        end_datetime = end_datetime.astimezone(timezone.utc)
 
     # Add attribute filters for track/frame if provided
     # CMR attribute names: TRACK_NUMBER (=relative orbit), FRAME_NUMBER (=track frame),
