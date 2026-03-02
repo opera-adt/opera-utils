@@ -177,43 +177,6 @@ class GslcProduct:
             raise ValueError(msg)
         return f"{NISAR_GSLC_GRIDS}/frequency{frequency}/{polarization}"
 
-    def read(
-        self,
-        frequency: str = "A",
-        polarization: str = "HH",
-    ) -> np.ndarray:
-        """Read the full GSLC raster for a frequency and polarization.
-
-        Parameters
-        ----------
-        frequency : str
-            Frequency band, either "A" or "B". Default is "A".
-        polarization : str
-            Polarization, e.g. "HH", "VV". Default is "HH".
-
-        Returns
-        -------
-        np.ndarray
-            The complex GSLC raster.
-
-        """
-        with self._open() as hf:
-            return hf[self.get_dataset_path(frequency, polarization)][:]
-
-    def __getitem__(self, key: str | tuple[str, str]) -> np.ndarray:
-        """Read GSLC data by polarization or (frequency, polarization).
-
-        Examples
-        --------
-        >>> product["HH"]             # Read frequency A, HH  # doctest: +SKIP
-        >>> product["A", "HH"]        # Same as above  # doctest: +SKIP
-        >>> product["B", "HH"]        # Read frequency B, HH  # doctest: +SKIP
-
-        """
-        if isinstance(key, str):
-            return self.read(polarization=key)
-        return self.read(frequency=key[0], polarization=key[1])
-
     def get_available_polarizations(self, frequency: str = "A") -> list[str]:
         """Get available polarizations for a frequency.
 
@@ -296,8 +259,8 @@ class GslcProduct:
 
     def read_subset(
         self,
-        rows: slice,
-        cols: slice,
+        rows: slice | int | None,
+        cols: slice | int | None,
         frequency: str = "A",
         polarization: str = "HH",
     ) -> np.ndarray:
@@ -305,9 +268,9 @@ class GslcProduct:
 
         Parameters
         ----------
-        rows : slice
+        rows : slice | int | None
             Row slice for subsetting.
-        cols : slice
+        cols : slice | int | None
             Column slice for subsetting.
         frequency : str
             Frequency band. Default is "A".
@@ -320,6 +283,11 @@ class GslcProduct:
             The subset of complex GSLC data.
 
         """
+        if rows is None:
+            rows = slice(None)
+        if cols is None:
+            cols = slice(None)
+
         with self._open() as hf:
             dset_path = self.get_dataset_path(frequency, polarization)
             return hf[dset_path][rows, cols]
