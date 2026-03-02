@@ -173,6 +173,9 @@ def search(
                 and str(product.orbit_direction) != orbit_direction.upper()
             ):
                 continue
+            # Filter by cycle number
+            if cycle_number is not None and product.cycle_number != cycle_number:
+                continue
             # Filter by datetime
             if start_datetime <= product.start_datetime <= end_datetime:
                 products.append(product)
