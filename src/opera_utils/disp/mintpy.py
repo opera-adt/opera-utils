@@ -22,48 +22,6 @@ def _decimal_year(t: np.ndarray) -> np.ndarray:
     return year + frac
 
 
-def _to_mintpy_dates(times: np.ndarray) -> np.ndarray:
-    """Convert np.datetime64 array to YYYYMMDD bytes expected by MintPy."""
-    day_times = np.asarray(times, dtype="datetime64[D]")
-    return np.array(
-        [np.datetime_as_string(t, unit="D").replace("-", "") for t in day_times],
-        dtype="S8",
-    )
-
-
-def _build_mintpy_timeseries_arrays(
-    ds: xr.Dataset,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, bool]:
-    """Build displacement/time/bperp arrays for MintPy.
-
-    Prepends the first reference epoch with zero displacement when
-    `reference_time[0] < time[0]`, so MintPy can display the full temporal range.
-    """
-    disp = np.asarray(
-        ds["displacement"].transpose("time", "y", "x").data, dtype=np.float32
-    )
-    times = np.asarray(ds["time"].data, dtype="datetime64[ns]")
-    bperp = np.asarray(ds["perpendicular_baseline"].data, dtype=np.float32)
-
-    prepend_reference_epoch = False
-    if "reference_time" in ds and ds["reference_time"].size > 0 and times.size > 0:
-        first_ref_time = np.asarray(
-            ds["reference_time"].data[0], dtype="datetime64[ns]"
-        )
-        if first_ref_time < times[0]:
-            prepend_reference_epoch = True
-            disp = np.concatenate(
-                [np.zeros((1, *disp.shape[1:]), dtype=disp.dtype), disp], axis=0
-            )
-            times = np.concatenate(
-                [np.array([first_ref_time], dtype="datetime64[ns]"), times]
-            )
-            bperp = np.concatenate([np.array([0.0], dtype=np.float32), bperp])
-
-    dates = _to_mintpy_dates(times)
-    return disp, times, dates, bperp, prepend_reference_epoch
-
-
 def _mintpy_metadata(prod: DispProduct) -> dict[str, str]:
     """Minimal attribute set expected by MintPy."""
     gt = prod.transform  # affine
@@ -128,7 +86,6 @@ def _write_timeseries_vds(
     meta: dict[str, str],
     dates: np.ndarray,
     bperp: np.ndarray,
-    prepend_reference_epoch: bool = False,
 ) -> None:
     """Create timeseries.h5 that virtually links to /displacement in src_nc."""
     with h5py.File(out_path, "w", libver="latest") as f:
@@ -138,29 +95,25 @@ def _write_timeseries_vds(
             f.attrs[k] = v
 
         nt_src, ny, nx = ds["displacement"].shape
-        nt = nt_src + int(prepend_reference_epoch)
+        nt = len(dates)
+        prepended = nt > nt_src
 
         # date / bperp vectors
         f.create_dataset("date", data=dates, dtype=dates.dtype)
-        f.create_dataset(
-            "bperp",
-            data=bperp,
-            dtype=np.float32,
-        )
+        f.create_dataset("bperp", data=bperp, dtype=np.float32)
 
         # the virtual dataset itself
         src_shape = (nt_src, ny, nx)
-        out_shape = (nt, ny, nx)
         dtype = ds["displacement"].dtype
 
-        layout = h5py.VirtualLayout(shape=out_shape, dtype=dtype)
+        layout = h5py.VirtualLayout(shape=(nt, ny, nx), dtype=dtype)
         source = h5py.VirtualSource(
             str(src_nc),  # external file
             "/displacement",  # path inside that file
             shape=src_shape,
         )
-        if prepend_reference_epoch:
-            # First epoch is left unmapped and filled with zeros.
+        if prepended:
+            # First epoch is unmapped -> filled with zeros
             layout[1:, :, :] = source
             fillvalue: float | np.floating[Any] = 0.0
         else:
@@ -342,11 +295,24 @@ def disp_nc_to_mintpy(
     ds = xr.open_dataset(reformatted_nc_path, engine="h5netcdf")
     prod = DispProduct.from_filename(sample_disp_nc)
 
-    disp, times, dates, bperp, prepend_reference_epoch = (
-        _build_mintpy_timeseries_arrays(ds)
+    disp = ds["displacement"].transpose("time", "y", "x").data.astype(np.float32)
+    times = ds["time"].data
+    bperp = ds["perpendicular_baseline"].data.astype(np.float32)
+
+    # Prepend zero-reference epoch if reference_time precedes the first time
+    if "reference_time" in ds and ds["reference_time"].data[0] < times[0]:
+        ref_time = ds["reference_time"].data[0]
+        disp = np.concatenate([np.zeros((1, *disp.shape[1:]), dtype=np.float32), disp])
+        times = np.concatenate([[ref_time], times])
+        bperp = np.concatenate([np.array([0.0], dtype=np.float32), bperp])
+
+    dates = np.array(
+        [
+            np.datetime_as_string(np.datetime64(t, "D"), unit="D").replace("-", "")
+            for t in times
+        ],
+        dtype="S8",
     )
-    if prepend_reference_epoch:
-        print(f"Prepended zero-reference epoch for date {dates[0].decode()}.")
 
     ny, nx = disp.shape[1:]
     nt = disp.shape[0]
@@ -361,7 +327,6 @@ def disp_nc_to_mintpy(
             meta=ts_meta,
             dates=dates,
             bperp=bperp,
-            prepend_reference_epoch=prepend_reference_epoch,
         )
         print("Done with timeseries.h5 (virtual link)")
     else:
