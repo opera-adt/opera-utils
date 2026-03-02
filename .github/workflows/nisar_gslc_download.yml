@@ -216,7 +216,7 @@ jobs:
 
       # Upload the final artefact (path determined by previous step)
       - name: Upload Result
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: gslc_subsets
           path: ${{ env.ARTIFACT_PATH }}
