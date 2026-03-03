@@ -133,11 +133,11 @@ class TestGslcProduct:
 
     def test_track_frame_id(self):
         product = GslcProduct.from_filename(FILE_1)
-        assert product.track_frame_id == "004_076_A_022"
+        assert product.track_frame_id == "076_A_022"
 
     def test_track_frame_id_descending(self):
         product = GslcProduct.from_filename(FILE_DESCENDING)
-        assert product.track_frame_id == "004_076_D_022"
+        assert product.track_frame_id == "076_D_022"
 
     def test_version(self):
         product = GslcProduct.from_filename(FILE_1)

@@ -105,17 +105,16 @@ class TestSearch:
         assert str(products[0].filename).startswith("s3://")
 
     def test_filter_by_track_frame(self, cmr_response_json):
-        """Exact track_frame match filters on the combined ID."""
+        """track_frame matches all products for a geographic footprint (across cycles)."""
         with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(cmr_response_json)
             products = search(
                 bbox=(40.0, 13.0, 41.0, 14.0),
-                track_frame="004_076_A_022",
+                track_frame="076_A_022",
             )
 
-        # Only FILE_1 matches cycle 004
-        assert len(products) == 1
-        assert products[0].cycle_number == 4
+        # Both FILE_1 (cycle 4) and FILE_2 (cycle 5) share the same track_frame_id
+        assert len(products) == 2
 
     def test_filter_by_orbit_direction(self):
         """Descending products filtered out when orbit_direction='A'."""
@@ -188,6 +187,18 @@ class TestSearch:
                 track_frame_number=22,
                 orbit_direction="A",
             )
+
+        _, kwargs = mock_get.call_args
+        attrs = kwargs["params"]["attribute[]"]
+        assert "int,TRACK_NUMBER,76" in attrs
+        assert "int,FRAME_NUMBER,22" in attrs
+        assert "string,ASCENDING_DESCENDING,ASCENDING" in attrs
+
+    def test_track_frame_pushes_cmr_filters(self):
+        """track_frame string is parsed into CMR attribute filters."""
+        with patch("opera_utils._cmr.requests.get") as mock_get:
+            mock_get.return_value = MockResponse({"items": []})
+            search(track_frame="076_A_022")
 
         _, kwargs = mock_get.call_args
         attrs = kwargs["params"]["attribute[]"]

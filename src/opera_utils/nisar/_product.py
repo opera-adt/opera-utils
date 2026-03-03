@@ -136,9 +136,15 @@ class GslcProduct:
 
     @property
     def track_frame_id(self) -> str:
-        """Get the combined track and frame identifier."""
+        """Get the combined track and frame identifier.
+
+        Format is ``RRR_D_TTT`` where RRR = relative orbit number,
+        D = orbit direction (A/D), TTT = track frame number.
+        These three fields are constant across repeat-pass acquisitions,
+        so this ID uniquely identifies a geographic footprint.
+        """
         return (
-            f"{self.cycle_number:03d}_{self.relative_orbit_number:03d}_"
+            f"{self.relative_orbit_number:03d}_"
             f"{self.orbit_direction}_{self.track_frame_number:03d}"
         )
 
