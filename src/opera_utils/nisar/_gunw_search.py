@@ -1,8 +1,8 @@
-"""Search for NISAR GSLC products from CMR.
+"""Search for NISAR GUNW products from CMR.
 
 Examples
 --------
-$ python -m opera_utils.nisar._search --track-frame 076_A_022
+$ python -m opera_utils.nisar._gunw_search --track-frame 076_A_022
 
 """
 
@@ -14,32 +14,37 @@ from datetime import datetime, timezone
 
 from opera_utils._cmr import fetch_cmr_pages
 
-from ._product import GslcProduct, UrlType
+from ._product import GunwProduct, UrlType
 
-__all__ = ["search"]
+__all__ = ["search_gunw"]
 
 logger = logging.getLogger("opera_utils")
 
-# CMR short name for NISAR GSLC products
+# CMR short name for NISAR GUNW products
 # This may need to be updated once official products are released
-NISAR_GSLC_SHORT_NAME = "NISAR_L2_GSLC_BETA_V1"
+NISAR_GUNW_SHORT_NAME = "NISAR_L2_GUNW_BETA_V1"
 
 
-def search(
+def search_gunw(
     bbox: tuple[float, float, float, float] | None = None,
     track_frame: str | None = None,
     track_frame_number: int | None = None,
     orbit_direction: str | None = None,
-    cycle_number: int | None = None,
+    reference_cycle_number: int | None = None,
+    secondary_cycle_number: int | None = None,
     relative_orbit_number: int | None = None,
     start_datetime: datetime | None = None,
     end_datetime: datetime | None = None,
     url_type: UrlType = UrlType.HTTPS,
-    short_name: str = NISAR_GSLC_SHORT_NAME,
+    short_name: str = NISAR_GUNW_SHORT_NAME,
     provider: str = "ASF",
     print_urls: bool = False,
-) -> list[GslcProduct]:
-    """Query CMR for NISAR GSLC granules matching the given criteria.
+) -> list[GunwProduct]:
+    """Query CMR for NISAR GUNW granules matching the given criteria.
+
+    Temporal filtering via ``start_datetime`` / ``end_datetime`` applies to the
+    **secondary** acquisition date, which is the most common way to build an
+    InSAR time series.
 
     Parameters
     ----------
@@ -50,46 +55,48 @@ def search(
         The track/frame identifier to search for, in format "RRR_D_TTT"
         where RRR=relative orbit, D=direction (A/D), TTT=track frame number.
         Example: "076_A_022". These fields stay constant across repeat passes,
-        so this returns all acquisitions for a given geographic footprint.
+        so this returns all interferogram pairs for a given geographic footprint.
     track_frame_number : int, optional
-        The track frame number (e.g., 8). This stays constant for repeat passes.
+        The track frame number (e.g., 22). This stays constant for repeat passes.
     orbit_direction : str, optional
         Orbit direction: "A" for ascending, "D" for descending.
-    cycle_number : int, optional
-        The cycle number to search for.
+    reference_cycle_number : int, optional
+        The reference (earlier) cycle number to filter by.
+    secondary_cycle_number : int, optional
+        The secondary (later) cycle number to filter by.
     relative_orbit_number : int, optional
         The relative orbit number to search for.
     start_datetime : datetime, optional
-        The start of the temporal range in UTC.
+        Start of the secondary acquisition temporal range in UTC.
     end_datetime : datetime, optional
-        The end of the temporal range in UTC.
+        End of the secondary acquisition temporal range in UTC.
     url_type : UrlType
         The protocol to use for downloading, either "s3" or "https".
     short_name : str
         The CMR collection short name.
-        Default is "NISAR_L2_GSLC_BETA_V1" (beta products).
+        Default is "NISAR_L2_GUNW_BETA_V1" (beta products).
     provider : str
         The CMR data provider. Default is "ASF".
     print_urls : bool
         If True, prints out the result urls to stdout in addition to returning
-        the `GslcProduct` objects.
+        the `GunwProduct` objects.
         Default is False.
 
     Returns
     -------
-    list[GslcProduct]
+    list[GunwProduct]
         List of products matching the search criteria.
 
     Examples
     --------
-    Search by bounding box (most ergonomic for finding a time series):
+    Search by bounding box:
 
-    >>> products = search(bbox=(40.62, 13.56, 40.72, 13.64))
+    >>> products = search_gunw(bbox=(40.62, 13.56, 40.72, 13.64))
 
     Search by orbit parameters:
 
-    >>> products = search(relative_orbit_number=172, track_frame_number=8,
-    ...                   orbit_direction="A")
+    >>> products = search_gunw(relative_orbit_number=151, track_frame_number=11,
+    ...                        orbit_direction="A")
 
     """
     search_url = "https://cmr.earthdata.nasa.gov/search/granules.umm_json"
@@ -104,7 +111,7 @@ def search(
         west, south, east, north = bbox
         params["bounding_box"] = f"{west},{south},{east},{north}"
 
-    # Optionally narrow search by temporal range
+    # Optionally narrow search by temporal range (applied to secondary date)
     if start_datetime is not None or end_datetime is not None:
         start_str = start_datetime.isoformat() if start_datetime is not None else ""
         end_str = end_datetime.isoformat() if end_datetime is not None else ""
@@ -124,8 +131,7 @@ def search(
     else:
         end_datetime = end_datetime.astimezone(timezone.utc)
 
-    # Parse track_frame (format "RRR_D_TTT") into its components so we can
-    # push them to CMR as attribute filters for efficient server-side filtering.
+    # Parse track_frame (format "RRR_D_TTT") into its components
     if track_frame is not None:
         parts = track_frame.split("_")
         assert (
@@ -140,8 +146,6 @@ def search(
             track_frame_number = int(tf_frame)
 
     # Add attribute filters for track/frame if provided
-    # CMR attribute names: TRACK_NUMBER (=relative orbit), FRAME_NUMBER (=track frame),
-    # ASCENDING_DESCENDING (=orbit direction as "ASCENDING" or "DESCENDING")
     attribute_filters: list[str] = []
     if relative_orbit_number is not None:
         attribute_filters.append(f"int,TRACK_NUMBER,{relative_orbit_number}")
@@ -157,7 +161,8 @@ def search(
     no_constraints = (
         bbox is None
         and track_frame is None
-        and cycle_number is None
+        and reference_cycle_number is None
+        and secondary_cycle_number is None
         and relative_orbit_number is None
     )
     if no_constraints:
@@ -169,14 +174,14 @@ def search(
 
     items = fetch_cmr_pages(search_url, params)
 
-    products: list[GslcProduct] = []
+    products: list[GunwProduct] = []
     for item in items:
         try:
-            product = GslcProduct.from_umm(item["umm"], url_type=url_type)
-            # Filter by track_frame if specified (exact match including cycle)
+            product = GunwProduct.from_umm(item["umm"], url_type=url_type)
+            # Filter by track_frame (exact match)
             if track_frame is not None and product.track_frame_id != track_frame:
                 continue
-            # Filter by track_frame_number (stays constant for repeat passes)
+            # Filter by track_frame_number
             if (
                 track_frame_number is not None
                 and product.track_frame_number != track_frame_number
@@ -188,15 +193,27 @@ def search(
                 and str(product.orbit_direction) != orbit_direction.upper()
             ):
                 continue
-            # Filter by datetime
-            if start_datetime <= product.start_datetime <= end_datetime:
+            # Filter by reference cycle number
+            if (
+                reference_cycle_number is not None
+                and product.reference_cycle_number != reference_cycle_number
+            ):
+                continue
+            # Filter by secondary cycle number
+            if (
+                secondary_cycle_number is not None
+                and product.secondary_cycle_number != secondary_cycle_number
+            ):
+                continue
+            # Filter by secondary datetime range
+            if start_datetime <= product.secondary_datetime <= end_datetime:
                 products.append(product)
         except (ValueError, KeyError) as e:
             logger.debug(f"Skipping granule due to parse error: {e}")
             continue
 
     # Return sorted list of products
-    products = sorted(products, key=lambda g: (g.track_frame_id, g.start_datetime))
+    products = sorted(products, key=lambda g: (g.track_frame_id, g.secondary_datetime))
 
     if print_urls:
         for p in products:
@@ -208,18 +225,27 @@ def search(
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Search for NISAR GSLC products")
+    parser = argparse.ArgumentParser(description="Search for NISAR GUNW products")
     parser.add_argument(
         "--track-frame", type=str, help="Track/frame ID (e.g. 076_A_022)"
     )
-    parser.add_argument("--cycle-number", type=int, help="Cycle number")
+    parser.add_argument(
+        "--reference-cycle-number", type=int, help="Reference cycle number"
+    )
+    parser.add_argument(
+        "--secondary-cycle-number", type=int, help="Secondary cycle number"
+    )
     parser.add_argument(
         "--relative-orbit-number", type=int, help="Relative orbit number"
     )
     parser.add_argument(
-        "--start-datetime", type=str, help="Start datetime (ISO format)"
+        "--start-datetime",
+        type=str,
+        help="Start datetime for secondary date (ISO format)",
     )
-    parser.add_argument("--end-datetime", type=str, help="End datetime (ISO format)")
+    parser.add_argument(
+        "--end-datetime", type=str, help="End datetime for secondary date (ISO format)"
+    )
 
     args = parser.parse_args()
 
@@ -228,9 +254,10 @@ if __name__ == "__main__":
     )
     end_dt = datetime.fromisoformat(args.end_datetime) if args.end_datetime else None
 
-    results = search(
+    results = search_gunw(
         track_frame=args.track_frame,
-        cycle_number=args.cycle_number,
+        reference_cycle_number=args.reference_cycle_number,
+        secondary_cycle_number=args.secondary_cycle_number,
         relative_orbit_number=args.relative_orbit_number,
         start_datetime=start_dt,
         end_datetime=end_dt,

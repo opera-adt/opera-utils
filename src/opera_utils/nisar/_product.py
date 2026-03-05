@@ -17,7 +17,7 @@ import pyproj
 from typing_extensions import Self
 
 from opera_utils._cmr import get_download_url
-from opera_utils.constants import NISAR_SDS_FILE_REGEX, UrlType
+from opera_utils.constants import NISAR_GUNW_FILE_REGEX, NISAR_SDS_FILE_REGEX, UrlType
 
 # NISAR GSLC HDF5 dataset paths
 NISAR_GSLC_ROOT = "/science/LSAR/GSLC"
@@ -30,10 +30,155 @@ NISAR_FREQUENCIES = ("A", "B")
 
 __all__ = [
     "GslcProduct",
+    "GunwProduct",
     "OrbitDirection",
     "OutOfBoundsError",
     "UrlType",
 ]
+
+
+@dataclass
+class GunwProduct:
+    """Class for information from one NISAR GUNW product filename.
+
+    GUNW (Geocoded UNWrapped interferogram) products are InSAR pairs derived
+    from two NISAR acquisitions. ``reference_datetime`` is the start of the
+    reference acquisition and ``secondary_datetime`` is the start of the
+    secondary acquisition.
+    """
+
+    filename: str | Path
+    project: str
+    level: str
+    mode: str
+    product_type: str
+    reference_cycle_number: int
+    secondary_cycle_number: int
+    relative_orbit_number: int
+    orbit_direction: OrbitDirection
+    track_frame_number: int
+    subswath_id: str
+    polarizations: str
+    reference_datetime: datetime
+    secondary_datetime: datetime
+    composite_release_id: str
+    processing_level: str
+    coverage_indicator: str
+    major_version: str
+    minor_version: int
+    size_in_bytes: int | None = None
+
+    @classmethod
+    def from_filename(cls, name: Path | str) -> Self:
+        """Parse a filename to create a GunwProduct.
+
+        Parameters
+        ----------
+        name : str or Path
+            Filename to parse for NISAR GUNW information.
+
+        Returns
+        -------
+        GunwProduct
+            Parsed file information.
+
+        Raises
+        ------
+        ValueError
+            If the filename format is invalid.
+
+        """
+        if not (match := re.match(NISAR_GUNW_FILE_REGEX, Path(name).name)):
+            msg = f"Invalid NISAR GUNW filename format: {name}"
+            raise ValueError(msg)
+
+        g = match.groupdict()
+        data: dict[str, Any] = {
+            "project": g["project"],
+            "level": g["level"],
+            "mode": g["processing_type"],
+            "product_type": g["product_type"],
+            "reference_cycle_number": int(g["reference_cycle"]),
+            "secondary_cycle_number": int(g["secondary_cycle"]),
+            "relative_orbit_number": int(g["relative_orbit"]),
+            "orbit_direction": OrbitDirection(g["direction"]),
+            "track_frame_number": int(g["frame"]),
+            "subswath_id": g["scene_id"],
+            "polarizations": g["polarization_mode"],
+            "reference_datetime": _to_datetime(g["reference_start_datetime"]),
+            "secondary_datetime": _to_datetime(g["secondary_start_datetime"]),
+            "composite_release_id": g["crid"],
+            "processing_level": g["field1"],
+            "coverage_indicator": g["field2"],
+            "major_version": g["field3"],
+            "minor_version": int(g["counter"]),
+        }
+
+        if Path(name).exists():
+            data["size_in_bytes"] = Path(name).stat().st_size
+
+        return cls(filename=name, **data)
+
+    @property
+    def track_frame_id(self) -> str:
+        """Get the combined track and frame identifier.
+
+        Format is ``RRR_D_TTT`` where RRR = relative orbit number,
+        D = orbit direction (A/D), TTT = track frame number.
+        These three fields are constant across repeat-pass acquisitions,
+        so this ID uniquely identifies a geographic footprint.
+        """
+        return (
+            f"{self.relative_orbit_number:03d}_"
+            f"{self.orbit_direction}_{self.track_frame_number:03d}"
+        )
+
+    @property
+    def pair_id(self) -> str:
+        """Get the reference/secondary date pair identifier.
+
+        Format is ``YYYYMMDD_YYYYMMDD`` (reference_secondary).
+        """
+        ref = self.reference_datetime.strftime("%Y%m%d")
+        sec = self.secondary_datetime.strftime("%Y%m%d")
+        return f"{ref}_{sec}"
+
+    @property
+    def version(self) -> str:
+        """Get the full version string."""
+        return f"{self.major_version}.{self.minor_version:03d}"
+
+    def __fspath__(self) -> str:
+        return os.fspath(self.filename)
+
+    @classmethod
+    def from_umm(
+        cls, umm_data: dict[str, Any], url_type: UrlType = UrlType.HTTPS
+    ) -> GunwProduct:
+        """Construct a GunwProduct instance from a raw CMR UMM dictionary.
+
+        Parameters
+        ----------
+        umm_data : dict[str, Any]
+            The raw granule UMM data from the CMR API.
+        url_type : UrlType
+            Type of url to use from the Product.
+            "s3" for S3 URLs (direct access), "https" for HTTPS URLs.
+
+        Returns
+        -------
+        GunwProduct
+            The parsed GunwProduct instance.
+
+        """
+        url = get_download_url(umm_data, protocol=url_type, filename_suffix=".h5")
+        product = GunwProduct.from_filename(url)
+        archive_info = umm_data.get("DataGranule", {}).get(
+            "ArchiveAndDistributionInformation", []
+        )
+        size_in_bytes = archive_info[0].get("SizeInBytes", 0) if archive_info else None
+        product.size_in_bytes = size_in_bytes
+        return product
 
 
 class OutOfBoundsError(ValueError):
@@ -133,9 +278,15 @@ class GslcProduct:
 
     @property
     def track_frame_id(self) -> str:
-        """Get the combined track and frame identifier."""
+        """Get the combined track and frame identifier.
+
+        Format is ``RRR_D_TTT`` where RRR = relative orbit number,
+        D = orbit direction (A/D), TTT = track frame number.
+        These three fields are constant across repeat-pass acquisitions,
+        so this ID uniquely identifies a geographic footprint.
+        """
         return (
-            f"{self.cycle_number:03d}_{self.relative_orbit_number:03d}_"
+            f"{self.relative_orbit_number:03d}_"
             f"{self.orbit_direction}_{self.track_frame_number:03d}"
         )
 
