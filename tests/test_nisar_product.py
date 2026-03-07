@@ -133,11 +133,11 @@ class TestGslcProduct:
 
     def test_track_frame_id(self):
         product = GslcProduct.from_filename(FILE_1)
-        assert product.track_frame_id == "004_076_A_022"
+        assert product.track_frame_id == "076_A_022"
 
     def test_track_frame_id_descending(self):
         product = GslcProduct.from_filename(FILE_DESCENDING)
-        assert product.track_frame_id == "004_076_D_022"
+        assert product.track_frame_id == "076_D_022"
 
     def test_version(self):
         product = GslcProduct.from_filename(FILE_1)
@@ -176,40 +176,35 @@ class TestGslcProduct:
 
     def test_get_available_polarizations(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
-        with h5py.File(gslc_h5) as f:
-            pols = product.get_available_polarizations(f)
-        assert set(pols) == {"HH", "VV"}
+        product.filename = gslc_h5
+        assert set(product.get_available_polarizations()) == {"HH", "VV"}
 
     def test_get_available_polarizations_missing_frequency(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
-        with h5py.File(gslc_h5) as f:
-            pols = product.get_available_polarizations(f, frequency="B")
-        assert pols == []
+        product.filename = gslc_h5
+        assert product.get_available_polarizations(frequency="B") == []
 
     def test_get_available_frequencies(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
-        with h5py.File(gslc_h5) as f:
-            freqs = product.get_available_frequencies(f)
-        assert freqs == ["A"]
+        product.filename = gslc_h5
+        assert product.get_available_frequencies() == ["A"]
 
     def test_get_shape(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
-        with h5py.File(gslc_h5) as f:
-            shape = product.get_shape(f)
-        assert shape == (MOCK_NROWS, MOCK_NCOLS)
+        product.filename = gslc_h5
+        assert product.get_shape() == (MOCK_NROWS, MOCK_NCOLS)
 
     def test_read_subset(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
-        with h5py.File(gslc_h5) as f:
-            subset = product.read_subset(f, rows=slice(10, 30), cols=slice(50, 80))
+        product.filename = gslc_h5
+        subset = product.read_subset(rows=slice(10, 30), cols=slice(50, 80))
         assert subset.shape == (20, 30)
         assert np.iscomplexobj(subset)
 
     def test_get_epsg(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
-        with h5py.File(gslc_h5) as f:
-            epsg = product.get_epsg(f)
-        assert epsg == MOCK_EPSG
+        product.filename = gslc_h5
+        assert product.get_epsg() == MOCK_EPSG
 
     def test_get_epsg_missing_projection(self, gslc_h5):
         # Remove projection dataset
@@ -217,21 +212,20 @@ class TestGslcProduct:
             del f[f"{NISAR_GSLC_GRIDS}/frequencyA/projection"]
 
         product = GslcProduct.from_filename(FILE_1)
-        with (
-            h5py.File(gslc_h5) as f,
-            pytest.raises(ValueError, match="No projection dataset found"),
-        ):
-            product.get_epsg(f)
+        product.filename = gslc_h5
+        with pytest.raises(KeyError):
+            product.get_epsg()
 
     def test_get_coordinates(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
-        with h5py.File(gslc_h5) as f:
-            x, y = product.get_coordinates(f)
+        product.filename = gslc_h5
+        x, y = product.get_coordinates()
         np.testing.assert_array_equal(x, MOCK_X_COORDS)
         np.testing.assert_array_equal(y, MOCK_Y_COORDS)
 
     def test_lonlat_to_rowcol(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
+        product.filename = gslc_h5
         # Convert center of grid to lon/lat, then back to row/col
         t = pyproj.Transformer.from_crs(
             f"EPSG:{MOCK_EPSG}", "EPSG:4326", always_xy=True
@@ -240,8 +234,7 @@ class TestGslcProduct:
         center_y = MOCK_Y_COORDS[MOCK_NROWS // 2]
         lon, lat = t.transform(center_x, center_y)
 
-        with h5py.File(gslc_h5) as f:
-            row, col = product.lonlat_to_rowcol(f, lon, lat)
+        row, col = product.lonlat_to_rowcol(lon, lat)
 
         # Should be close to the center indices
         assert abs(row - MOCK_NROWS // 2) <= 1
@@ -249,6 +242,7 @@ class TestGslcProduct:
 
     def test_lonlat_to_rowcol_out_of_bounds(self, gslc_h5):
         product = GslcProduct.from_filename(FILE_1)
+        product.filename = gslc_h5
         # Convert a point far past the grid boundaries to lon/lat
         t = pyproj.Transformer.from_crs(
             f"EPSG:{MOCK_EPSG}", "EPSG:4326", always_xy=True
@@ -257,8 +251,8 @@ class TestGslcProduct:
             MOCK_X_COORDS[-1] + 50000,  # way past east edge
             MOCK_Y_COORDS[-1] - 50000,  # way past south edge
         )
-        with h5py.File(gslc_h5) as f, pytest.raises(OutOfBoundsError):
-            product.lonlat_to_rowcol(f, lon_oob, lat_oob)
+        with pytest.raises(OutOfBoundsError):
+            product.lonlat_to_rowcol(lon_oob, lat_oob)
 
 
 class TestFromUmm:

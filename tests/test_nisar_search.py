@@ -16,6 +16,8 @@ FILE_1 = "NISAR_L2_PR_GSLC_004_076_A_022_2005_QPDH_A_20251103T110514_20251103T11
 FILE_2 = "NISAR_L2_PR_GSLC_005_076_A_022_2005_QPDH_A_20251115T110514_20251115T110549_X05008_N_F_J_001.h5"
 # Different orbit direction
 FILE_DESC = "NISAR_L2_PR_GSLC_004_076_D_022_2005_QPDH_A_20251103T110514_20251103T110549_X05007_N_F_J_001.h5"
+# Different polarization mode (DHDH instead of QPDH), same track/frame/cycle as FILE_1
+FILE_DHDH = "NISAR_L2_PR_GSLC_004_076_A_022_4005_DHDH_A_20251103T110550_20251103T110610_X05007_N_F_J_001.h5"
 
 
 def _make_umm_item(filename: str, protocol: str = "https") -> dict:
@@ -105,17 +107,16 @@ class TestSearch:
         assert str(products[0].filename).startswith("s3://")
 
     def test_filter_by_track_frame(self, cmr_response_json):
-        """Exact track_frame match filters on the combined ID."""
+        """track_frame matches all products for a geographic footprint (across cycles)."""
         with patch("opera_utils._cmr.requests.get") as mock_get:
             mock_get.return_value = MockResponse(cmr_response_json)
             products = search(
                 bbox=(40.0, 13.0, 41.0, 14.0),
-                track_frame="004_076_A_022",
+                track_frame="076_A_022",
             )
 
-        # Only FILE_1 matches cycle 004
-        assert len(products) == 1
-        assert products[0].cycle_number == 4
+        # Both FILE_1 (cycle 4) and FILE_2 (cycle 5) share the same track_frame_id
+        assert len(products) == 2
 
     def test_filter_by_orbit_direction(self):
         """Descending products filtered out when orbit_direction='A'."""
@@ -194,6 +195,42 @@ class TestSearch:
         assert "int,TRACK_NUMBER,76" in attrs
         assert "int,FRAME_NUMBER,22" in attrs
         assert "string,ASCENDING_DESCENDING,ASCENDING" in attrs
+
+    def test_track_frame_pushes_cmr_filters(self):
+        """track_frame string is parsed into CMR attribute filters."""
+        with patch("opera_utils._cmr.requests.get") as mock_get:
+            mock_get.return_value = MockResponse({"items": []})
+            search(track_frame="076_A_022")
+
+        _, kwargs = mock_get.call_args
+        attrs = kwargs["params"]["attribute[]"]
+        assert "int,TRACK_NUMBER,76" in attrs
+        assert "int,FRAME_NUMBER,22" in attrs
+        assert "string,ASCENDING_DESCENDING,ASCENDING" in attrs
+
+    def test_filter_by_pol(self):
+        """pol filter keeps only matching polarization mode."""
+        response = {
+            "items": [
+                _make_umm_item(FILE_1),  # QPDH
+                _make_umm_item(FILE_DHDH),  # DHDH
+            ]
+        }
+        with patch("opera_utils._cmr.requests.get") as mock_get:
+            mock_get.return_value = MockResponse(response)
+            products = search(bbox=(40.0, 13.0, 41.0, 14.0), pol="QPDH")
+
+        assert len(products) == 1
+        assert products[0].polarizations == "QPDH"
+
+    def test_filter_by_pol_case_insensitive(self):
+        """pol filter is case-insensitive."""
+        response = {"items": [_make_umm_item(FILE_1)]}
+        with patch("opera_utils._cmr.requests.get") as mock_get:
+            mock_get.return_value = MockResponse(response)
+            products = search(bbox=(40.0, 13.0, 41.0, 14.0), pol="qpdh")
+
+        assert len(products) == 1
 
     def test_temporal_param_in_request(self):
         """Start/end datetime is sent to CMR as temporal parameter."""
