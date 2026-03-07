@@ -32,6 +32,7 @@ def search(
     orbit_direction: str | None = None,
     cycle_number: int | None = None,
     relative_orbit_number: int | None = None,
+    pol: str | None = None,
     start_datetime: datetime | None = None,
     end_datetime: datetime | None = None,
     url_type: UrlType = UrlType.HTTPS,
@@ -59,6 +60,12 @@ def search(
         The cycle number to search for.
     relative_orbit_number : int, optional
         The relative orbit number to search for.
+    pol : str, optional
+        4-character polarization mode code (POLE field in the NISAR filename).
+        Each pair of characters describes the primary and secondary band
+        polarization: QP=quad, DH=dual-H, DV=dual-V, SH=single-H, SV=single-V,
+        CL=compact-L, CR=compact-R, NA=no band.
+        Example: "QPDH" for quad-pol primary / dual-H secondary.
     start_datetime : datetime, optional
         The start of the temporal range in UTC.
     end_datetime : datetime, optional
@@ -190,6 +197,9 @@ def search(
                 continue
             # Filter by cycle number
             if cycle_number is not None and product.cycle_number != cycle_number:
+                continue
+            # Filter by polarization mode (POLE field, e.g. "QPDH", "DHDH")
+            if pol is not None and product.polarizations != pol.upper():
                 continue
             # Filter by datetime
             if start_datetime <= product.start_datetime <= end_datetime:
