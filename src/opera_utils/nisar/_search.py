@@ -2,7 +2,7 @@
 
 Examples
 --------
-$ python -m opera_utils.nisar._search --track-frame 004_076_A_022
+$ python -m opera_utils.nisar._search --track-frame 076_A_022
 
 """
 
@@ -32,6 +32,7 @@ def search(
     orbit_direction: str | None = None,
     cycle_number: int | None = None,
     relative_orbit_number: int | None = None,
+    pol: str | None = None,
     start_datetime: datetime | None = None,
     end_datetime: datetime | None = None,
     url_type: UrlType = UrlType.HTTPS,
@@ -47,10 +48,10 @@ def search(
         Bounding box as (west, south, east, north) in degrees lon/lat.
         CMR will return products that intersect this region.
     track_frame : str, optional
-        The track/frame identifier to search for, in format "CCC_RRR_D_TTT"
-        where CCC=cycle, RRR=relative orbit, D=direction (A/D), TTT=track frame.
-        Example: "004_076_A_022". Note: cycle changes between acquisitions,
-        so this is typically only useful for finding a specific granule.
+        The track/frame identifier to search for, in format "RRR_D_TTT"
+        where RRR=relative orbit, D=direction (A/D), TTT=track frame number.
+        Example: "076_A_022". These fields stay constant across repeat passes,
+        so this returns all acquisitions for a given geographic footprint.
     track_frame_number : int, optional
         The track frame number (e.g., 8). This stays constant for repeat passes.
     orbit_direction : str, optional
@@ -59,6 +60,12 @@ def search(
         The cycle number to search for.
     relative_orbit_number : int, optional
         The relative orbit number to search for.
+    pol : str, optional
+        4-character polarization mode code (POLE field in the NISAR filename).
+        Each pair of characters describes the primary and secondary band
+        polarization: QP=quad, DH=dual-H, DV=dual-V, SH=single-H, SV=single-V,
+        CL=compact-L, CR=compact-R, NA=no band.
+        Example: "QPDH" for quad-pol primary / dual-H secondary.
     start_datetime : datetime, optional
         The start of the temporal range in UTC.
     end_datetime : datetime, optional
@@ -124,6 +131,21 @@ def search(
     else:
         end_datetime = end_datetime.astimezone(timezone.utc)
 
+    # Parse track_frame (format "RRR_D_TTT") into its components so we can
+    # push them to CMR as attribute filters for efficient server-side filtering.
+    if track_frame is not None:
+        parts = track_frame.split("_")
+        assert (
+            len(parts) == 3
+        ), f"track_frame must be 'RRR_D_TTT' (e.g. '076_A_022'), got {track_frame!r}"
+        tf_rel_orbit, tf_direction, tf_frame = parts
+        if relative_orbit_number is None:
+            relative_orbit_number = int(tf_rel_orbit)
+        if orbit_direction is None:
+            orbit_direction = tf_direction
+        if track_frame_number is None:
+            track_frame_number = int(tf_frame)
+
     # Add attribute filters for track/frame if provided
     # CMR attribute names: TRACK_NUMBER (=relative orbit), FRAME_NUMBER (=track frame),
     # ASCENDING_DESCENDING (=orbit direction as "ASCENDING" or "DESCENDING")
@@ -173,6 +195,12 @@ def search(
                 and str(product.orbit_direction) != orbit_direction.upper()
             ):
                 continue
+            # Filter by cycle number
+            if cycle_number is not None and product.cycle_number != cycle_number:
+                continue
+            # Filter by polarization mode (POLE field, e.g. "QPDH", "DHDH")
+            if pol is not None and product.polarizations != pol.upper():
+                continue
             # Filter by datetime
             if start_datetime <= product.start_datetime <= end_datetime:
                 products.append(product)
@@ -195,7 +223,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Search for NISAR GSLC products")
     parser.add_argument(
-        "--track-frame", type=str, help="Track/frame ID (e.g. 004_076_A_022)"
+        "--track-frame", type=str, help="Track/frame ID (e.g. 076_A_022)"
     )
     parser.add_argument("--cycle-number", type=int, help="Cycle number")
     parser.add_argument(

@@ -7,15 +7,25 @@ from datetime import datetime
 from pathlib import Path
 
 import h5py
+import numpy as np
 from shapely import from_wkt
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 
-from opera_utils.nisar._product import NISAR_GSLC_GRIDS, NISAR_POLARIZATIONS
+from opera_utils.nisar._product import (
+    NISAR_GSLC_GRIDS,
+    NISAR_GSLC_IDENTIFICATION,
+    NISAR_GSLC_ROOT,
+    NISAR_POLARIZATIONS,
+)
 
 from ._product import GslcProduct, UrlType
 from ._remote import open_h5
 from ._search import search
+
+# Metadata groups to copy into subset files (full path from root)
+_IDENTIFICATION_GROUP = NISAR_GSLC_IDENTIFICATION
+_ORBIT_GROUP = f"{NISAR_GSLC_ROOT}/metadata/orbit"
 
 logger = logging.getLogger("opera_utils")
 
@@ -157,9 +167,15 @@ def _extract_subset_from_h5(
     col_slice = cols if cols is not None else slice(None)
 
     with h5py.File(outpath, "w") as dst:
-        # Note: We skip copying identification/metadata groups for remote files
-        # because h5py's copy() doesn't work well with fsspec byte-range access.
-        # The essential georeferencing info is in the frequency group.
+        # Copy identification and orbit metadata groups
+        for group in [_IDENTIFICATION_GROUP, _ORBIT_GROUP]:
+            if group in src:
+                dst.require_group("/".join(group.split("/")[:-1]))
+                src.copy(group, dst, name=group)
+
+        # Add complex64 type to root for GDAL recognition of datasets
+        ctype = h5py.h5t.py_create(np.complex64)
+        ctype.commit(dst["/"].id, np.bytes_("complex64"))
 
         # Get available polarizations for the frequency
         freq_path = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
@@ -183,9 +199,9 @@ def _extract_subset_from_h5(
             msg = f"No polarizations to extract from {source_name}"
             raise ValueError(msg)
 
-        # Create the grids structure
-        dst.create_group(NISAR_GSLC_GRIDS)
-        dst_freq_group = dst.create_group(freq_path)
+        # Create the grids structure (require_group since parents may already exist)
+        dst.require_group(NISAR_GSLC_GRIDS)
+        dst_freq_group = dst.require_group(freq_path)
 
         # Copy coordinate datasets if present (x, y coordinates)
         for coord_name in [
@@ -277,14 +293,8 @@ def _get_rowcol_slice(
 
     lon_left, lat_bottom, lon_right, lat_top = bbox
 
-    # Need to open the file to get coordinate info
-    with open_h5(str(product.filename)) as h5f:
-        row_start, col_start = product.lonlat_to_rowcol(
-            h5f, lon_left, lat_top, frequency
-        )
-        row_stop, col_stop = product.lonlat_to_rowcol(
-            h5f, lon_right, lat_bottom, frequency
-        )
+    row_start, col_start = product.lonlat_to_rowcol(lon_left, lat_top, frequency)
+    row_stop, col_stop = product.lonlat_to_rowcol(lon_right, lat_bottom, frequency)
 
     # Ensure start < stop
     if row_start > row_stop:
