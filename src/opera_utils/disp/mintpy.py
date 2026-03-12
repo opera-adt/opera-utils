@@ -85,6 +85,7 @@ def _write_timeseries_vds(
     ds: xr.Dataset,
     meta: dict[str, str],
     dates: np.ndarray,
+    bperp: np.ndarray,
 ) -> None:
     """Create timeseries.h5 that virtually links to /displacement in src_nc."""
     with h5py.File(out_path, "w", libver="latest") as f:
@@ -93,29 +94,34 @@ def _write_timeseries_vds(
         for k, v in meta.items():
             f.attrs[k] = v
 
-        nt, ny, nx = ds["displacement"].shape
+        nt_src, ny, nx = ds["displacement"].shape
+        nt = len(dates)
+        prepended = nt > nt_src
 
         # date / bperp vectors
         f.create_dataset("date", data=dates, dtype=dates.dtype)
-        f.create_dataset(
-            "bperp",
-            data=ds["perpendicular_baseline"].data,
-            dtype=np.float32,
-        )
+        f.create_dataset("bperp", data=bperp, dtype=np.float32)
 
         # the virtual dataset itself
-        src_shape = (nt, ny, nx)
+        src_shape = (nt_src, ny, nx)
         dtype = ds["displacement"].dtype
 
-        layout = h5py.VirtualLayout(shape=src_shape, dtype=dtype)
-        layout[:] = h5py.VirtualSource(
+        layout = h5py.VirtualLayout(shape=(nt, ny, nx), dtype=dtype)
+        source = h5py.VirtualSource(
             str(src_nc),  # external file
             "/displacement",  # path inside that file
             shape=src_shape,
         )
+        if prepended:
+            # First epoch is unmapped -> filled with zeros
+            layout[1:, :, :] = source
+            fillvalue: float | np.floating[Any] = 0.0
+        else:
+            layout[:, :, :] = source
+            fillvalue = np.nan
 
         # NOTE: compression/chunks must be None on a VDS
-        vds = f.create_virtual_dataset("timeseries", layout, fillvalue=np.nan)
+        vds = f.create_virtual_dataset("timeseries", layout, fillvalue=fillvalue)
         # MintPy sometimes checks for UNIT on the dataset itself
         vds.attrs["UNIT"] = "m"
 
@@ -286,13 +292,25 @@ def disp_nc_to_mintpy(
     outdir.mkdir(parents=True, exist_ok=True)
 
     # 1. Load existing NetCDF
-    ds = xr.open_dataset(reformatted_nc_path)
+    ds = xr.open_dataset(reformatted_nc_path, engine="h5netcdf")
     prod = DispProduct.from_filename(sample_disp_nc)
 
     disp = ds["displacement"].transpose("time", "y", "x").data.astype(np.float32)
-    times = ds["time"].data  # np.datetime64[…]
+    times = ds["time"].data
+    bperp = ds["perpendicular_baseline"].data.astype(np.float32)
+
+    # Prepend zero-reference epoch if reference_time precedes the first time
+    if "reference_time" in ds and ds["reference_time"].data[0] < times[0]:
+        ref_time = ds["reference_time"].data[0]
+        disp = np.concatenate([np.zeros((1, *disp.shape[1:]), dtype=np.float32), disp])
+        times = np.concatenate([[ref_time], times])
+        bperp = np.concatenate([np.array([0.0], dtype=np.float32), bperp])
+
     dates = np.array(
-        [t.astype("datetime64[D]").astype(str).replace("-", "") for t in times],
+        [
+            np.datetime_as_string(np.datetime64(t, "D"), unit="D").replace("-", "")
+            for t in times
+        ],
         dtype="S8",
     )
 
@@ -308,17 +326,14 @@ def disp_nc_to_mintpy(
             ds=ds,
             meta=ts_meta,
             dates=dates,
+            bperp=bperp,
         )
         print("Done with timeseries.h5 (virtual link)")
     else:
         # Copy displacement data directly to avoid VDS issues with MintPy
         ts_dsets = {
             "date": (dates.dtype, dates.shape, dates),
-            "bperp": (
-                np.float32,
-                ds["perpendicular_baseline"].shape,
-                ds["perpendicular_baseline"].data.astype(np.float32),
-            ),
+            "bperp": (np.float32, bperp.shape, bperp),
             "timeseries": (np.float32, disp.shape, disp),
         }
         _write_hdf5(outdir / "timeseries.h5", ts_dsets, ts_meta)
