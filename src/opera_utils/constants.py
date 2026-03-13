@@ -74,7 +74,7 @@ NISAR_FILE_REGEX = (
 # NISAR_L2_PR_GSLC_002_151_A_011_4005_DHDH_A_20251015T155040_ \
 #                         20251015T155057_X05006_N_P_J_990.h5
 # Format: NISAR_<level>_<proc_type>_<product>_<cycle>_<rel_orbit>_\
-#        <direction>_<frame>_<scene>_<pol_mode>_<?>_<start>_<end>_<crid>_...
+#        <direction>_<frame>_<bandwidth>_<pol_mode>_<?>_<start>_<end>_<crid>_...
 NISAR_SDS_FILE_REGEX = (
     r"(?P<project>NISAR)_"
     r"(?P<level>L\d)_"
@@ -84,7 +84,7 @@ NISAR_SDS_FILE_REGEX = (
     r"(?P<relative_orbit>\d{3})_"
     r"(?P<direction>[AD])_"
     r"(?P<frame>\d{3})_"
-    r"(?P<scene_id>\d{4})_"
+    r"(?P<bandwidth>\d{4})_"
     r"(?P<polarization_mode>[A-Z]{4})_"
     r"(?P<freq_pol>[A-Z])_"
     r"(?P<start_datetime>\d{8}T\d{6})_"
@@ -99,7 +99,7 @@ NISAR_SDS_FILE_REGEX = (
 # NISAR_L2_PR_GUNW_004_151_A_011_005_4000_SH_20251108T155041_20251108T155058_
 #                         20251120T155041_20251120T155058_X05010_N_P_J_001.h5
 # Format: NISAR_<level>_<proc_type>_GUNW_<ref_cycle>_<rel_orbit>_<direction>_
-#         <frame>_<sec_cycle>_<scene>_<pol_mode>_<ref_start>_<ref_end>_
+#         <frame>_<sec_cycle>_<bandwidth>_<pol_mode>_<ref_start>_<ref_end>_
 #         <sec_start>_<sec_end>_<crid>_...
 NISAR_GUNW_FILE_REGEX = (
     r"(?P<project>NISAR)_"
@@ -111,7 +111,7 @@ NISAR_GUNW_FILE_REGEX = (
     r"(?P<direction>[AD])_"
     r"(?P<frame>\d{3})_"
     r"(?P<secondary_cycle>\d{3})_"
-    r"(?P<scene_id>\d{4})_"
+    r"(?P<bandwidth>\d{4})_"
     r"(?P<polarization_mode>[A-Z]{2,4})_"
     r"(?P<reference_start_datetime>\d{8}T\d{6})_"
     r"(?P<reference_end_datetime>\d{8}T\d{6})_"

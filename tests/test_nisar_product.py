@@ -37,7 +37,7 @@ EXPECTED = {
     "relative_orbit_number": 76,
     "orbit_direction": OrbitDirection.ASCENDING,
     "track_frame_number": 22,
-    "subswath_id": "2005",
+    "bandwidth": "2005",
     "polarizations": "QPDH",
     "look_direction": "A",
     "start_datetime": datetime(2025, 11, 3, 11, 5, 14, tzinfo=timezone.utc),

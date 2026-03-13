@@ -57,7 +57,7 @@ class GunwProduct:
     relative_orbit_number: int
     orbit_direction: OrbitDirection
     track_frame_number: int
-    subswath_id: str
+    bandwidth: str
     polarizations: str
     reference_datetime: datetime
     secondary_datetime: datetime
@@ -103,7 +103,7 @@ class GunwProduct:
             "relative_orbit_number": int(g["relative_orbit"]),
             "orbit_direction": OrbitDirection(g["direction"]),
             "track_frame_number": int(g["frame"]),
-            "subswath_id": g["scene_id"],
+            "bandwidth": g["bandwidth"],
             "polarizations": g["polarization_mode"],
             "reference_datetime": _to_datetime(g["reference_start_datetime"]),
             "secondary_datetime": _to_datetime(g["secondary_start_datetime"]),
@@ -213,7 +213,7 @@ class GslcProduct:
     relative_orbit_number: int
     orbit_direction: OrbitDirection
     track_frame_number: int
-    subswath_id: str
+    bandwidth: str
     polarizations: str
     look_direction: str
     start_datetime: datetime
@@ -259,7 +259,7 @@ class GslcProduct:
             "relative_orbit_number": int(g["relative_orbit"]),
             "orbit_direction": OrbitDirection(g["direction"]),
             "track_frame_number": int(g["frame"]),
-            "subswath_id": g["scene_id"],
+            "bandwidth": g["bandwidth"],
             "polarizations": g["polarization_mode"],
             "look_direction": g["freq_pol"],
             "start_datetime": _to_datetime(g["start_datetime"]),

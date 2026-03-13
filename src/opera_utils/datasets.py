@@ -22,9 +22,7 @@ NISAR_FRAME_TO_BOUNDS_FILENAME = (
 NISAR_POOCH = pooch.create(
     path=pooch.os_cache("opera_utils"),
     # TODO: update to a release URL once the file is published
-    base_url=(
-        "https://github.com/opera-adt/disp-nisar/tree/main/configs/static_ancillary_files/"
-    ),
+    base_url="https://github.com/opera-adt/disp-nisar/tree/main/configs/static_ancillary_files/",
     version=NISAR_FRAME_DB_VERSION,
     version_dev="main",
     env="OPERA_UTILS_DATA_DIR",
