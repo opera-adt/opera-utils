@@ -17,6 +17,8 @@ FILE_1 = "NISAR_L2_PR_GSLC_004_076_A_022_2005_QPDH_A_20251103T110514_20251103T11
 FILE_2 = "NISAR_L2_PR_GSLC_005_076_A_022_2005_QPDH_A_20251115T110514_20251115T110549_X05008_N_F_J_001.h5"
 # Different orbit direction
 FILE_DESC = "NISAR_L2_PR_GSLC_004_076_D_022_2005_QPDH_A_20251103T110514_20251103T110549_X05007_N_F_J_001.h5"
+# Different polarization mode (DHDH instead of QPDH), same track/frame/cycle as FILE_1
+FILE_DHDH = "NISAR_L2_PR_GSLC_004_076_A_022_4005_DHDH_A_20251103T110550_20251103T110610_X05007_N_F_J_001.h5"
 
 
 def _make_umm_item(filename: str, protocol: str = "https") -> dict:
@@ -207,6 +209,33 @@ class TestSearch:
         assert "int,FRAME_NUMBER,22" in attrs
         assert "string,ASCENDING_DESCENDING,ASCENDING" in attrs
 
+<<<<<<< HEAD
+=======
+    def test_filter_by_pol(self):
+        """pol filter keeps only matching polarization mode."""
+        response = {
+            "items": [
+                _make_umm_item(FILE_1),  # QPDH
+                _make_umm_item(FILE_DHDH),  # DHDH
+            ]
+        }
+        with patch("opera_utils._cmr.requests.get") as mock_get:
+            mock_get.return_value = MockResponse(response)
+            products = search(bbox=(40.0, 13.0, 41.0, 14.0), pol="QPDH")
+
+        assert len(products) == 1
+        assert products[0].polarizations == "QPDH"
+
+    def test_filter_by_pol_case_insensitive(self):
+        """pol filter is case-insensitive."""
+        response = {"items": [_make_umm_item(FILE_1)]}
+        with patch("opera_utils._cmr.requests.get") as mock_get:
+            mock_get.return_value = MockResponse(response)
+            products = search(bbox=(40.0, 13.0, 41.0, 14.0), pol="qpdh")
+
+        assert len(products) == 1
+
+>>>>>>> 1d0369c6281d923bfbde11b858ae07ad644fafda
     def test_temporal_param_in_request(self):
         """Start/end datetime is sent to CMR as temporal parameter."""
         with patch("opera_utils._cmr.requests.get") as mock_get:

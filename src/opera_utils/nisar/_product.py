@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -17,7 +19,12 @@ import pyproj
 from typing_extensions import Self
 
 from opera_utils._cmr import get_download_url
+<<<<<<< HEAD
 from opera_utils.constants import NISAR_GUNW_FILE_REGEX, NISAR_SDS_FILE_REGEX, UrlType
+=======
+from opera_utils._remote import open_h5
+from opera_utils.constants import NISAR_SDS_FILE_REGEX, UrlType
+>>>>>>> 1d0369c6281d923bfbde11b858ae07ad644fafda
 
 # NISAR GSLC HDF5 dataset paths
 NISAR_GSLC_ROOT = "/science/LSAR/GSLC"
@@ -295,6 +302,12 @@ class GslcProduct:
         """Get the full version string."""
         return f"{self.major_version}.{self.minor_version:03d}"
 
+    @contextmanager
+    def _open(self) -> Iterator[h5py.File]:
+        """Open the HDF5 file (local or remote) as a context manager."""
+        with open_h5(str(self.filename)) as hf:
+            yield hf
+
     def get_dataset_path(self, frequency: str = "A", polarization: str = "HH") -> str:
         """Get the HDF5 dataset path for a specific frequency and polarization.
 
@@ -310,11 +323,6 @@ class GslcProduct:
         str
             The HDF5 dataset path.
 
-        Raises
-        ------
-        ValueError
-            If the frequency or polarization is invalid.
-
         """
         if frequency not in NISAR_FREQUENCIES:
             msg = f"Invalid frequency {frequency}. Choices: {NISAR_FREQUENCIES}"
@@ -324,15 +332,11 @@ class GslcProduct:
             raise ValueError(msg)
         return f"{NISAR_GSLC_GRIDS}/frequency{frequency}/{polarization}"
 
-    def get_available_polarizations(
-        self, h5file: h5py.File, frequency: str = "A"
-    ) -> list[str]:
-        """Get available polarizations for a frequency from an open HDF5 file.
+    def get_available_polarizations(self, frequency: str = "A") -> list[str]:
+        """Get available polarizations for a frequency.
 
         Parameters
         ----------
-        h5file : h5py.File
-            Open HDF5 file handle.
         frequency : str
             Frequency band, either "A" or "B". Default is "A".
 
@@ -343,17 +347,14 @@ class GslcProduct:
 
         """
         freq_group = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
-        if freq_group not in h5file:
-            return []
-        return [name for name in h5file[freq_group] if name in NISAR_POLARIZATIONS]
+        with self._open() as hf:
+            group = hf.get(freq_group)
+            if group is None:
+                return []
+            return [name for name in NISAR_POLARIZATIONS if name in group]
 
-    def get_available_frequencies(self, h5file: h5py.File) -> list[str]:
-        """Get available frequencies from an open HDF5 file.
-
-        Parameters
-        ----------
-        h5file : h5py.File
-            Open HDF5 file handle.
+    def get_available_frequencies(self) -> list[str]:
+        """Get available frequencies from the HDF5 file.
 
         Returns
         -------
@@ -361,11 +362,12 @@ class GslcProduct:
             List of available frequency names ("A" and/or "B").
 
         """
-        return [
-            freq
-            for freq in NISAR_FREQUENCIES
-            if f"{NISAR_GSLC_GRIDS}/frequency{freq}" in h5file
-        ]
+        with self._open() as hf:
+            return [
+                freq
+                for freq in NISAR_FREQUENCIES
+                if f"{NISAR_GSLC_GRIDS}/frequency{freq}" in hf
+            ]
 
     @cached_property
     def _identification_cache(self) -> dict[str, Any]:
@@ -387,14 +389,14 @@ class GslcProduct:
         return bp
 
     def get_shape(
-        self, h5file: h5py.File, frequency: str = "A", polarization: str = "HH"
+        self,
+        frequency: str = "A",
+        polarization: str = "HH",
     ) -> tuple[int, int]:
         """Get the shape of a GSLC dataset.
 
         Parameters
         ----------
-        h5file : h5py.File
-            Open HDF5 file handle.
         frequency : str
             Frequency band. Default is "A".
         polarization : str
@@ -406,14 +408,14 @@ class GslcProduct:
             Shape as (rows, cols).
 
         """
-        dset_path = self.get_dataset_path(frequency, polarization)
-        return h5file[dset_path].shape
+        with self._open() as hf:
+            dset_path = self.get_dataset_path(frequency, polarization)
+            return hf[dset_path].shape  # type: ignore[return-value]
 
     def read_subset(
         self,
-        h5file: h5py.File,
-        rows: slice,
-        cols: slice,
+        rows: slice | int | None,
+        cols: slice | int | None,
         frequency: str = "A",
         polarization: str = "HH",
     ) -> np.ndarray:
@@ -421,11 +423,9 @@ class GslcProduct:
 
         Parameters
         ----------
-        h5file : h5py.File
-            Open HDF5 file handle.
-        rows : slice
+        rows : slice | int | None
             Row slice for subsetting.
-        cols : slice
+        cols : slice | int | None
             Column slice for subsetting.
         frequency : str
             Frequency band. Default is "A".
@@ -438,19 +438,23 @@ class GslcProduct:
             The subset of complex GSLC data.
 
         """
-        dset_path = self.get_dataset_path(frequency, polarization)
-        return h5file[dset_path][rows, cols]
+        if rows is None:
+            rows = slice(None)
+        if cols is None:
+            cols = slice(None)
+
+        with self._open() as hf:
+            dset_path = self.get_dataset_path(frequency, polarization)
+            return hf[dset_path][rows, cols]
 
     def __fspath__(self) -> str:
         return os.fspath(self.filename)
 
-    def get_epsg(self, h5file: h5py.File, frequency: str = "A") -> int:
-        """Get the EPSG code from an open HDF5 file.
+    def get_epsg(self, frequency: str = "A") -> int:
+        """Get the EPSG code for the coordinate system.
 
         Parameters
         ----------
-        h5file : h5py.File
-            Open HDF5 file handle.
         frequency : str
             Frequency band. Default is "A".
 
@@ -461,21 +465,14 @@ class GslcProduct:
 
         """
         freq_path = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
-        # The projection dataset contains the EPSG code as a scalar integer
-        if "projection" in h5file[freq_path]:
-            return int(h5file[freq_path]["projection"][()])
-        msg = f"No projection dataset found in {freq_path}"
-        raise ValueError(msg)
+        with self._open() as hf:
+            return int(hf[freq_path]["projection"][()])  # type: ignore[index]
 
-    def get_coordinates(
-        self, h5file: h5py.File, frequency: str = "A"
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Get the x and y coordinate arrays from an open HDF5 file.
+    def get_coordinates(self, frequency: str = "A") -> tuple[np.ndarray, np.ndarray]:
+        """Get the x and y coordinate arrays.
 
         Parameters
         ----------
-        h5file : h5py.File
-            Open HDF5 file handle.
         frequency : str
             Frequency band. Default is "A".
 
@@ -486,13 +483,13 @@ class GslcProduct:
 
         """
         freq_path = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
-        x_coords = h5file[freq_path]["xCoordinates"][:]
-        y_coords = h5file[freq_path]["yCoordinates"][:]
-        return x_coords, y_coords
+        with self._open() as hf:
+            x_coords = hf[freq_path]["xCoordinates"][:]  # type: ignore[index]
+            y_coords = hf[freq_path]["yCoordinates"][:]  # type: ignore[index]
+            return x_coords, y_coords
 
     def lonlat_to_rowcol(
         self,
-        h5file: h5py.File,
         lon: float,
         lat: float,
         frequency: str = "A",
@@ -501,8 +498,6 @@ class GslcProduct:
 
         Parameters
         ----------
-        h5file : h5py.File
-            Open HDF5 file handle.
         lon : float
             Longitude in degrees.
         lat : float
@@ -521,8 +516,11 @@ class GslcProduct:
             If the coordinates are outside the image bounds.
 
         """
-        epsg = self.get_epsg(h5file, frequency)
-        x_coords, y_coords = self.get_coordinates(h5file, frequency)
+        with self._open() as hf:
+            freq_path = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
+            epsg = int(hf[freq_path]["projection"][()])  # type: ignore[index]
+            x_coords = hf[freq_path]["xCoordinates"][:]  # type: ignore[index]
+            y_coords = hf[freq_path]["yCoordinates"][:]  # type: ignore[index]
 
         # Transform lon/lat to projected coordinates
         transformer = pyproj.Transformer.from_crs(
