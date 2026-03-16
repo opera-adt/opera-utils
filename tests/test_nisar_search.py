@@ -209,8 +209,6 @@ class TestSearch:
         assert "int,FRAME_NUMBER,22" in attrs
         assert "string,ASCENDING_DESCENDING,ASCENDING" in attrs
 
-<<<<<<< HEAD
-=======
     def test_filter_by_pol(self):
         """pol filter keeps only matching polarization mode."""
         response = {
@@ -235,7 +233,6 @@ class TestSearch:
 
         assert len(products) == 1
 
->>>>>>> 1d0369c6281d923bfbde11b858ae07ad644fafda
     def test_temporal_param_in_request(self):
         """Start/end datetime is sent to CMR as temporal parameter."""
         with patch("opera_utils._cmr.requests.get") as mock_get:

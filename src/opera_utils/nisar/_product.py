@@ -19,12 +19,8 @@ import pyproj
 from typing_extensions import Self
 
 from opera_utils._cmr import get_download_url
-<<<<<<< HEAD
-from opera_utils.constants import NISAR_GUNW_FILE_REGEX, NISAR_SDS_FILE_REGEX, UrlType
-=======
 from opera_utils._remote import open_h5
-from opera_utils.constants import NISAR_SDS_FILE_REGEX, UrlType
->>>>>>> 1d0369c6281d923bfbde11b858ae07ad644fafda
+from opera_utils.constants import NISAR_GUNW_FILE_REGEX, NISAR_SDS_FILE_REGEX, UrlType
 
 # NISAR GSLC HDF5 dataset paths
 NISAR_GSLC_ROOT = "/science/LSAR/GSLC"
