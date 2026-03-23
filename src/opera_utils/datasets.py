@@ -7,11 +7,33 @@ __all__ = [
     "fetch_burst_to_frame_mapping_file",
     "fetch_frame_geometries_simple",
     "fetch_frame_to_burst_mapping_file",
+    "fetch_nisar_frame_to_bounds_file",
 ]
 
 BASE_URL = "https://github.com/opera-adt/burst_db/releases/download/v{version}/"
 
 BURST_DB_VERSION = "0.9.0"
+
+NISAR_FRAME_DB_VERSION = "0.1.0"
+NISAR_FRAME_TO_BOUNDS_FILENAME = (
+    f"opera-nisar-disp-{NISAR_FRAME_DB_VERSION}-frame-to-bounds.json"
+)
+
+NISAR_POOCH = pooch.create(
+    path=pooch.os_cache("opera_utils"),
+    # TODO: update to a release URL once the file is published
+    base_url="https://github.com/opera-adt/disp-nisar/tree/main/configs/static_ancillary_files/",
+    version=NISAR_FRAME_DB_VERSION,
+    version_dev="main",
+    env="OPERA_UTILS_DATA_DIR",
+    # $ shasum -a 256 opera-nisar-disp-0.1.0-frame-to-bounds.json
+    # f9f2e64f34cedadb9a35d7a792990f684f153eb5463a80d5b26982a942ea1a03
+    registry={
+        NISAR_FRAME_TO_BOUNDS_FILENAME: (
+            "f9f2e64f34cedadb9a35d7a792990f684f153eb5463a80d5b26982a942ea1a03"
+        ),
+    },
+)
 
 POOCH = pooch.create(
     # Folder where the data will be stored. For a sensible default, use the
@@ -73,3 +95,8 @@ def fetch_burst_to_frame_mapping_file() -> str:
 def fetch_frame_to_burst_mapping_file() -> str:
     """Get the frame-to-burst mapping for the burst database."""
     return POOCH.fetch(f"opera-s1-disp-{BURST_DB_VERSION}-frame-to-burst.json.zip")
+
+
+def fetch_nisar_frame_to_bounds_file() -> str:
+    """Get the NISAR frame-to-bounds mapping file."""
+    return NISAR_POOCH.fetch(NISAR_FRAME_TO_BOUNDS_FILENAME)
