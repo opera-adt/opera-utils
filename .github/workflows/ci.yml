@@ -47,7 +47,7 @@ jobs:
           password: ${{ secrets.EARTHDATA_PASSWORD }}
 
       - name: Setup environment
-        uses: mamba-org/setup-micromamba@v2
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: environment.yml
           environment-name: opera_utils-env
