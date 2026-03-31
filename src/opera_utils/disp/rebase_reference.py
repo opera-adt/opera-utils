@@ -631,7 +631,9 @@ def main(
 
     # Transfer the quality layers (no rebasing needed)
     all_products = DispProductStack.from_file_list(nc_files)
-    with multiprocessing.Pool(num_workers) as pool:
+    # Use 'forkserver' to avoid h5py/HDF5 mutex deadlocks that occur with 'fork'
+    mp_ctx = multiprocessing.get_context("forkserver")
+    with mp_ctx.Pool(num_workers) as pool:
         list(
             pool.starmap(
                 extract_quality_layers,
@@ -664,7 +666,7 @@ def main(
     futures: set[Future] = set()
     mask_dataset = QualityDataset.RECOMMENDED_MASK if apply_mask else None
 
-    with ProcessPoolExecutor(num_workers) as pool:
+    with ProcessPoolExecutor(num_workers, mp_context=mp_ctx) as pool:
         # Submit time series rebase function
         futures.add(
             pool.submit(
