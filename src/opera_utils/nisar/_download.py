@@ -3,21 +3,15 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-import netrc
-import shutil
-
 import h5py
 import numpy as np
-import requests
 from shapely import from_wkt
 from tqdm.auto import tqdm
 from tqdm.contrib.concurrent import process_map
 
-from opera_utils._types import PathOrStr
 from opera_utils.nisar._product import (
     NISAR_GSLC_GRIDS,
     NISAR_GSLC_IDENTIFICATION,
@@ -35,7 +29,7 @@ _ORBIT_GROUP = f"{NISAR_GSLC_ROOT}/metadata/orbit"
 
 logger = logging.getLogger("opera_utils")
 
-__all__ = ["download_gslcs", "process_file", "run_download"]
+__all__ = ["process_file", "run_download"]
 
 
 def process_file(
@@ -270,114 +264,6 @@ def _extract_subset_from_h5(
         dst.attrs["subset_rows"] = str(row_slice)
         dst.attrs["subset_cols"] = str(col_slice)
         dst.attrs["source_file"] = source_name
-
-
-def download_gslcs(
-    output_dir: PathOrStr,
-    bbox: tuple[float, float, float, float] | None = None,
-    track_frame_number: int | None = None,
-    relative_orbit_number: int | None = None,
-    orbit_direction: str | None = None,
-    start_datetime: datetime | None = None,
-    end_datetime: datetime | None = None,
-    max_jobs: int = 4,
-    short_name: str = "NISAR_L2_GSLC_BETA_V1",
-) -> list[Path]:
-    """Download full NISAR GSLC files matching the given search criteria.
-
-    Parameters
-    ----------
-    output_dir : Path | str
-        Directory to save downloaded files to.
-    bbox : tuple[float, float, float, float], optional
-        Bounding box as (west, south, east, north) in degrees lon/lat.
-    track_frame_number : int, optional
-        Track frame number (stays constant for repeat passes).
-    relative_orbit_number : int, optional
-        Relative orbit number to filter by.
-    orbit_direction : str, optional
-        Orbit direction: "A" for ascending, "D" for descending.
-    start_datetime : datetime, optional
-        Start datetime of the product search.
-    end_datetime : datetime, optional
-        End datetime of the product search.
-    max_jobs : int, optional
-        Number of parallel downloads, by default 4.
-    short_name : str, optional
-        CMR collection short name, by default "NISAR_L2_GSLC_BETA_V1".
-
-    Returns
-    -------
-    list[Path]
-        List of paths to the downloaded files.
-
-    Examples
-    --------
-    Download by bounding box:
-
-    >>> download_gslcs(  # doctest: +SKIP
-    ...     output_dir="./gslc_data",
-    ...     bbox=(-120.5, 35.0, -119.5, 36.0),
-    ... )
-
-    Download by track/orbit:
-
-    >>> download_gslcs(  # doctest: +SKIP
-    ...     output_dir="./gslc_data",
-    ...     relative_orbit_number=64,
-    ...     orbit_direction="A",
-    ... )
-
-    """
-    output_dir = Path(output_dir)
-    products = search(
-        bbox=bbox,
-        track_frame_number=track_frame_number,
-        relative_orbit_number=relative_orbit_number,
-        orbit_direction=orbit_direction,
-        start_datetime=start_datetime,
-        end_datetime=end_datetime,
-        url_type=UrlType.HTTPS,
-        short_name=short_name,
-    )
-
-    if not products:
-        logger.warning("No GSLC products found matching search criteria")
-        return []
-
-    logger.info(f"Found {len(products)} GSLC products to download")
-    output_dir.mkdir(exist_ok=True, parents=True)
-
-    auth = netrc.netrc().authenticators("urs.earthdata.nasa.gov")
-    if auth is None:
-        msg = "No .netrc entry found for urs.earthdata.nasa.gov"
-        raise ValueError(msg)
-    username, _, password = auth
-    session = requests.Session()
-    session.auth = (username, password)
-
-    def _download_one(product: GslcProduct) -> Path:
-        url = str(product.filename)
-        out_path = output_dir / Path(url).name
-        if out_path.exists():
-            logger.info(f"Skipped (exists): {out_path.name}")
-            return out_path
-        logger.debug(f"Downloading {out_path.name}")
-        with session.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(out_path, "wb") as f:
-                shutil.copyfileobj(r.raw, f)
-        return out_path
-
-    out_paths: list[Path] = []
-    with ThreadPoolExecutor(max_workers=max_jobs) as pool:
-        futures = {pool.submit(_download_one, p): p for p in products}
-        for future in tqdm(
-            as_completed(futures), total=len(futures), desc="Downloading GSLC"
-        ):
-            out_paths.append(future.result())
-
-    return sorted(out_paths)
 
 
 def _get_rowcol_slice(
