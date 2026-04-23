@@ -9,8 +9,6 @@ from itertools import groupby
 from typing import Any
 
 import numpy as np
-from rich.console import Console
-from rich.table import Table
 
 from ._dates import filter_by_date, get_dates
 from ._helpers import flatten, powerset, sorted_deduped_values
@@ -326,6 +324,9 @@ def print_with_rich(
     options: Iterable[BurstSubsetOption], use_stderr: bool = True
 ) -> None:
     """Print a summary of the burst options using `rich.Table`."""
+    from rich.console import Console  # noqa: PLC0415
+    from rich.table import Table  # noqa: PLC0415
+
     console = Console(stderr=use_stderr)
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Option", style="dim", width=6)
