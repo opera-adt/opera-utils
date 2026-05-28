@@ -7,7 +7,6 @@ from typing import Literal
 
 import h5py
 import numpy as np
-import rioxarray as rxr
 import xarray as xr
 
 
@@ -56,8 +55,11 @@ def get_gslc_mask(
         valid.astype(np.uint8),
         dims=("y", "x"),
         coords={"y": y_coords, "x": x_coords},
-        attrs={"long_name": "valid sample mask", "flag_values": "0,1",
-               "flag_meanings": "invalid valid"},
+        attrs={
+            "long_name": "valid sample mask",
+            "flag_values": "0,1",
+            "flag_meanings": "invalid valid",
+        },
     ).rio.write_crs(f"EPSG:{epsg}")
 
     if output_path is not None:
@@ -115,9 +117,9 @@ def get_gunw_mask(
         epsg = int(grp["projection"][()])
 
     # Decode 3-digit decimal encoding
-    water_flag = raw // 100          # hundreds digit
+    water_flag = raw // 100  # hundreds digit
     ref_subswath = (raw % 100) // 10  # tens digit
-    sec_subswath = raw % 10           # units digit
+    sec_subswath = raw % 10  # units digit
     fill = raw == 255
 
     valid = (water_flag == 0) & (ref_subswath != 0) & (sec_subswath != 0) & ~fill
@@ -126,9 +128,12 @@ def get_gunw_mask(
         valid.astype(np.uint8),
         dims=("y", "x"),
         coords={"y": y_coords, "x": x_coords},
-        attrs={"long_name": "valid sample mask", "flag_values": "0,1",
-               "flag_meanings": "invalid valid",
-               "source_layer": layer},
+        attrs={
+            "long_name": "valid sample mask",
+            "flag_values": "0,1",
+            "flag_meanings": "invalid valid",
+            "source_layer": layer,
+        },
     ).rio.write_crs(f"EPSG:{epsg}")
 
     if output_path is not None:

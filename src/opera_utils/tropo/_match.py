@@ -11,7 +11,7 @@ import rioxarray as rxr
 
 def read_reference_point(reference_point_file: str | Path) -> tuple[int, int]:
     """Read ``(row, col)`` from a ``reference_point.txt`` file."""
-    row_col = Path(reference_point_file).read_text().strip().split(",")
+    row_col = Path(reference_point_file).read_text(encoding="utf-8").strip().split(",")
     return int(row_col[0]), int(row_col[1])
 
 

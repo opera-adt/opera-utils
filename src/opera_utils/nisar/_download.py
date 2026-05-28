@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
+import netrc
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-
-import netrc
-import shutil
 
 import h5py
 import numpy as np

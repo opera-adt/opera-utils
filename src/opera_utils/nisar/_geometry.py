@@ -18,7 +18,18 @@ from tqdm import tqdm
 def _interp_chunk(
     args: tuple,
 ) -> tuple[slice, list[np.ndarray]]:
-    sl, y_vals, x_vals, dem_chunk, heights, y_rg_inc, x_rg, arrays_3d, src_epsg, dem_crs = args
+    (
+        sl,
+        y_vals,
+        x_vals,
+        dem_chunk,
+        heights,
+        y_rg_inc,
+        x_rg,
+        arrays_3d,
+        src_epsg,
+        dem_crs,
+    ) = args
     transformer = Transformer.from_crs(dem_crs, f"EPSG:{src_epsg}", always_xy=True)
     yy_c, xx_c = np.meshgrid(y_vals, x_vals, indexing="ij")
     xx_rg, yy_rg = transformer.transform(xx_c.ravel(), yy_c.ravel())
@@ -89,7 +100,7 @@ def prepare_incidence_angle(
     assert np.all(np.diff(heights) > 0), "heights must be strictly increasing"
     assert np.all(np.diff(x_rg) > 0), "x_rg must be strictly increasing"
 
-    t_to_rg = Transformer.from_crs("EPSG:4326", f"EPSG:{src_epsg}", always_xy=True)
+    Transformer.from_crs("EPSG:4326", f"EPSG:{src_epsg}", always_xy=True)
     dem_da = rxr.open_rasterio(dem_path, masked=True).squeeze()
     dem_val = dem_da.values
     dem_crs = dem_da.rio.crs
@@ -102,9 +113,12 @@ def prepare_incidence_angle(
     x_overlap = max(dem_xs_rg) > x_rg.min() and min(dem_xs_rg) < x_rg.max()
     y_overlap = max(dem_ys_rg) > y_rg.min() and min(dem_ys_rg) < y_rg.max()
     if not (x_overlap and y_overlap):
-        raise ValueError(
+        msg = (
             "DEM and radarGrid do not overlap. "
             "Check that gslc_path covers your area of interest."
+        )
+        raise ValueError(
+            msg
         )
 
     # Flip y axis so RegularGridInterpolator gets strictly increasing coords
