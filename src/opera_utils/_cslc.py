@@ -669,4 +669,3 @@ def _get_raster_gt(filename: Filename) -> list[float]:
         raise ImportError(msg)
     ds = gdal.Open(fspath(filename))
     return ds.GetGeoTransform()
-
