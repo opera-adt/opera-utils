@@ -117,9 +117,7 @@ def prepare_incidence_angle(
             "DEM and radarGrid do not overlap. "
             "Check that gslc_path covers your area of interest."
         )
-        raise ValueError(
-            msg
-        )
+        raise ValueError(msg)
 
     # Flip y axis so RegularGridInterpolator gets strictly increasing coords
     y_rg_flip = y_rg[::-1]

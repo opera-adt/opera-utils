@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -54,8 +55,6 @@ def apply_tropo_correction(
         if np.isfinite(ref_val):
             tropo_data -= ref_val
         else:
-            import warnings
-
             warnings.warn(
                 f"Reference pixel ({ref_row}, {ref_col}) is NaN in "
                 f"{Path(tropo_path).name}; skipping re-referencing.",
