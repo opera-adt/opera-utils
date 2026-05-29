@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import subprocess
 import tempfile
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
@@ -600,33 +599,41 @@ def create_nodata_mask(
             msg = f"{opera_file_list[-1]} is not a CSLC file"
             raise ValueError(msg) from e
 
+    test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"
     try:
-        test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"
-        # convert pixels to degrees lat/lon
-        gt = _get_raster_gt(test_f)
+        src_ds = gdal.Open(fspath(test_f))
+        if src_ds is None:
+            msg = f"Unable to open {test_f}"
+            raise ValueError(msg)
+        gt = src_ds.GetGeoTransform()
     except RuntimeError as e:
         msg = f"Unable to get geotransform from {test_f}"
         raise ValueError(msg) from e
     # TODO: more robust way to get the pixel size... this is a hack
     # maybe just use pyproj to warp lat/lon to meters and back?
-    dx_meters = gt[1]
-    dx_degrees = dx_meters / 111000
+    dx_degrees = gt[1] / 111000
     buffer_degrees = buffer_pixels * dx_degrees
 
     # Get the union of all the polygons and convert to a temp geojson
     union_poly = get_union_polygon(opera_file_list, buffer_degrees=buffer_degrees)
-    # convert shapely polygon to geojson
 
-    # Make a dummy raster from the first file with all 0s
-    # This will get filled in with the polygon rasterization
-    cmd = (
-        f"gdal_calc.py --quiet --outfile {out_file} --type Byte  -A"
-        f" NETCDF:{opera_file_list[-1]}:{dataset_name} --calc 'numpy.nan_to_num(A)"
-        " * 0' --creation-option COMPRESS=LZW --creation-option TILED=YES"
-        " --creation-option BLOCKXSIZE=256 --creation-option BLOCKYSIZE=256"
+    # Create the zero-filled template raster via GDAL Python API.
+    # Reads only file metadata (geotransform, projection, size) — avoids
+    # spawning a gdal_calc.py subprocess and reading any SLC/GSLC data.
+    drv = gdal.GetDriverByName("GTiff")
+    dst_ds = drv.Create(
+        fspath(out_file),
+        src_ds.RasterXSize,
+        src_ds.RasterYSize,
+        1,
+        gdal.GDT_Byte,
+        options=["COMPRESS=LZW", "TILED=YES", "BLOCKXSIZE=256", "BLOCKYSIZE=256"],
     )
-    logger.info(cmd)
-    subprocess.check_call(cmd, shell=True)
+    dst_ds.SetGeoTransform(gt)
+    dst_ds.SetProjection(src_ds.GetProjection())
+    dst_ds.GetRasterBand(1).Fill(0)
+    src_ds = None
+    dst_ds = None
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_vector_file = Path(tmpdir) / "temp.geojson"
         with open(temp_vector_file, "w", encoding="utf-8") as f:
@@ -644,23 +651,21 @@ make_nodata_mask = create_nodata_mask
 
 
 def _get_raster_gt(filename: Filename) -> list[float]:
-    """Get the geotransform from a file.
+    """Get the GDAL geotransform from a raster file.
 
     Parameters
     ----------
     filename : Filename
-        Path to the file to load.
+        Path to the raster file (supports any GDAL-readable format).
 
     Returns
     -------
-    List[float]
-        6 floats representing a GDAL Geotransform.
+    list[float]
+        Six-element GDAL geotransform.
 
     """
     if not HAS_GDAL:
         msg = "osgeo (GDAL) must be installed to use this function"
         raise ImportError(msg)
-
     ds = gdal.Open(fspath(filename))
-    gt = ds.GetGeoTransform()
-    return gt
+    return ds.GetGeoTransform()
