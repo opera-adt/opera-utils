@@ -89,14 +89,18 @@ def search(
 
     Examples
     --------
+    These examples query CMR over the network, so they are skipped during
+    doctest collection (they require network access).
+
     Search by bounding box (most ergonomic for finding a time series):
 
-    >>> products = search(bbox=(40.62, 13.56, 40.72, 13.64))
+    >>> products = search(bbox=(40.62, 13.56, 40.72, 13.64))  # doctest: +SKIP
 
     Search by orbit parameters:
 
-    >>> products = search(relative_orbit_number=172, track_frame_number=8,
-    ...                   orbit_direction="A")
+    >>> products = search(  # doctest: +SKIP
+    ...     relative_orbit_number=172, track_frame_number=8, orbit_direction="A"
+    ... )
 
     """
     search_url = "https://cmr.earthdata.nasa.gov/search/granules.umm_json"
