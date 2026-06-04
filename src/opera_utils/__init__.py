@@ -6,6 +6,7 @@ from __future__ import annotations
 from ._cslc import *
 from ._dates import *
 from ._helpers import *
+from ._remote import *
 from ._utils import *
 from ._version import version as __version__
 from .burst_frame_db import *

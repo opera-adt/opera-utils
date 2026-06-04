@@ -27,9 +27,40 @@ __all__ = [
     "get_https_fs",
     "get_s3_fs",
     "get_url_str",
+    "is_remote_url",
     "open_file",
     "open_h5",
 ]
+
+
+def is_remote_url(file_path: str | Path) -> bool:
+    """Check if a file path is a remote URL (https://, http://, or s3://).
+
+    Parameters
+    ----------
+    file_path : str | Path
+        File path to check.
+
+    Returns
+    -------
+    bool
+        True if the path is a remote URL, False otherwise.
+
+    Examples
+    --------
+    >>> is_remote_url("https://example.com/file.h5")
+    True
+    >>> is_remote_url("s3://bucket/file.h5")
+    True
+    >>> is_remote_url("/local/path/file.h5")
+    False
+    >>> is_remote_url("file.h5")
+    False
+
+    """
+    path_str = str(file_path)
+    parsed = urlparse(path_str)
+    return parsed.scheme in ("https", "http", "s3")
 
 
 def open_file(

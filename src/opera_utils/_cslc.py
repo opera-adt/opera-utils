@@ -7,11 +7,12 @@ import tempfile
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from os import fspath
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
 import h5py
 import numpy as np
+from osgeo import osr
 from pyproj import CRS, Transformer
 from shapely import geometry, ops, wkt
 
@@ -599,16 +600,30 @@ def create_nodata_mask(
             msg = f"{opera_file_list[-1]} is not a CSLC file"
             raise ValueError(msg) from e
 
-    test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"
-    try:
-        src_ds = gdal.Open(fspath(test_f))
-        if src_ds is None:
-            msg = f"Unable to open {test_f}"
-            raise ValueError(msg)
-        gt = src_ds.GetGeoTransform()
-    except RuntimeError as e:
-        msg = f"Unable to get geotransform from {test_f}"
-        raise ValueError(msg) from e
+    # GDAL's NETCDF driver can't derive a geotransform from NISAR's CF layout,
+    # and GDAL's HDF5 driver returns identity. Read it from h5py for NISAR;
+    # fall back to GDAL for OPERA-CSLC files.
+    is_nisar = "NISAR" in str(opera_file_list[-1])
+    if is_nisar:
+        gt, projection_wkt, x_size, y_size = _nisar_geotransform_and_grid(
+            opera_file_list[-1], dataset_name
+        )
+    else:
+        test_f = f"NETCDF:{opera_file_list[-1]}:{dataset_name}"
+        try:
+            src_ds = gdal.Open(fspath(test_f))
+            if src_ds is None:
+                msg = f"Unable to open {test_f}"
+                raise ValueError(msg)
+            gt = src_ds.GetGeoTransform()
+            projection_wkt = src_ds.GetProjection()
+            x_size = src_ds.RasterXSize
+            y_size = src_ds.RasterYSize
+            src_ds = None
+        except RuntimeError as e:
+            msg = f"Unable to get geotransform from {test_f}"
+            raise ValueError(msg) from e
+
     # TODO: more robust way to get the pixel size... this is a hack
     # maybe just use pyproj to warp lat/lon to meters and back?
     dx_degrees = gt[1] / 111000
@@ -617,22 +632,18 @@ def create_nodata_mask(
     # Get the union of all the polygons and convert to a temp geojson
     union_poly = get_union_polygon(opera_file_list, buffer_degrees=buffer_degrees)
 
-    # Create the zero-filled template raster via GDAL Python API.
-    # Reads only file metadata (geotransform, projection, size) — avoids
-    # spawning a gdal_calc.py subprocess and reading any SLC/GSLC data.
     drv = gdal.GetDriverByName("GTiff")
     dst_ds = drv.Create(
         fspath(out_file),
-        src_ds.RasterXSize,
-        src_ds.RasterYSize,
+        x_size,
+        y_size,
         1,
         gdal.GDT_Byte,
         options=["COMPRESS=LZW", "TILED=YES", "BLOCKXSIZE=256", "BLOCKYSIZE=256"],
     )
     dst_ds.SetGeoTransform(gt)
-    dst_ds.SetProjection(src_ds.GetProjection())
+    dst_ds.SetProjection(projection_wkt)
     dst_ds.GetRasterBand(1).Fill(0)
-    src_ds = None
     dst_ds = None
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_vector_file = Path(tmpdir) / "temp.geojson"
@@ -645,6 +656,36 @@ def create_nodata_mask(
 
         # Now burn in the union of all polygons
         gdal.Rasterize(dst_ds, src_ds, burnValues=[1])
+
+
+def _nisar_geotransform_and_grid(
+    nisar_file: Filename, subdataset: str
+) -> tuple[tuple[float, float, float, float, float, float], str, int, int]:
+    """Read geotransform, projection WKT, and grid size from a NISAR GSLC HDF5.
+
+    NISAR's CF layout isn't recognized by GDAL's NETCDF driver and the HDF5
+    driver returns an identity transform — so read directly via h5py.
+    """
+    grid_path = str(PurePosixPath(subdataset).parent)
+    with h5py.File(nisar_file, "r") as f:
+        x_coords = f[f"{grid_path}/xCoordinates"][:]
+        y_coords = f[f"{grid_path}/yCoordinates"][:]
+        dx = float(f[f"{grid_path}/xCoordinateSpacing"][()])
+        dy = float(f[f"{grid_path}/yCoordinateSpacing"][()])
+        proj_dset_name = f[subdataset].attrs.get("grid_mapping", "projection")
+        if isinstance(proj_dset_name, bytes):
+            proj_dset_name = proj_dset_name.decode()
+        epsg_raw = f[f"{grid_path}/{proj_dset_name}"][()]
+        epsg = int(epsg_raw.decode()) if isinstance(epsg_raw, bytes) else int(epsg_raw)
+
+    nx, ny = len(x_coords), len(y_coords)
+    left = float(x_coords.min()) - abs(dx) / 2.0
+    top = float(y_coords.max()) + abs(dy) / 2.0
+    gt = (left, abs(dx), 0.0, top, 0.0, -abs(dy))
+
+    sr = osr.SpatialReference()
+    sr.ImportFromEPSG(epsg)
+    return gt, sr.ExportToWkt(), nx, ny
 
 
 make_nodata_mask = create_nodata_mask
