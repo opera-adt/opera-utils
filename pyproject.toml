@@ -27,10 +27,12 @@ classifiers = [
 license = { file = "LICENSE.txt" }
 
 dependencies = [
+  "aiohttp",
   "h5py>=1.10",
   "numpy>=1.24",
   "pooch>=1.7",
   "pyproj>=3.3",
+  "s3fs",
   "shapely>=1.8",
   "typing_extensions>=4",
   "tyro>=0.9",
