@@ -82,12 +82,14 @@ class ASFCredentialEndpoints(Enum):
     OPERA = "https://cumulus.asf.alaska.edu/s3credentials"
     OPERA_UAT = "https://cumulus-test.asf.alaska.edu/s3credentials"
     SENTINEL1 = "https://sentinel1.asf.alaska.edu/s3credentials"
+    NISAR = "https://nisar.asf.earthdatacloud.nasa.gov/s3credentials"
 
 
 ENDPOINT_TO_HOST = {
     ASFCredentialEndpoints.OPERA: "urs.earthdata.nasa.gov",
     ASFCredentialEndpoints.OPERA_UAT: "uat.urs.earthdata.nasa.gov",
     ASFCredentialEndpoints.SENTINEL1: "urs.earthdata.nasa.gov",
+    ASFCredentialEndpoints.NISAR: "urs.earthdata.nasa.gov",
 }
 
 
