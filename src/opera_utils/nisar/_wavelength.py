@@ -59,7 +59,7 @@ def _get_frequency_group_path(subdataset: str) -> str:
     matches = list(_FREQUENCY_GROUP_REGEX.finditer(subdataset))
     if len(matches) != 1:
         msg = (
-            f"Expected exactly one 'frequencyA' or 'frequencyB' path segment in"
+            "Expected exactly one 'frequencyA' or 'frequencyB' path segment in"
             f" subdataset {subdataset!r}, found {len(matches)}"
         )
         raise ValueError(msg)
