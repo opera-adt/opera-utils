@@ -23,6 +23,7 @@ from ._product import (
 )
 from ._remote import open_file, open_h5
 from ._search import search
+from ._wavelength import get_nisar_wavelength
 
 __all__ = [
     "GslcProduct",
@@ -36,6 +37,7 @@ __all__ = [
     "get_gslc_mask",
     "get_gunw_mask",
     "get_nisar_bbox",
+    "get_nisar_wavelength",
     "load_gpkg",
     "nisar_frame_info",
     "open_file",
