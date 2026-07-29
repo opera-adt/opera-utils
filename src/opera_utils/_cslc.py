@@ -23,7 +23,7 @@ except ImportError:
     HAS_ICE3 = False
 
 try:
-    from osgeo import gdal
+    from osgeo import gdal, osr
 
     HAS_GDAL = True
 except ImportError:
