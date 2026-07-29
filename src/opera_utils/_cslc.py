@@ -12,7 +12,6 @@ from typing import Any, Callable
 
 import h5py
 import numpy as np
-from osgeo import osr
 from pyproj import CRS, Transformer
 from shapely import geometry, ops, wkt
 
@@ -30,6 +29,7 @@ try:
 except ImportError:
     HAS_GDAL = False
     gdal = None
+    osr = None
 
 from ._types import Filename
 from .bursts import normalize_burst_id
