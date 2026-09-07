@@ -216,7 +216,7 @@ def _burst_id_mapping_from_files(
 
 
 def generate_burst_subset_options(
-    B: np.ndarray,  # noqa: N803
+    B: np.ndarray,  # ruff: ignore[invalid-argument-name]
     burst_ids: Sequence[str],
     dates: Sequence[datetime],
 ) -> list[BurstSubsetOption]:

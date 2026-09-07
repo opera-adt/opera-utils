@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import rioxarray as rxr  # noqa: F401
+import rioxarray as rxr  # ruff: ignore[unused-import]
 import tyro
 import xarray as xr
 from affine import Affine
