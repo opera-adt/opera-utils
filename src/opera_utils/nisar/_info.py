@@ -72,11 +72,11 @@ def plot_frames(
     query_bbox: Bbox | None = None,
 ) -> None:
     """Plot actual frame polygons on a map with annotations."""
-    import cartopy.crs as ccrs  # noqa: PLC0415
-    import cartopy.io.shapereader as shpreader  # noqa: PLC0415
-    import matplotlib.patches as mpatches  # noqa: PLC0415
-    import matplotlib.pyplot as plt  # noqa: PLC0415
-    from shapely.ops import unary_union  # noqa: PLC0415
+    import cartopy.crs as ccrs  # ruff: ignore[import-outside-top-level]
+    import cartopy.io.shapereader as shpreader  # ruff: ignore[import-outside-top-level]
+    import matplotlib.patches as mpatches  # ruff: ignore[import-outside-top-level]
+    import matplotlib.pyplot as plt  # ruff: ignore[import-outside-top-level]
+    from shapely.ops import unary_union  # ruff: ignore[import-outside-top-level]
 
     geometry_union = unary_union(gdf_match.geometry.values)
     minx, miny, maxx, maxy = geometry_union.bounds
