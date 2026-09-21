@@ -127,7 +127,7 @@ NISAR_GUNW_FILE_REGEX = (
 # {burst_id_str}_{date_str}
 COMPASS_FILE_REGEX = r"(?P<burst_id>t\d{3}_\d+_iw\d)_(?P<start_datetime>\d{8}).h5"
 
-# OPERA_L3_DISP-S1_IW_F11116_VV_20160705T140755Z_20160729T140756Z_v1.0_20241219T231545Z.nc  # noqa: E501
+# OPERA_L3_DISP-S1_IW_F11116_VV_20160705T140755Z_20160729T140756Z_v1.0_20241219T231545Z.nc  # ruff: ignore[line-too-long]
 DISP_FILE_REGEX = re.compile(
     r"OPERA_L3_DISP-"
     r"(?P<sensor>(S1|NI))_"

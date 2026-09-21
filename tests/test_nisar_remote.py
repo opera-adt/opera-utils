@@ -47,7 +47,7 @@ class TestGetHttpsFs:
         mock_fs = MagicMock()
         monkeypatch.setattr(
             "opera_utils._remote.fsspec.filesystem",
-            lambda *a, **kw: mock_fs,  # noqa: ARG005
+            lambda *a, **kw: mock_fs,  # ruff: ignore[unused-lambda-argument]
         )
 
         fs = get_https_fs()
@@ -91,7 +91,7 @@ class TestOpenFile:
 
         monkeypatch.setattr(
             "opera_utils._remote.fsspec.filesystem",
-            lambda protocol: mock_fs,  # noqa: ARG005
+            lambda protocol: mock_fs,  # ruff: ignore[unused-lambda-argument]
         )
 
         result = open_file(test_file)
@@ -106,7 +106,7 @@ class TestOpenFile:
 
         monkeypatch.setattr(
             "opera_utils._remote.get_https_fs",
-            lambda username, password, host=None: mock_fs,  # noqa: ARG005
+            lambda username, password, host=None: mock_fs,  # ruff: ignore[unused-lambda-argument]
         )
 
         result = open_file("https://example.com/data/file.h5")
@@ -121,7 +121,7 @@ class TestOpenFile:
 
         monkeypatch.setattr(
             "opera_utils._remote.get_s3_fs",
-            lambda asf_endpoint=None: mock_fs,  # noqa: ARG005
+            lambda asf_endpoint=None: mock_fs,  # ruff: ignore[unused-lambda-argument]
         )
 
         result = open_file("s3://bucket/data/file.h5")
@@ -143,11 +143,11 @@ class TestOpenH5:
 
         monkeypatch.setattr(
             "opera_utils._remote.open_file",
-            lambda *a, **kw: mock_byte_stream,  # noqa: ARG005
+            lambda *a, **kw: mock_byte_stream,  # ruff: ignore[unused-lambda-argument]
         )
         monkeypatch.setattr(
             "opera_utils._remote.h5py.File",
-            lambda *a, **kw: mock_h5_file,  # noqa: ARG005
+            lambda *a, **kw: mock_h5_file,  # ruff: ignore[unused-lambda-argument]
         )
 
         result = open_h5("https://example.com/data/file.h5")
@@ -164,7 +164,7 @@ class TestOpenH5:
 
         monkeypatch.setattr(
             "opera_utils._remote.open_file",
-            lambda *a, **kw: mock_byte_stream,  # noqa: ARG005
+            lambda *a, **kw: mock_byte_stream,  # ruff: ignore[unused-lambda-argument]
         )
         monkeypatch.setattr("opera_utils._remote.h5py.File", mock_h5_file)
 
