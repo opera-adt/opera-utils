@@ -170,7 +170,7 @@ class AWSCredentials:
             If botocore is not installed.
 
         """
-        import botocore.session  # noqa: PLC0415
+        import botocore.session  # ruff: ignore[import-outside-top-level]
 
         session = botocore.session.get_session()
         credentials = session.get_credentials()
