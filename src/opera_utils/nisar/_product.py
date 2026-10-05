@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -299,7 +299,7 @@ class GslcProduct:
         return f"{self.major_version}.{self.minor_version:03d}"
 
     @contextmanager
-    def _open(self) -> Iterator[h5py.File]:
+    def _open(self) -> Generator[h5py.File, None, None]:
         """Open the HDF5 file (local or remote) as a context manager."""
         with open_h5(str(self.filename)) as hf:
             yield hf
