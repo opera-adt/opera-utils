@@ -135,7 +135,7 @@ def _convert_lonlat_to_rowcol(
     )
     xx, yy = transformer_from_latlon.transform(lon, lat, radians=False)
     # Now transform from the grid x, y to row, col using the inverse of the transform
-    col, row = ~transform * (xx, yy)
+    col, row = ~transform @ (xx, yy)
     return round(row), round(col)
 
 

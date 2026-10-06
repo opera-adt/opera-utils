@@ -280,8 +280,9 @@ def get_https_fs(
         earthdata_username, earthdata_password, host=host
     )
 
+    auth_header = aiohttp.encode_basic_auth(username, password)
     fs = fsspec.filesystem(
-        "https", client_kwargs={"auth": aiohttp.BasicAuth(username, password)}
+        "https", client_kwargs={"headers": {"Authorization": auth_header}}
     )
     return fs
 
