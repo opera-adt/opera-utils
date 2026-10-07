@@ -324,8 +324,8 @@ def print_with_rich(
     options: Iterable[BurstSubsetOption], use_stderr: bool = True
 ) -> None:
     """Print a summary of the burst options using `rich.Table`."""
-    from rich.console import Console  # noqa: PLC0415
-    from rich.table import Table  # noqa: PLC0415
+    from rich.console import Console
+    from rich.table import Table
 
     console = Console(stderr=use_stderr)
     table = Table(show_header=True, header_style="bold magenta")

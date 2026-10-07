@@ -143,9 +143,9 @@ class DispProduct:
 
     @property
     def bounds(self) -> Bbox:
-        left, top = self.transform * (0, 0)
+        left, top = self.transform @ (0, 0)
         height, width = self.shape[-2:]
-        right, bottom = self.transform * (width, height)
+        right, bottom = self.transform @ (width, height)
         return Bbox(float(left), float(bottom), float(right), float(top))
 
     def get_rasterio_profile(self, chunks: tuple[int, int] = (256, 256)) -> dict:
@@ -383,7 +383,7 @@ def lonlat_to_rowcol(product: DispProduct, lon: float, lat: float) -> tuple[int,
     x, y = transformer.transform(lon, lat, radians=False)
 
     # Apply the inverse of the UTM affine transform to get row/col
-    col, row = ~product.transform * (x, y)
+    col, row = ~product.transform @ (x, y)
 
     # Return to nearest, then check if out of bounds
     row, col = round(row), round(col)
