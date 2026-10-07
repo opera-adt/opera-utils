@@ -20,7 +20,14 @@ from typing_extensions import Self
 
 from opera_utils._cmr import get_download_url
 from opera_utils._remote import open_h5
-from opera_utils.constants import NISAR_GUNW_FILE_REGEX, NISAR_SDS_FILE_REGEX, UrlType
+from opera_utils.constants import (
+    NISAR_GUNW_FILE_REGEX,
+    NISAR_SDS_FILE_REGEX,
+    SPEED_OF_LIGHT,
+    UrlType,
+)
+
+from ._wavelength import _read_center_frequency
 
 # NISAR GSLC HDF5 dataset paths
 NISAR_GSLC_ROOT = "/science/LSAR/GSLC"
@@ -364,6 +371,33 @@ class GslcProduct:
                 for freq in NISAR_FREQUENCIES
                 if f"{NISAR_GSLC_GRIDS}/frequency{freq}" in hf
             ]
+
+    def get_wavelength(self, frequency: str = "A") -> float:
+        """Get the radar wavelength for a frequency band.
+
+        Parameters
+        ----------
+        frequency : str
+            Frequency band, either "A" or "B". Default is "A".
+
+        Returns
+        -------
+        float
+            Radar wavelength in meters, computed from the frequency group's
+            ``centerFrequency``.
+
+        Raises
+        ------
+        ValueError
+            If `frequency` is invalid, or if ``centerFrequency`` is missing
+            or is not a positive, finite, real-valued scalar.
+
+        """
+        if frequency not in NISAR_FREQUENCIES:
+            msg = f"Invalid frequency {frequency}. Choices: {NISAR_FREQUENCIES}"
+            raise ValueError(msg)
+        freq_group = f"{NISAR_GSLC_GRIDS}/frequency{frequency}"
+        return SPEED_OF_LIGHT / _read_center_frequency(self.filename, freq_group)
 
     @cached_property
     def _identification_cache(self) -> dict[str, Any]:
