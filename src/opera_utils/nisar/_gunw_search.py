@@ -176,7 +176,8 @@ def search_gunw(
             stacklevel=1,
         )
 
-    items = fetch_cmr_pages(search_url, params)
+    # CMR's UMM-JSON leaves out and mislabels NISAR records (2026-10).
+    items = fetch_cmr_pages(search_url, params, verify=True)
 
     products: list[GunwProduct] = []
     for item in items:

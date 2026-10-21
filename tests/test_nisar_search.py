@@ -50,6 +50,13 @@ def cmr_response_json():
     }
 
 
+@pytest.fixture(autouse=True)
+def _no_atom_listing(monkeypatch):
+    """These tests mock UMM-JSON pages only; the atom-JSON cross-check that
+    ``verify=True`` adds is covered in test_cmr.py."""
+    monkeypatch.setattr("opera_utils._cmr._list_granule_names", lambda *_a, **_k: {})
+
+
 class MockResponse:
     def __init__(self, json_data, status_code=200, headers=None):
         self.json_data = json_data
