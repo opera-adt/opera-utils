@@ -53,7 +53,7 @@ class FakeCMR:
             if c not in self.hidden
         ]
 
-    def get(self, url, params=None, headers=None, timeout=0):  # noqa: ARG002
+    def get(self, url, params=None, headers=None, timeout=0):  # ruff: ignore[unused-method-argument]
         assert timeout > 0
         if self.failures:
             failure = self.failures.pop(0)
@@ -75,7 +75,7 @@ class FakeCMR:
         entries = [{"id": c, "title": self.ids[c]} for c in page]
         return FakeResponse({"feed": {"entry": entries}}, after=after)
 
-    def post(self, url, data=None, timeout=0):  # noqa: ARG002
+    def post(self, url, data=None, timeout=0):  # ruff: ignore[unused-method-argument]
         assert timeout > 0
         cids = [c for c in data["concept_id[]"] if c in self.ids]
         return FakeResponse({"items": self._items(cids)})
