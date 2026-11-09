@@ -89,7 +89,7 @@ class TestDispProduct:
     def mock_get_frame_bbox(self, monkeypatch):
         monkeypatch.setattr(
             "opera_utils.burst_frame_db.get_frame_bbox",
-            lambda frame_id: MOCK_FRAME_BBOX_RESULT,  # noqa: ARG005
+            lambda frame_id: MOCK_FRAME_BBOX_RESULT,  # ruff: ignore[unused-lambda-argument]
         )
 
     def test_epsg_property(self):
@@ -252,8 +252,9 @@ class TestDispProductStack:
 
         # Check we kept the newer generation times
         assert all(
-            p.generation_datetime
-            == datetime(2025, 10, 27, 2, 34, 6, tzinfo=timezone.utc)
+            p.generation_datetime == datetime(
+                2025, 10, 27, 2, 34, 6, tzinfo=timezone.utc
+            )
             for p in stack.products
         )
 
