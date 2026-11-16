@@ -518,7 +518,8 @@ def _req(url, method="GET", body=None, headers=None):
         with urllib.request.urlopen(req) as r:
             return r.status, r.read(), r.headers.get("Content-Type")
     except urllib.error.HTTPError as e:
-        return e.code, e.read(), e.headers.get("Content-Type")
+        with e:  # an HTTPError holds the response: close it (ResourceWarning)
+            return e.code, e.read(), e.headers.get("Content-Type")
 
 
 def test_server_api_and_static(server):

@@ -252,13 +252,13 @@ class Frame:
         x, y = Transformer.from_crs("EPSG:4326", self.crs, always_xy=True).transform(
             lon, lat
         )
-        col, row = ~self.transform * (x, y)
+        col, row = _apply(~self.transform, x, y)
         return int(np.floor(row)), int(np.floor(col))
 
     def rowcol_to_lonlat(self, row: int, col: int) -> tuple[float, float]:
         from pyproj import Transformer
 
-        x, y = self.transform * (col + 0.5, row + 0.5)
+        x, y = _apply(self.transform, col + 0.5, row + 0.5)
         lon, lat = Transformer.from_crs(
             self.crs, "EPSG:4326", always_xy=True
         ).transform(x, y)
@@ -270,7 +270,9 @@ class Frame:
 
         h, w = self.shape
         tf = Transformer.from_crs(self.crs, "EPSG:4326", always_xy=True)
-        pts = [self.transform * (c, r) for c, r in ((0, 0), (w, 0), (w, h), (0, h))]
+        pts = [
+            _apply(self.transform, c, r) for c, r in ((0, 0), (w, 0), (w, h), (0, h))
+        ]
         return [list(map(float, tf.transform(x, y))) for x, y in pts]
 
     # analysis (velocity, coherence, valid epochs), computed once
@@ -523,6 +525,15 @@ class Frame:
                 )
             written.append(path)
         return written
+
+
+def _apply(t, x: float, y: float) -> tuple[float, float]:
+    """Apply an affine transform to one point.
+
+    Written out instead of ``t * (x, y)``: affine 3 deprecates ``*`` for ``@``,
+    which affine 2 does not have.
+    """
+    return t.a * x + t.b * y + t.c, t.d * x + t.e * y + t.f
 
 
 def _iso(d: datetime) -> str:
