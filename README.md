@@ -43,6 +43,19 @@ pip install opera-utils[all]  # all optional dependencies
 ```
 
 
+## OPERA Studio (web interface)
+
+Search, subset and download DISP-S1, CSLC-S1, NISAR, TROPO and static layers from a
+map, with DISP-S1 rebasing and point re-referencing:
+
+```bash
+pip install "opera-utils[studio]"
+opera-utils studio            # then open http://localhost:8765
+```
+
+See [docs/studio.md](docs/studio.md) for the options, Earthdata Login and the
+hosted interface.
+
 ## DISP-S1 Usage examples
 
 ### Try it out!

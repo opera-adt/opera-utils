@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OPERA Studio</title>
+  <link rel="icon" type="image/png" href="opera-favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div id="map" aria-label="Map"></div>
+
+  <!-- Command panel -->
+  <aside id="dock" class="glass">
+    <header class="brand">
+      <span class="logo"><img src="opera-emblem.png" alt="OPERA" width="40" height="40" /></span>
+      <div>
+        <h1>OPERA Studio</h1>
+        <p class="tag">search · subset · download</p>
+      </div>
+    </header>
+
+    <div class="dock-scroll" id="dockScroll">
+      <section class="step">
+        <div class="step-h"><span class="num">01</span><h2>Product</h2></div>
+        <div class="products" id="products" role="tablist"></div>
+      </section>
+
+      <section class="step">
+        <div class="step-h"><span class="num">02</span><h2>Area</h2><span class="hint" id="aoiHint">draw on the map</span></div>
+        <div class="toolrow">
+          <button class="tool" data-draw="polygon" title="Draw a polygon (P)"><svg viewBox="0 0 24 24"><path d="M5 7l7-4 7 5-2 10H7z"/></svg>Polygon</button>
+          <button class="tool" data-draw="rectangle" title="Draw a rectangle (R)"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1.5"/></svg>Box</button>
+          <button class="tool" id="importBtn" title="Paste WKT, GeoJSON or a bounding box"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14"/></svg>Import</button>
+          <button class="tool ghost" id="clearAoi" title="Clear the area"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <div class="aoi-card" id="aoiCard" hidden>
+          <div><span class="k">area</span><span class="v mono" id="aoiArea">–</span></div>
+          <div><span class="k">bounds</span><span class="v mono small" id="aoiBounds">–</span></div>
+        </div>
+      </section>
+
+      <section class="step">
+        <div class="step-h"><span class="num">03</span><h2>Time &amp; filters</h2></div>
+        <div class="dates">
+          <label><span>From</span><input type="date" id="start" /></label>
+          <label><span>To</span><input type="date" id="end" /></label>
+        </div>
+        <div class="chips" id="dateChips">
+          <button data-range="90d">90 days</button>
+          <button data-range="1y">1 year</button>
+          <button data-range="3y">3 years</button>
+          <button data-range="all">All</button>
+        </div>
+        <div id="filters"></div>
+        <button class="primary" id="searchBtn"><span class="btn-label">Search</span><kbd>⏎</kbd></button>
+      </section>
+
+      <section class="step" id="resultsStep" hidden>
+        <div class="step-h"><span class="num">04</span><h2>Results</h2><span class="hint" id="resultHint"></span></div>
+        <div class="results-bar">
+          <label class="check"><input type="checkbox" id="selectAll" /><span>Select all</span></label>
+          <span class="mono small dim" id="searchTime"></span>
+        </div>
+        <div class="results" id="results"></div>
+      </section>
+
+      <section class="step" id="optionsStep" hidden>
+        <div class="step-h"><span class="num">05</span><h2>Output</h2></div>
+        <div id="options"></div>
+      </section>
+    </div>
+
+    <footer class="dock-foot" id="dockFoot" hidden>
+      <div class="sel-summary" id="selSummary"></div>
+      <button class="primary go" id="runBtn">Subset &amp; download</button>
+    </footer>
+  </aside>
+
+  <!-- Top-right cluster -->
+  <div id="topbar">
+    <div class="seg basemaps glass" id="basemaps">
+      <button data-bm="dark" class="on">Dark</button>
+      <button data-bm="satellite">Satellite</button>
+      <button data-bm="light">Light</button>
+    </div>
+    <button class="chip-btn glass" id="connectChip" hidden title="The OPERA Studio server on your machine"><span class="dot"></span><span class="conn-text">Local studio</span></button>
+    <button class="chip-btn glass" id="authChip"><span class="dot"></span><span id="authText">Earthdata</span></button>
+    <button class="chip-btn glass" id="jobsBtn"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Jobs<span class="badge" id="jobsBadge" hidden>0</span></button>
+  </div>
+
+  <!-- Reference layers -->
+  <section id="layers" class="glass">
+    <header><h2>Layers</h2><button class="icon" id="layersFold" aria-label="Collapse"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button></header>
+    <div class="layers-body">
+      <label class="lay"><input type="checkbox" data-layer-toggle="frames" /><i class="sw frames"></i><span>DISP-S1 frames<small>OPERA frame database</small></span></label>
+      <label class="lay"><input type="checkbox" data-layer-toggle="bursts" /><i class="sw bursts"></i><span>Sentinel-1 bursts<small>burst database · zoom in</small></span></label>
+      <label class="lay"><input type="checkbox" data-layer-toggle="nisar" /><i class="sw nisar"></i><span>NISAR frames<small>track · frame database</small></span></label>
+      <div class="lay-dir">
+        <span class="opt-label">Orbit direction</span>
+        <div class="seg small" id="layDir" role="group" aria-label="Orbit direction of frames and bursts">
+          <button data-d="both">Both</button><button data-d="ascending">Asc</button><button data-d="descending">Desc</button>
+        </div>
+        <small>applies to frames, bursts and NISAR frames</small>
+      </div>
+      <label class="switch depth-sw"><span>Colour by archive depth<small id="depthWhat">granules in CMR, in the date range</small></span><input type="checkbox" id="depthToggle" /></label>
+      <div class="ramp" id="ramp" hidden><div class="ramp-bar"></div><div class="ramp-ticks mono"><span>0</span><span id="rampMid"></span><span id="rampMax"></span></div></div>
+      <p class="lay-status mono" id="layStatus"></p>
+    </div>
+  </section>
+  <div id="hoverTip" hidden></div>
+
+  <!-- Archive timeline -->
+  <section id="timeline" class="glass" hidden>
+    <div class="insp-head">
+      <div class="insp-title"><span class="pill" id="tlPill">DISP-S1</span><h2 id="tlTitle"></h2></div>
+      <div class="insp-actions">
+        <button class="ghost-btn" id="tlUseArea">Use as area</button>
+        <button class="icon" id="tlClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+    </div>
+    <div class="tl-stats mono small" id="tlStats"></div>
+    <div id="tlChart" class="chart"></div>
+  </section>
+
+  <!-- Draw helper -->
+  <div id="drawHint" class="glass" hidden></div>
+
+  <!-- Jobs drawer -->
+  <aside id="drawer" class="glass" aria-hidden="true">
+    <header>
+      <h2>Jobs</h2>
+      <span class="dim small mono" id="workdir"></span>
+      <button class="icon" id="closeDrawer" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </header>
+    <div class="jobs" id="jobs"><p class="empty">No jobs yet. Search, pick results, then <b>Subset &amp; download</b>.</p></div>
+  </aside>
+
+  <!-- DISP inspector -->
+  <section id="inspector" class="glass" hidden>
+    <div class="insp-head">
+      <div class="insp-title">
+        <span class="pill disp">DISP-S1</span>
+        <h2 id="inspTitle">Explore</h2>
+        <div class="frame-tabs" id="frameTabs"></div>
+      </div>
+      <div class="insp-actions">
+        <button class="ghost-btn" id="csvBtn" disabled>CSV</button>
+        <button class="icon" id="closeInsp" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+    </div>
+    <div class="insp-body">
+      <div class="insp-side">
+        <div class="legend">
+          <div class="legend-bar"></div>
+          <div class="legend-ticks mono"><span id="legMin"></span><span>0</span><span id="legMax"></span></div>
+          <div class="legend-cap"><span>away</span><span>velocity, mm/yr (LOS)</span><span>toward</span></div>
+        </div>
+        <label class="slider"><span>Colour range <b class="mono" id="vmaxVal"></b></span><input type="range" id="vmax" min="1" max="100" step="0.5" /></label>
+        <label class="slider"><span>Hide coherence below <b class="mono" id="cohVal"></b></span><input type="range" id="minCoh" min="0" max="0.95" step="0.05" value="0" /></label>
+        <label class="slider"><span>Opacity <b class="mono" id="opVal"></b></span><input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.85" /></label>
+        <div class="ref-card" id="refCard"></div>
+        <div class="seg small" id="refModes">
+          <button data-ref="pick">Pick on map</button>
+          <button data-ref="auto">Most coherent</button>
+          <button data-ref="area">Area median</button>
+        </div>
+      </div>
+      <div class="insp-chart">
+        <div class="chart-top">
+          <div class="series-toggles" id="seriesToggles">
+            <label class="tg ref"><input type="checkbox" data-s="referenced" checked /><i></i>Re-referenced to point</label>
+            <label class="tg reb"><input type="checkbox" data-s="rebased" /><i></i>Rebased (area median)</label>
+            <label class="tg raw"><input type="checkbox" data-s="raw" checked /><i></i>Raw · moving reference date</label>
+          </div>
+          <div class="chart-stats mono small" id="chartStats"></div>
+        </div>
+        <div id="chart" class="chart"><p class="empty">Click the map inside the frame to plot a time series.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modals -->
+  <dialog id="authDlg" class="modal">
+    <form method="dialog" id="authForm">
+      <header><h2>Earthdata Login</h2><button class="icon" value="cancel" formnovalidate aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+      <p class="dim" id="authNow"></p>
+      <label class="field"><span>Username</span><input name="username" autocomplete="username" required /></label>
+      <label class="field"><span>Password</span><input name="password" type="password" autocomplete="current-password" required /></label>
+      <label class="check"><input type="checkbox" name="remember" /><span>Remember on this machine <small class="dim">(saved by the studio with 0600 permissions; your ~/.netrc is never changed)</small></span></label>
+      <p class="err" id="authErr" hidden></p>
+      <footer>
+        <a class="dim small" href="https://urs.earthdata.nasa.gov/users/new" target="_blank" rel="noopener">Create an account ↗</a>
+        <span class="grow"></span>
+        <button type="button" class="ghost-btn" id="signOut" hidden>Sign out</button>
+        <button class="primary" id="authSubmit" value="default">Sign in</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="connectDlg" class="modal wide">
+    <form method="dialog" id="connectForm">
+      <header><h2>Connect to OPERA Studio</h2><button class="icon" value="cancel" formnovalidate aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+      <p class="dim">This page is the studio's interface. Searching, downloads, rebasing and your Earthdata login run in a small server on <b>your own machine</b>; nothing goes through this website.</p>
+      <ol class="steps">
+        <li>Install opera-utils with the studio's dependencies:<pre><code>pip install "opera-utils[studio]"</code></pre></li>
+        <li>Start the studio and let this page talk to it:<pre><code>opera-utils studio --allow-origin <span id="pagesOrigin"></span></code></pre></li>
+        <li>Connect below. If the browser asks to let this site <i>access other apps and services on this device</i>, choose <b>Allow</b>: that is how the page reaches the studio on your machine.</li>
+      </ol>
+      <label class="field"><span>Studio address</span><input id="serverUrl" placeholder="http://localhost:8765" /></label>
+      <p class="err" id="connectErr" hidden></p>
+      <footer><span class="dim small">Or open the address the command prints, which needs no --allow-origin.</span><span class="grow"></span><button class="primary" value="default">Connect</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="importDlg" class="modal">
+    <form method="dialog" id="importForm">
+      <header><h2>Import an area</h2><button class="icon" value="cancel" formnovalidate aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+      <p class="dim">Paste WKT, GeoJSON or <span class="mono">west, south, east, north</span>, or drop a .geojson / .wkt file.</p>
+      <textarea id="importText" rows="7" spellcheck="false" placeholder="POLYGON((-118.4 34.0, -118.2 34.0, -118.2 34.1, -118.4 34.1, -118.4 34.0))"></textarea>
+      <p class="err" id="importErr" hidden></p>
+      <footer><input type="file" id="importFile" accept=".geojson,.json,.wkt,.txt" /><span class="grow"></span><button class="primary" value="default">Use area</button></footer>
+    </form>
+  </dialog>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
