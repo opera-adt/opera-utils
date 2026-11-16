@@ -83,6 +83,8 @@ nisar = [
   "s3fs",
   "tqdm",
 ]
+# OPERA Studio web UI (`opera-utils studio`)
+studio = ["opera-utils[tropo,asf,disp,geopandas]"]
 all = ["opera-utils[tropo,asf,disp,geopandas,nisar]"]
 
 test = [
@@ -165,6 +167,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "src/opera_utils/cli.py" = ["PLC0415"]
+# studio: optional heavy dependencies are imported where used; http.server
+# dictates the do_GET-style handler names.
+"src/opera_utils/studio/**" = ["PLC0415", "N802"]
 "src/opera_utils/missing_data.py" = ["PLC0415"]
 "**/__init__.py" = ["F401", "F403"]
 "tests/**" = [

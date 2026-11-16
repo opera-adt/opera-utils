@@ -6,6 +6,7 @@ import json
 import logging
 from collections.abc import Callable
 from functools import partial
+from pathlib import Path
 
 import tyro
 
@@ -135,6 +136,54 @@ def missing_data_options(
             f.write("\n")
 
 
+def studio(
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    workdir: Path = Path("./opera-studio"),
+    allow_origin: tuple[str, ...] = (),
+    nisar_frames: Path | None = None,
+    max_running: int = 2,
+    open_browser: bool = False,
+) -> None:
+    """Start OPERA Studio: a web UI to search, subset and download OPERA products.
+
+    Parameters
+    ----------
+    host : str
+        Interface to bind. Keep 127.0.0.1: the server holds your Earthdata login.
+    port : int
+        Port to serve on.
+    workdir : Path
+        Where job folders (downloads, stacks, GeoTIFFs) are written.
+    allow_origin : tuple[str, ...]
+        Web origins allowed to use this server, e.g. the hosted interface on
+        GitHub Pages (``https://<user>.github.io``).
+    nisar_frames : Path, optional
+        NISAR track-frame GeoPackage (``NISAR_TrackFrame_*.gpkg``) for the real
+        NISAR frame outlines.
+    max_running : int
+        Jobs running at once.
+    open_browser : bool
+        Open the studio in a web browser.
+
+    """
+    from opera_utils.studio.server import serve
+
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
+    serve(
+        host,
+        port,
+        workdir,
+        open_browser,
+        max_running,
+        nisar_frames,
+        allow_origin,
+    )
+
+
 def cli_app() -> None:
     """opera-utils command-line interface."""
     # Use subcommand_cli_from_dict to handle the top-level commands
@@ -147,6 +196,7 @@ def cli_app() -> None:
         "disp-s1-frame-bbox": frame_bbox,
         "disp-s1-intersects": intersects,
         "disp-s1-missing-data-options": missing_data_options,
+        "studio": studio,
     }
     try:
         from opera_utils.disp._download import run_download

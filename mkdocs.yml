@@ -48,6 +48,7 @@ nav:
 - getting-started.md
 - tutorials.md
 - how-to-guides.md
+- studio.md
 # https://mkdocstrings.github.io/recipes/#generate-a-literate-navigation-file
 # trailing slash: that mkdocs-literate-nav knows a summary.md file is in that folder.
 - Code Reference: reference/
