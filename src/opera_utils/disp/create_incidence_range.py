@@ -62,8 +62,8 @@ def create_incidence_angle_raster(
             # Set the units attribute as degrees
             dst.units = ["degrees"]
             dst.descriptions = [
-                "Incidence angle between the line-of-sight (LOS) vector and the normal"
-                " to the ellipsoid at the target"
+                ("Incidence angle between the line-of-sight (LOS) vector and the normal"
+                " to the ellipsoid at the target")
             ]
 
 
