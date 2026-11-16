@@ -50,7 +50,7 @@ def get_dates(filename: Filename, fmt: str = DATE_FORMAT) -> list[datetime.datet
     >>> get_dates("/not/a/date_named_file.tif")
     []
 
-    """  # noqa: E501
+    """  # ruff: ignore[line-too-long]
     path = _get_path_from_gdal_str(filename)
     pattern = _date_format_to_regex(fmt)
     date_list = re.findall(pattern, path.name)
