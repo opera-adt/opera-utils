@@ -53,7 +53,9 @@ class FakeCMR:
             if c not in self.hidden
         ]
 
-    def get(self, url, params=None, headers=None, timeout=0):  # ruff: ignore[unused-method-argument]
+    def get(
+        self, url, params=None, headers=None, timeout=0
+    ):
         assert timeout > 0
         if self.failures:
             failure = self.failures.pop(0)
